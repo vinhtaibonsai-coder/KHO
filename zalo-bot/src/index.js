@@ -213,33 +213,104 @@ async function handleGroupMessage(api, message) {
     `[msg] "${text}" từ "${name || groupId}" -> ${label}: ${res.ok ? "OK" : "LỖI"}${res.message?.detail ? " - " + res.message.detail : ""}`
   );
 
-  // CẢNH BÁO TRÙNG MÃ: Trả lời trực tiếp vào nhóm Zalo để người gửi biết ngay
-  try {
-    if (res.duplicate && res.message?.detail) {
-      // Trường hợp gửi 1 mã bị trùng
-      await api.sendMessage(
-        `⚠️ ${res.message.detail}`,
-        groupId,
-        ThreadType.Group
-      );
-      console.log(`[bot-reply] Đã gửi cảnh báo trùng mã vào nhóm ${name || groupId}`);
-    } else if (Array.isArray(res.duplicates) && res.duplicates.length > 0) {
-      // Trường hợp gửi danh sách nhiều mã có mã bị trùng
-      const dupList = res.duplicates.join(", ");
-      await api.sendMessage(
-        `⚠️ CẢNH BÁO TRÙNG MÃ: Các mã sau đã có ở kho khác nên bị bỏ qua:\n👉 ${dupList}`,
-        groupId,
-        ThreadType.Group
-      );
-      console.log(`[bot-reply] Đã gửi cảnh báo danh sách trùng vào nhóm ${name || groupId}`);
+  // CẢNH BÁO TRÙNG MÃ & TỰ ĐỘNG THU HỒI / XÓA TIN NHẮN TRÙNG TRONG NHÓM
+  const hasDuplicate = res.duplicate || (Array.isArray(res.duplicates) && res.duplicates.length > 0);
+
+  if (hasDuplicate) {
+    // 1. TỰ ĐỘNG XÓA / THU HỒI TIN NHẮN TRÙNG KHỎI NHÓM ZALO
+    try {
+      const msgId = message.data?.msgId || message.msgId;
+      const cliMsgId = message.data?.cliMsgId || message.cliMsgId;
+      const uidFrom = message.data?.uidFrom || message.uidFrom || "";
+
+      let deleted = false;
+
+      // Nếu là chính tài khoản Bot gửi -> Thu hồi tin nhắn (Undo)
+      if (message.isSelf && api.undo && msgId && cliMsgId) {
+        await api.undo({ msgId, cliMsgId }, groupId, ThreadType.Group);
+        console.log(`[bot-delete] Đã THU HỒI tin nhắn trùng (${text}) khỏi nhóm ${name || groupId}`);
+        deleted = true;
+      } 
+      
+      // Nếu là người khác gửi (Bot là Admin/Phó nhóm) hoặc fallback -> Xóa tin nhắn (deleteMessage)
+      if (!deleted && api.deleteMessage && msgId && cliMsgId) {
+        await api.deleteMessage({
+          data: { cliMsgId: String(cliMsgId), msgId: String(msgId), uidFrom: String(uidFrom) },
+          threadId: groupId,
+          type: ThreadType.Group,
+        }, false); // onlyMe = false (xóa phía tất cả mọi người trong nhóm)
+        console.log(`[bot-delete] Đã XÓA tin nhắn trùng (${text}) của thành viên khỏi nhóm ${name || groupId}`);
+      }
+    } catch (delErr) {
+      console.warn(`[bot-delete] Không xóa được tin nhắn trong nhóm (Có thể tài khoản chưa được phân quyền Trưởng/Phó nhóm): ${delErr.message}`);
     }
-  } catch (replyErr) {
-    console.error("[bot-reply] Không gửi được tin nhắn phản hồi vào nhóm Zalo:", replyErr.message);
+
+    // 2. GỬI BÁO CÁO CHI TIẾT RIÊNG VÀO "CLOUD CỦA TÔI" (MY DOCUMENTS)
+    try {
+      const ownId = api.getOwnId ? api.getOwnId() : null;
+
+      if (res.duplicate && res.message?.detail) {
+        const warningText = `🚫 [KHO ${pad(warehouse)} - ĐÃ XÓA TIN NHẮN TRÙNG]\n${res.message.detail}\n👉 Nội dung vi phạm: "${text}"\n(Đã tự động xóa khỏi nhóm "${name || groupId}" để tránh người khác tìm nhầm)`;
+        
+        if (ownId) {
+          await api.sendMessage(warningText, ownId, ThreadType.User);
+          console.log(`[bot-reply] Đã gửi thông báo xóa tin trùng vào "Cloud của tôi" (UID: ${ownId})`);
+        }
+      } else if (Array.isArray(res.duplicates) && res.duplicates.length > 0) {
+        const dupList = res.duplicates.join("\n👉 ");
+        const warningText = `🚫 [KHO ${pad(warehouse)} - CẢNH BÁO TRÙNG MÃ]\nCác mã sau đã tồn tại ở kho khác nên bị từ chối:\n👉 ${dupList}\n👉 Nội dung: "${text}"\n(Phát hiện trong nhóm "${name || groupId}")`;
+        
+        if (ownId) {
+          await api.sendMessage(warningText, ownId, ThreadType.User);
+          console.log(`[bot-reply] Đã gửi thông báo danh sách trùng vào "Cloud của tôi" (UID: ${ownId})`);
+        }
+      }
+    } catch (replyErr) {
+      console.error("[bot-reply] Không gửi được tin cảnh báo vào My Documents:", replyErr.message);
+    }
+  }
+}
+
+async function handleDirectMessage(api, message) {
+  let text = "";
+  if (typeof message.data?.content === "string") {
+    text = message.data.content.trim();
+  } else if (typeof message.data === "string") {
+    text = message.data.trim();
+  } else if (message.data?.content?.title) {
+    text = String(message.data.content.title).trim();
+  }
+
+  if (!text) return;
+
+  const ownId = api.getOwnId ? api.getOwnId() : null;
+  const isMyDocs = message.threadId === ownId || message.isSelf;
+
+  // Kiểm tra cú pháp lệnh chuyển kho (CK ... hoặc CHUYEN ...)
+  const isTransfer = /^(?:CK|CHUYEN|CHUYENKHO)\s+/i.test(text);
+
+  if (isTransfer) {
+    console.log(`[my-docs] Nhận lệnh chuyển kho: "${text}"`);
+    const res = await forward("MY_DOCS", text);
+
+    if (res.isTransfer && res.message?.detail) {
+      const replyMsg = res.ok
+        ? `✅ THÀNH CÔNG:\n${res.message.detail}`
+        : `❌ THẤT BẠI:\n${res.message.detail}`;
+      
+      try {
+        if (ownId) {
+          await api.sendMessage(replyMsg, ownId, ThreadType.User);
+        }
+      } catch (err) {
+        console.error("[my-docs] Lỗi gửi phản hồi kết quả chuyển kho:", err.message);
+      }
+    }
   }
 }
 
 function startListener(api) {
-  api.listener.on("connected", () => console.log("[ws] Đã kết nối, đang nghe tin nhắn 30 nhóm..."));
+  api.listener.on("connected", () => console.log("[ws] Đã kết nối, đang nghe tin nhắn 30 nhóm & Cloud của tôi..."));
   api.listener.on("disconnected", (code, reason) => console.error(`[ws] Mất kết nối (${code}): ${reason}`));
   api.listener.on("error", (err) => console.error("[ws] Lỗi:", err));
   api.listener.on("message", (message) => {
@@ -249,8 +320,11 @@ function startListener(api) {
       const sender = message?.isSelf ? "CHÍNH BẠN" : (message?.data?.dName || message?.data?.uidFrom || "Ai đó");
       console.log(`[debug-raw] Nhận tin: [${sender}] type=${message?.type}, threadId=${message?.threadId}, isSelf=${message?.isSelf}, content="${text}"`);
       
-      if (message.type !== ThreadType.Group) return;
-      handleGroupMessage(api, message).catch((err) => console.error("[msg] Lỗi xử lý:", err.message));
+      if (message.type === ThreadType.Group) {
+        handleGroupMessage(api, message).catch((err) => console.error("[msg] Lỗi xử lý:", err.message));
+      } else if (message.type === ThreadType.User) {
+        handleDirectMessage(api, message).catch((err) => console.error("[direct-msg] Lỗi xử lý:", err.message));
+      }
     } catch (err) {
       console.error("[msg] Lỗi bóc tách tin nhắn:", err.message);
     }

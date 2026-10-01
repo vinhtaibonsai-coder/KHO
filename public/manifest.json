@@ -1,0 +1,24 @@
+{
+  "name": "Định Vị 30 Ô Kho",
+  "short_name": "Kho 30",
+  "description": "Hệ thống quản lý và định vị 30 ô kho sản phẩm độc bản",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#059669",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

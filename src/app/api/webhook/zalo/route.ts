@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addQty, pushMessage, removeItem, upsertItem, findItem } from "@/lib/store";
+import { addQty, pushMessage, removeItem, upsertItem, findItem, transferItem, TOTAL_WAREHOUSES } from "@/lib/store";
 import { validateSku, extractValidSkusFromText } from "@/lib/sku-rules";
 import type { ZaloMessage } from "@/types";
 
@@ -10,6 +10,26 @@ function parseWarehouse(groupId: string): number | null {
   if (!m) return null;
   const n = parseInt(m[1], 10);
   return n >= 1 && n <= 30 ? n : null;
+}
+
+// Bóc tách cú pháp chuyển kho: CK E120.124 -> 5, CHUYEN E120.124 QUA KHO 5, CK E120.124 KHO 5, v.v.
+function parseTransferCommand(text: string): { sku: string; toWarehouse: number } | null {
+  const clean = text.trim();
+  // Khớp các mẫu:
+  // 1. CK E120.124 5  hoặc  CK E120.124 K5  hoặc  CK E120.124 KHO 5
+  // 2. CK E120.124 -> 5  hoặc  CK E120.124 > 5
+  // 3. CHUYEN E120.124 QUA KHO 5  hoặc  CHUYEN E120.124 SANG KHO 5
+  const m = clean.match(/^(?:CK|CHUYEN|CHUYENKHO)\s+([A-Za-z0-9.]+)\s*(?:->|>|QUA|SANG|DEN|TO)?\s*(?:KHO|K)?\s*(\d{1,2})$/i);
+  if (!m) return null;
+
+  const rawSku = m[1].trim();
+  const toWh = parseInt(m[2], 10);
+
+  const val = validateSku(rawSku);
+  const sku = val.valid ? val.normalizedSku : rawSku.toUpperCase();
+
+  if (toWh < 1 || toWh > TOTAL_WAREHOUSES) return null;
+  return { sku, toWarehouse: toWh };
 }
 
 function parseMessage(text: string): { action: "in" | "out" | "assign"; sku: string; qty: number; error?: string } | null {
@@ -63,6 +83,35 @@ export async function POST(req: Request) {
   }
 
   try {
+    // 0. XỬ LÝ LỆNH CHUYỂN KHO (Có thể gửi từ My Documents hoặc bất kỳ đâu)
+    const transferCmd = parseTransferCommand(body.message);
+    if (transferCmd) {
+      const { sku, toWarehouse } = transferCmd;
+      const result = await transferItem(sku, toWarehouse, "Chuyển kho qua tin nhắn Zalo");
+
+      const msg: ZaloMessage = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        groupId: body.groupId,
+        warehouse: toWarehouse,
+        message: body.message,
+        status: result.success ? "ok" : "error",
+        detail: result.success
+          ? `Đã chuyển mã [${sku}] từ Kho ${result.fromWarehouse} sang Kho ${toWarehouse} thành công!`
+          : (result.error || "Không thể chuyển kho"),
+        createdAt: new Date().toISOString(),
+      };
+      await pushMessage(msg);
+
+      return NextResponse.json({
+        ok: result.success,
+        isTransfer: true,
+        message: msg,
+        sku,
+        fromWarehouse: result.fromWarehouse,
+        toWarehouse,
+        error: result.error,
+      }, { status: result.success ? 200 : 400 });
+    }
     const warehouse = parseWarehouse(body.groupId);
     if (!warehouse) {
       const msg: ZaloMessage = {
