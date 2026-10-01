@@ -1,0 +1,90 @@
+Vercel CLI 61.1.0 (Node.js 24.16.0)
+> Not authenticated. Deploying anonymously.
+> Building your project locally…
+Installing dependencies...
+
+up to date in 2s
+
+140 packages are looking for funding
+  run `npm fund` for details
+Detected Next.js version: 15.5.26
+Running "npm run build"
+
+> kho-30-warehouse@0.1.0 build
+> next build
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+   ▲ Next.js 15.5.26
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 12.3s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/5) ...
+   Generating static pages (1/5) 
+   Generating static pages (2/5) 
+   Generating static pages (3/5) 
+ ✓ Generating static pages (5/5)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                     5.5 kB         108 kB
+├ ○ /_not-found                            990 B         104 kB
+└ ƒ /api/webhook/zalo                      123 B         103 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/255-2dbbf79f36f0dfa2.js       46.4 kB
+  ├ chunks/4bd1b696-c023c6e3521b1417.js  54.2 kB
+  └ other shared chunks (total)          1.96 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+Traced Next.js server files in: 126.551ms
+Tracing entries due to missing build traces:
+[
+  "C:/Users/Administrator/Downloads/TEST/.next/server/app/_not-found/page.js",
+  "C:/Users/Administrator/Downloads/TEST/.next/server/app/favicon.ico/route.js",
+  "C:/Users/Administrator/Downloads/TEST/.next/server/app/api/webhook/zalo/route.js"
+]: 2.872s
+Created all serverless functions in: 3.050s
+Collected static files (public/, static/, .next/static): 14.889ms
+Deploying anonymous/prj_66TGekizQOaoV5QqEHBjdF6c5BjU
+Uploading [--------------------] (0.0B/1MB)
+Uploading [=====---------------] (265.9KB/1MB)
+Uploading [==========----------] (527.4KB/1MB)
+Uploading [===============-----] (783.4KB/1MB)
+Uploading [====================] (1.0MB/1MB)
+Building…
+
+▲ Temporary       https://temporary-snappy-zircon-j1w0vym.vercel.app
+{
+  "status": "ok",
+  "deployment": {
+    "id": "dpl_8pbFJgaWotQCyMVbryrcfCTAEwcw",
+    "url": "https://temporary-snappy-zircon-j1w0vym.vercel.app",
+    "productionUrl": null,
+    "inspectorUrl": null,
+    "readyState": "READY",
+    "target": "production",
+    "deploymentApiUrl": "https://api.vercel.com/v13/deployments/dpl_8pbFJgaWotQCyMVbryrcfCTAEwcw",
+    "expiresAt": 1790771437425,
+    "claimUrl": "https://vercel.com/claim-deployment?code=661adaaa-9baf-4691-a30a-b674853964e4"
+  },
+  "message": "Anonymous deployment temporary-snappy-zircon-j1w0vym.vercel.app ready. It expires in 59 minutes. Claim it at https://vercel.com/claim-deployment?code=661adaaa-9baf-4691-a30a-b674853964e4 to keep it.",
+  "next": [
+    {
+      "command": "vercel deploy --temporary",
+      "when": "Redeploy changes to the same anonymous deployment"
+    },
+    {
+      "command": "vercel login",
+      "when": "Create an account to keep deploying"
+    }
+  ]
+}

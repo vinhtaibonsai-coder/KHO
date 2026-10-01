@@ -1,0 +1,21 @@
+{
+  "name": "zalo-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Worker bot Zalo: quét QR đăng nhập, nghe tin nhắn 30 nhóm, chuyển tiếp về webhook Next.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "sync-history": "node src/sync-history.js",
+    "selftest": "node src/index.js --selftest"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0",
+    "qrcode-terminal": "^0.12.0",
+    "zca-js": "^2.2.0"
+  }
+}

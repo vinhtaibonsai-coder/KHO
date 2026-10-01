@@ -1,0 +1,384 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { 
+  Boxes, 
+  MapPin, 
+  PackageSearch, 
+  RefreshCw, 
+  CheckCircle2, 
+  AlertCircle,
+  Warehouse,
+  History
+} from "lucide-react";
+import SearchBar from "@/components/SearchBar";
+import WarehouseDetailModal from "@/components/WarehouseDetailModal";
+import WarehouseGrid from "@/components/WarehouseGrid";
+import ZaloSimulator from "@/components/ZaloSimulator";
+import ZaloLiveFeed from "@/components/ZaloLiveFeed";
+import PasteImportModal from "@/components/PasteImportModal";
+import { ClipboardPaste } from "lucide-react";
+import { getSupabase } from "@/lib/supabase";
+import type { Item, ItemsResponse, ZaloMessage, ItemHistory } from "@/types";
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const fmt = (iso: string) => {
+  const d = new Date(iso);
+  return `${pad(d.getHours())}:${pad(d.getMinutes())} - ${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+};
+
+type Effect = { action: "in" | "out" | "assign"; sku: string; warehouse: number; qty: number };
+
+function applyEffect(list: Item[], e: Effect): Item[] {
+  const now = new Date().toISOString();
+  const idx = list.findIndex((i) => i.sku === e.sku);
+  if (e.action === "out") {
+    return idx < 0 ? list : list.filter((_, i) => i !== idx);
+  }
+  if (idx >= 0) {
+    return list.map((it, i) =>
+      i === idx
+        ? {
+            ...it,
+            warehouse: e.warehouse,
+            qty: e.action === "in" ? it.qty + e.qty : it.qty,
+            updatedAt: now,
+          }
+        : it
+    );
+  }
+  return [
+    ...list,
+    {
+      sku: e.sku,
+      name: "Hàng độc bản",
+      warehouse: e.warehouse,
+      qty: 1,
+      updatedAt: now,
+    },
+  ];
+}
+
+export default function Home() {
+  const [items, setItems] = useState<Item[]>([]);
+  const [messages, setMessages] = useState<ZaloMessage[]>([]);
+  const [history, setHistory] = useState<ItemHistory[]>([]);
+  const [query, setQuery] = useState("");
+  const [openWarehouse, setOpenWarehouse] = useState<number | null>(null);
+  const [isPasteOpen, setIsPasteOpen] = useState(false);
+  const [defaultPasteWarehouse, setDefaultPasteWarehouse] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = () => {
+    fetch("/api/items", { cache: "no-store" })
+      .then((r) => r.json() as Promise<ItemsResponse>)
+      .then((data) => {
+        setItems(data.items || []);
+        setMessages(data.messages || []);
+        setHistory(data.history || []);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Không thể đồng bộ dữ liệu kho");
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Lắng nghe Realtime của Supabase: có mã mới là giao diện tự nhảy số
+  useEffect(() => {
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const channel = sb
+      .channel("kho-30-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "warehouse_items" }, () => {
+        fetchData();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "warehouse_history" }, () => {
+        fetchData();
+      })
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "zalo_messages" },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          const msg: ZaloMessage = {
+            id: String(row.id),
+            groupId: String(row.group_id),
+            warehouse: (row.warehouse as number | null) ?? null,
+            message: String(row.message),
+            status: (row.status as "ok" | "error") ?? "ok",
+            detail: String(row.detail ?? ""),
+            createdAt: String(row.created_at),
+          };
+          setMessages((prev) =>
+            prev.some((m) => m.id === msg.id) ? prev : [msg, ...prev].slice(0, 50)
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      sb.removeChannel(channel);
+    };
+  }, []);
+
+  const found = useMemo(() => {
+    const code = query.trim().toUpperCase();
+    if (!code) return null;
+    return items.find((i) => i.sku.includes(code)) ?? null;
+  }, [items, query]);
+
+  async function removeSku(sku: string) {
+    const res = await fetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "remove", sku, note: "Xuất kho từ modal chi tiết" }),
+    });
+    if (res.ok) {
+      setItems((list) => list.filter((i) => i.sku !== sku));
+      fetchData();
+    }
+  }
+
+  async function transferSku(sku: string, toWarehouse: number) {
+    const res = await fetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "transfer", sku, toWarehouse }),
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      fetchData();
+    } else {
+      alert(data.error || "Không thể chuyển kho");
+    }
+  }
+
+  async function onWebhook(payload: { groupId: string; message: string }) {
+    const res = await fetch("/api/webhook/zalo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    setMessages((m) => [data.message as ZaloMessage, ...m].slice(0, 50));
+    if (data.ok) setItems((list) => applyEffect(list, data.effect as Effect));
+    return data as { ok: boolean; message: ZaloMessage };
+  }
+
+  // Thống kê số lượng ô kho đang có hàng
+  const occupiedWarehouses = useMemo(() => {
+    const set = new Set(items.map((i) => i.warehouse));
+    return set.size;
+  }, [items]);
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col antialiased selection:bg-emerald-100 selection:text-emerald-900">
+      
+      {/* TOPBAR / HEADER THEO CHUẨN DESIGN SYSTEM SÁNG */}
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-xs">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm ring-1 ring-slate-800">
+              <Boxes className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold text-slate-900 tracking-tight sm:text-lg">
+                  HỆ THỐNG ĐỊNH VỊ 30 Ô KHO
+                </h1>
+                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
+                  Độc bản
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 font-medium hidden sm:block">
+                Tra cứu vị trí mã sản phẩm tức thời · Tự động đọc tin nhắn từ 30 nhóm Zalo
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-1.5 border border-slate-200 text-xs font-medium text-slate-600">
+              <span>Đang chứa: <strong className="font-mono text-slate-900 font-bold">{items.length}</strong> mã</span>
+              <span className="text-slate-300">|</span>
+              <span><strong className="text-emerald-600 font-bold">{occupiedWarehouses}</strong>/30 kho</span>
+            </div>
+
+            {/* NÚT DÁN ĐOẠN CHAT ZALO */}
+            <button
+              type="button"
+              onClick={() => {
+                setDefaultPasteWarehouse(1);
+                setIsPasteOpen(true);
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
+              title="Dán đoạn chat Zalo để bóc tách mã nạp vào kho"
+            >
+              <ClipboardPaste className="h-4 w-4 text-emerald-600" />
+              <span className="hidden sm:inline">Dán Đoạn Chat Zalo</span>
+              <span className="sm:hidden">Dán Chat</span>
+            </button>
+
+            <button
+              onClick={fetchData}
+              title="Làm mới dữ liệu"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-xs"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* NỘI DUNG CHÍNH */}
+      <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-6 sm:px-6">
+        
+        {error && (
+          <div className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+            <p className="font-medium">{error}</p>
+          </div>
+        )}
+
+        {/* SECTION 1: THANH TÌM KIẾM TRA CỨU ĐỈNH CAO */}
+        <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PackageSearch className="h-5 w-5 text-emerald-600" />
+              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                Tra Cứu Nhanh Vị Trí Sản Phẩm
+              </h2>
+            </div>
+            <span className="text-xs text-slate-400">1 Mã = Duy nhất 1 Vị trí</span>
+          </div>
+
+          <SearchBar value={query} onChange={setQuery} />
+
+          {/* BANNER THÔNG BÁO KẾT QUẢ TÌM KIẾM */}
+          {query.trim() && (
+            found ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border-2 border-emerald-500 bg-emerald-50/80 px-5 py-4 shadow-sm">
+                <div className="flex items-center gap-3.5">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-baseline gap-2">
+                      <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wide">
+                        Đã tìm thấy vị trí:
+                      </span>
+                      <span className="font-mono text-lg sm:text-xl font-bold text-slate-900 tracking-wider">
+                        {found.sku}
+                      </span>
+                      <span className="text-xs text-slate-500 font-medium">
+                        (Nhập lúc {fmt(found.updatedAt)})
+                      </span>
+                    </div>
+                    <div className="text-sm text-slate-700 font-medium mt-0.5">
+                      Sản phẩm hiện đang nằm cố định tại:{" "}
+                      <span className="inline-flex items-center gap-1 font-black text-emerald-700 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 text-base">
+                        KHO {pad(found.warehouse)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setOpenWarehouse(found.warehouse)}
+                  className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition active:scale-95 shrink-0"
+                >
+                  <Warehouse className="h-4 w-4" />
+                  Mở Kho {pad(found.warehouse)}
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-center text-sm font-semibold text-rose-700">
+                KHÔNG TÌM THẤY MÃ SẢN PHẨM &quot;<span className="font-mono">{query.trim().toUpperCase()}</span>&quot; TRONG HỆ THỐNG 30 KHO
+              </div>
+            )
+          )}
+        </section>
+
+        {/* SECTION 2: SƠ ĐỒ LƯỚI 30 Ô KHO TRỰC QUAN */}
+        <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Warehouse className="h-5 w-5 text-slate-700" />
+              <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                Sơ Đồ 30 Ô Kho Vận Hành
+              </h2>
+              <span className="text-xs text-slate-400">(Nhấp vào ô kho để xem danh sách mã bên trong)</span>
+            </div>
+
+            <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-md bg-slate-100 border border-slate-300"></span> Trống
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-md bg-emerald-50 border border-emerald-300"></span> Có hàng
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-3 w-3 rounded-md bg-emerald-500 ring-2 ring-emerald-300"></span> Đang chọn
+              </span>
+            </div>
+          </div>
+
+          <WarehouseGrid
+            items={items}
+            highlight={found ? found.warehouse : null}
+            onSelect={setOpenWarehouse}
+          />
+        </section>
+
+        {/* SECTION 3: BẢNG TIN NHẬN DIỆN THỜI GIAN THỰC TỪ ZALO */}
+        <ZaloLiveFeed 
+          messages={messages} 
+          onOpenWarehouse={setOpenWarehouse} 
+        />
+
+        {/* SECTION 4: MÔ PHỎNG TEST TIN NHẮN */}
+        <ZaloSimulator messages={messages} onSend={onWebhook} items={items} />
+
+      </main>
+
+      {/* FOOTER */}
+      <footer className="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
+        Hệ Thống Quản Lý Kho Độc Bản · Giao diện UX/UI Pro Max Nền Sáng · Lưu trữ vĩnh viễn
+      </footer>
+
+      {/* MODAL CHI TIẾT Ô KHO */}
+      {openWarehouse !== null && (
+        <WarehouseDetailModal
+          warehouse={openWarehouse}
+          items={items}
+          history={history}
+          onClose={() => setOpenWarehouse(null)}
+          onRemove={removeSku}
+          onTransfer={transferSku}
+          onOpenPaste={(wh) => {
+            setDefaultPasteWarehouse(wh);
+            setIsPasteOpen(true);
+          }}
+        />
+      )}
+
+      {/* MODAL DÁN ĐOẠN CHAT ZALO ĐỂ BÓC TÁCH MÃ */}
+      <PasteImportModal
+        isOpen={isPasteOpen}
+        defaultWarehouse={defaultPasteWarehouse}
+        existingItems={items}
+        onClose={() => setIsPasteOpen(false)}
+        onSuccess={() => {
+          fetchData();
+        }}
+      />
+    </div>
+  );
+}

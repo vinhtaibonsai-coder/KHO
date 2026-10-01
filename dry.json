@@ -1,0 +1,2 @@
+Error: No existing credentials found. Run `vercel deploy --temporary` to create a temporary deployment you can claim later, or `vercel login` to log in.
+Learn More: https://err.sh/vercel/no-credentials-found

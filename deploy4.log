@@ -1,0 +1,87 @@
+Vercel CLI 61.1.0 (Node.js 24.16.0)
+> Not authenticated. Deploying anonymously.
+> Building your project locally…
+Installing dependencies...
+
+up to date in 2s
+
+140 packages are looking for funding
+  run `npm fund` for details
+Detected Next.js version: 15.5.26
+Running "npm run build"
+
+> kho-30-warehouse@0.1.0 build
+> next build
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+   ▲ Next.js 15.5.26
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 13.5s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/5) ...
+   Generating static pages (1/5) 
+   Generating static pages (2/5) 
+   Generating static pages (3/5) 
+ ✓ Generating static pages (5/5)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    6.25 kB         109 kB
+└ ○ /_not-found                            990 B         104 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/255-2dbbf79f36f0dfa2.js       46.4 kB
+  ├ chunks/4bd1b696-c023c6e3521b1417.js  54.2 kB
+  └ other shared chunks (total)          1.97 kB
+
+
+○  (Static)  prerendered as static content
+
+Traced Next.js server files in: 112.92ms
+Tracing entries due to missing build traces:
+[
+  "C:/Users/Administrator/Downloads/TEST/.next/server/app/_not-found/page.js",
+  "C:/Users/Administrator/Downloads/TEST/.next/server/app/favicon.ico/route.js"
+]: 3.054s
+Created all serverless functions in: 3.274s
+Collected static files (public/, static/, .next/static): 13.103ms
+Deploying anonymous/prj_Xr7djYuSV7RnTdWoahiiKwtqgset
+Uploading [--------------------] (0.0B/695.7KB)
+Uploading [=====---------------] (176.9KB/695.7KB)
+Uploading [==========----------] (351.9KB/695.7KB)
+Uploading [===============-----] (527.9KB/695.7KB)
+Uploading [====================] (695.7KB/695.7KB)
+Building…
+
+▲ Temporary       https://temporary-rapid-carbon-5kzoqxi.vercel.app
+{
+  "status": "ok",
+  "deployment": {
+    "id": "dpl_8m6noCfYxSwyATF6fSEKUb9MaxFR",
+    "url": "https://temporary-rapid-carbon-5kzoqxi.vercel.app",
+    "productionUrl": null,
+    "inspectorUrl": null,
+    "readyState": "READY",
+    "target": "production",
+    "deploymentApiUrl": "https://api.vercel.com/v13/deployments/dpl_8m6noCfYxSwyATF6fSEKUb9MaxFR",
+    "expiresAt": 1790771656424,
+    "claimUrl": "https://vercel.com/claim-deployment?code=7b6edd9f-122a-49d1-9cbf-a5b2dee78d47"
+  },
+  "message": "Anonymous deployment temporary-rapid-carbon-5kzoqxi.vercel.app ready. It expires in 59 minutes. Claim it at https://vercel.com/claim-deployment?code=7b6edd9f-122a-49d1-9cbf-a5b2dee78d47 to keep it.",
+  "next": [
+    {
+      "command": "vercel deploy --temporary",
+      "when": "Redeploy changes to the same anonymous deployment"
+    },
+    {
+      "command": "vercel login",
+      "when": "Create an account to keep deploying"
+    }
+  ]
+}

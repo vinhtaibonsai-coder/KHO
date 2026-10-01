@@ -1,0 +1,77 @@
+Vercel CLI 61.1.0 (Node.js 24.16.0)
+> Not authenticated. Deploying anonymously.
+> Building your project locally…
+Installing dependencies...
+
+up to date in 2s
+
+140 packages are looking for funding
+  run `npm fund` for details
+Detected Next.js version: 15.5.26
+Running "npm run build"
+
+> kho-30-warehouse@0.1.0 build
+> next build
+
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+   ▲ Next.js 15.5.26
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 13.6s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/5) ...
+   Generating static pages (1/5) 
+   Generating static pages (2/5) 
+   Generating static pages (3/5) 
+ ✓ Generating static pages (5/5)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    6.25 kB         109 kB
+├ ○ /_not-found                            990 B         104 kB
+├ ƒ /api/items                             127 B         103 kB
+└ ƒ /api/webhook/zalo                      127 B         103 kB
++ First Load JS shared by all             103 kB
+  ├ chunks/255-2dbbf79f36f0dfa2.js       46.4 kB
+  ├ chunks/4bd1b696-c023c6e3521b1417.js  54.2 kB
+  └ other shared chunks (total)          1.97 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+Traced Next.js server files in: 105.184ms
+Tracing entries due to missing build traces:
+[
+  "C:/Users/Administrator/Downloads/TEST/.next/server/app/_not-found/page.js",
+  "C:/Users/Administrator/Downloads/TEST/.next/server/app/favicon.ico/route.js",
+  "C:/Users/Administrator/Downloads/TEST/.next/server/app/api/items/route.js",
+  "C:/Users/Administrator/Downloads/TEST/.next/server/app/api/webhook/zalo/route.js"
+]: 2.837s
+Created all serverless functions in: 3.053s
+Collected static files (public/, static/, .next/static): 14.309ms
+Deploying anonymous/prj_DiiM9aTDYPtYZ2ls6smzMadoEf6w
+Uploading [--------------------] (0.0B/679.8KB)
+Uploading [=====---------------] (182.9KB/679.8KB)
+Uploading [==========----------] (355.4KB/679.8KB)
+Uploading [===============-----] (515.4KB/679.8KB)
+Uploading [====================] (679.8KB/679.8KB)
+Building…
+{
+  "status": "error",
+  "reason": "deploy_failed",
+  "message": "ENOENT: no such file or directory, stat '/vercel/path0/.vercel/output/functions/api/webhook/zalo.func'",
+  "next": [
+    {
+      "command": "vercel deploy --temporary",
+      "when": "retry deploy"
+    }
+  ]
+}
+Error: ENOENT: no such file or directory, stat '/vercel/path0/.vercel/output/functions/api/webhook/zalo.func'
