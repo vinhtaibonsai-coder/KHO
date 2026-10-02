@@ -12,10 +12,12 @@ export default function ZaloSimulator({
   messages,
   onSend,
   items = [],
+  totalWarehouses = 30,
 }: {
   messages: ZaloMessage[];
   onSend: (payload: { groupId: string; message: string }) => Promise<{ ok: boolean; message: ZaloMessage }>;
   items?: Item[];
+  totalWarehouses?: number;
 }) {
   const [group, setGroup] = useState("KHO_05");
   const [text, setText] = useState("+E120.124");
@@ -104,9 +106,9 @@ export default function ZaloSimulator({
           value={group}
           onChange={(e) => setGroup(e.target.value)}
           aria-label="Chọn nhóm Zalo"
-          className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 font-medium text-xs text-slate-800 outline-none focus:border-emerald-500 focus:bg-white"
+          className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 font-medium text-xs text-slate-800 outline-none focus:border-emerald-500 focus:bg-white cursor-pointer"
         >
-          {Array.from({ length: 30 }, (_, i) => i + 1).map((w) => (
+          {Array.from({ length: totalWarehouses }, (_, i) => i + 1).map((w) => (
             <option key={w} value={`KHO_${pad(w)}`}>
               Nhóm Zalo: Kho {pad(w)}
             </option>

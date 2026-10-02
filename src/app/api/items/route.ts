@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import {
   addQty,
+  addWarehouse,
   findItem,
   getHistory,
   getItems,
   getMessages,
+  getWarehouseCount,
+  markAllMessagesRead,
   removeItem,
-  TOTAL_WAREHOUSES,
   transferItem,
   upsertItem,
 } from "@/lib/store";
@@ -15,16 +17,17 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [items, messages, history] = await Promise.all([
+    const [items, messages, history, totalWarehouses] = await Promise.all([
       getItems(),
       getMessages(),
       getHistory(),
+      getWarehouseCount(),
     ]);
     return NextResponse.json({
       items,
       messages,
       history,
-      totalWarehouses: TOTAL_WAREHOUSES,
+      totalWarehouses,
     });
   } catch (err) {
     console.error("API GET /api/items lỗi:", err);
@@ -34,11 +37,29 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
-  if (!body?.sku || typeof body.sku !== "string") {
-    return NextResponse.json({ error: "Thiếu sku" }, { status: 400 });
+  if (!body) {
+    return NextResponse.json({ error: "Dữ liệu không hợp lệ" }, { status: 400 });
   }
 
   try {
+    // 1. Thêm kho mới
+    if (body.action === "add_warehouse") {
+      const newTotal = await addWarehouse();
+      return NextResponse.json({ ok: true, totalWarehouses: newTotal });
+    }
+
+    // 2. Đánh dấu tất cả thông báo đã đọc
+    if (body.action === "mark_all_read") {
+      await markAllMessagesRead();
+      return NextResponse.json({ ok: true });
+    }
+
+    const totalWarehouses = await getWarehouseCount();
+
+    if (!body.sku || typeof body.sku !== "string") {
+      return NextResponse.json({ error: "Thiếu sku" }, { status: 400 });
+    }
+
     if (body.action === "remove") {
       const note = typeof body.note === "string" ? body.note : "Xuất kho thủ công";
       const removed = await removeItem(body.sku, note);
@@ -50,8 +71,8 @@ export async function POST(req: Request) {
 
     if (body.action === "transfer") {
       const toWarehouse = Number(body.toWarehouse);
-      if (!Number.isInteger(toWarehouse) || toWarehouse < 1 || toWarehouse > TOTAL_WAREHOUSES) {
-        return NextResponse.json({ error: "Kho đích không hợp lệ (1-30)" }, { status: 400 });
+      if (!Number.isInteger(toWarehouse) || toWarehouse < 1 || toWarehouse > totalWarehouses) {
+        return NextResponse.json({ error: `Kho đích không hợp lệ (1-${totalWarehouses})` }, { status: 400 });
       }
       const note = typeof body.note === "string" ? body.note : "";
       const result = await transferItem(body.sku, toWarehouse, note);
@@ -62,8 +83,8 @@ export async function POST(req: Request) {
     }
 
     const warehouse = Number(body.warehouse);
-    if (!Number.isInteger(warehouse) || warehouse < 1 || warehouse > TOTAL_WAREHOUSES) {
-      return NextResponse.json({ error: "warehouse không hợp lệ (1-30)" }, { status: 400 });
+    if (!Number.isInteger(warehouse) || warehouse < 1 || warehouse > totalWarehouses) {
+      return NextResponse.json({ error: `warehouse không hợp lệ (1-${totalWarehouses})` }, { status: 400 });
     }
 
     const item =
@@ -76,3 +97,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Không ghi được dữ liệu" }, { status: 500 });
   }
 }
+

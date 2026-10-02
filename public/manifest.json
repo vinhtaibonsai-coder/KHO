@@ -1,7 +1,7 @@
 {
-  "name": "Định Vị 30 Ô Kho",
-  "short_name": "Kho 30",
-  "description": "Hệ thống quản lý và định vị 30 ô kho sản phẩm độc bản",
+  "name": "Xưởng Lũa Nhựt - Quản Lý Kho Độc Bản",
+  "short_name": "Lũa Nhựt",
+  "description": "Hệ thống quản lý và định vị ô kho sản phẩm độc bản Xưởng Lũa Nhựt",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",

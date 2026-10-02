@@ -8,15 +8,17 @@ const pad = (n: number) => String(n).padStart(2, "0");
 export default function WarehouseGrid({
   items,
   highlight,
+  totalWarehouses = 30,
   onSelect,
 }: {
   items: Item[];
   highlight: number | null;
+  totalWarehouses?: number;
   onSelect: (warehouse: number) => void;
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
-      {Array.from({ length: 30 }, (_, i) => i + 1).map((w) => {
+      {Array.from({ length: totalWarehouses }, (_, i) => i + 1).map((w) => {
         const list = items.filter((it) => it.warehouse === w);
         const count = list.length;
         const hasItem = count > 0;

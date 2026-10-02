@@ -25,9 +25,11 @@ const fmtFullTime = (iso: string) => {
 
 export default function ZaloLiveFeed({
   messages,
+  totalWarehouses = 30,
   onOpenWarehouse,
 }: {
   messages: ZaloMessage[];
+  totalWarehouses?: number;
   onOpenWarehouse: (warehouse: number) => void;
 }) {
   const [filterWh, setFilterWh] = useState<string>("all");
@@ -122,8 +124,8 @@ export default function ZaloLiveFeed({
             onChange={(e) => setFilterWh(e.target.value)}
             className="w-full sm:w-44 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:bg-white focus:border-blue-500 transition"
           >
-            <option value="all">Tất cả các kho (30 kho)</option>
-            {Array.from({ length: 30 }, (_, i) => i + 1).map((w) => (
+            <option value="all">Tất cả các kho ({totalWarehouses} kho)</option>
+            {Array.from({ length: totalWarehouses }, (_, i) => i + 1).map((w) => (
               <option key={w} value={String(w)}>
                 Kho {pad(w)}
               </option>

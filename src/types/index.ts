@@ -26,6 +26,7 @@ export interface ZaloMessage {
   status: "ok" | "error";
   detail: string;
   createdAt: string;
+  read?: boolean;
 }
 
 export interface ItemsResponse {
@@ -34,3 +35,4 @@ export interface ItemsResponse {
   history: ItemHistory[];
   totalWarehouses: number;
 }
+

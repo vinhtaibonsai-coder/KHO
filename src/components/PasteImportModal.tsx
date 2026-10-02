@@ -22,12 +22,14 @@ export default function PasteImportModal({
   onSuccess,
   defaultWarehouse = 1,
   existingItems = [],
+  totalWarehouses = 30,
 }: {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (data: { warehouse: number; skus: string[] }) => void;
   defaultWarehouse?: number;
   existingItems?: Item[];
+  totalWarehouses?: number;
 }) {
   const [warehouse, setWarehouse] = useState<number>(defaultWarehouse);
   const [rawText, setRawText] = useState("");
@@ -161,14 +163,14 @@ export default function PasteImportModal({
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
               <WarehouseIcon className="h-4 w-4 text-emerald-600" />
-              1. Chọn Kho Cần Nạp Hàng (Kho 1 - Kho 30)
+              1. Chọn Kho Cần Nạp Hàng (Kho 1 - Kho {pad(totalWarehouses)})
             </label>
             <select
               value={warehouse}
               onChange={(e) => setWarehouse(Number(e.target.value))}
               className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-bold text-slate-900 shadow-2xs focus:border-emerald-500 focus:outline-none focus:ring-3 focus:ring-emerald-500/10 cursor-pointer"
             >
-              {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
+              {Array.from({ length: totalWarehouses }, (_, i) => i + 1).map((n) => (
                 <option key={n} value={n}>
                   Kho {pad(n)} (KHO_{pad(n)})
                 </option>

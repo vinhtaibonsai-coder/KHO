@@ -3,7 +3,8 @@ import path from "path";
 import type { Item, ZaloMessage, ItemHistory } from "@/types";
 import { getSupabase, supabaseEnabled } from "@/lib/supabase";
 
-export const TOTAL_WAREHOUSES = 30;
+export const DEFAULT_TOTAL_WAREHOUSES = 30;
+export const TOTAL_WAREHOUSES = 30; // legacy fallback
 
 const DATA_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DATA_DIR, "database.json");
@@ -12,6 +13,7 @@ interface DB {
   items: Item[];
   messages: ZaloMessage[];
   history: ItemHistory[];
+  totalWarehouses?: number;
 }
 
 function initialSeed(): DB {
@@ -70,6 +72,7 @@ function initialSeed(): DB {
     ],
     messages: [],
     history: [],
+    totalWarehouses: DEFAULT_TOTAL_WAREHOUSES,
   };
 }
 
@@ -85,6 +88,9 @@ function loadDB(): DB {
       const content = fs.readFileSync(DB_FILE, "utf-8");
       const parsed = JSON.parse(content) as DB;
       if (!Array.isArray(parsed.history)) parsed.history = [];
+      if (!parsed.totalWarehouses || parsed.totalWarehouses < DEFAULT_TOTAL_WAREHOUSES) {
+        parsed.totalWarehouses = DEFAULT_TOTAL_WAREHOUSES;
+      }
       return parsed;
     }
   } catch (err) {
@@ -437,8 +443,9 @@ export async function transferItem(
   note: string = ""
 ): Promise<{ success: boolean; item?: Item; fromWarehouse?: number; error?: string }> {
   const code = sku.trim().toUpperCase();
-  if (toWarehouse < 1 || toWarehouse > TOTAL_WAREHOUSES) {
-    return { success: false, error: `Kho đích không hợp lệ (1-${TOTAL_WAREHOUSES})` };
+  const maxWh = await getWarehouseCount();
+  if (toWarehouse < 1 || toWarehouse > maxWh) {
+    return { success: false, error: `Kho đích không hợp lệ (1-${maxWh})` };
   }
 
   const existing = await findItem(code);
@@ -463,17 +470,39 @@ export async function transferItem(
   return { success: true, item: updated, fromWarehouse: fromWh };
 }
 
-export async function itemsInWarehouse(warehouse: number): Promise<Item[]> {
+export async function getWarehouseCount(): Promise<number> {
   if (supabaseEnabled) {
-    const sb = getSupabase();
-    const { data, error } = await sb!
-      .from("warehouse_items")
-      .select("*")
-      .eq("warehouse", warehouse)
-      .order("updated_at", { ascending: false });
-    if (error) throw new Error(`Supabase itemsInWarehouse: ${error.message}`);
-    return (data ?? []).map(rowToItem);
+    // Nếu có supabase, có thể lưu vào settings table hoặc query max warehouse
+    try {
+      const sb = getSupabase();
+      const { data } = await sb!
+        .from("warehouse_items")
+        .select("warehouse")
+        .order("warehouse", { ascending: false })
+        .limit(1);
+      const maxWh = data && data[0]?.warehouse ? Number(data[0].warehouse) : DEFAULT_TOTAL_WAREHOUSES;
+      return Math.max(DEFAULT_TOTAL_WAREHOUSES, maxWh);
+    } catch {
+      return DEFAULT_TOTAL_WAREHOUSES;
+    }
   }
   db = loadDB();
-  return db.items.filter((i) => i.warehouse === warehouse);
+  return db.totalWarehouses || DEFAULT_TOTAL_WAREHOUSES;
 }
+
+export async function addWarehouse(): Promise<number> {
+  const current = await getWarehouseCount();
+  const next = current + 1;
+  db = loadDB();
+  db.totalWarehouses = next;
+  saveDB(db);
+  return next;
+}
+
+export async function markAllMessagesRead(): Promise<boolean> {
+  db = loadDB();
+  db.messages = db.messages.map((m) => ({ ...m, read: true }));
+  saveDB(db);
+  return true;
+}
+

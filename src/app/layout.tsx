@@ -12,13 +12,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Kho 30 · Định Vị Sản Phẩm",
-  description: "Web App PWA quản lý định vị mã sản phẩm tại 30 ô kho thời gian thực",
+  title: "Xưởng Lũa Nhựt · Định Vị Sản Phẩm & Quản Lý Kho",
+  description: "Web App PWA quản lý định vị mã sản phẩm độc bản Xưởng Lũa Nhựt theo từng ô kho thời gian thực",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Kho 30",
+    title: "Xưởng Lũa Nhựt",
   },
   formatDetection: {
     telephone: false,

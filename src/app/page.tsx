@@ -9,7 +9,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   Warehouse,
-  History
+  History,
+  Menu,
+  Sparkles
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import WarehouseDetailModal from "@/components/WarehouseDetailModal";
@@ -17,6 +19,8 @@ import WarehouseGrid from "@/components/WarehouseGrid";
 import ZaloSimulator from "@/components/ZaloSimulator";
 import ZaloLiveFeed from "@/components/ZaloLiveFeed";
 import PasteImportModal from "@/components/PasteImportModal";
+import NotificationBell from "@/components/NotificationBell";
+import RightMenuDrawer from "@/components/RightMenuDrawer";
 import { ClipboardPaste } from "lucide-react";
 import { getSupabase } from "@/lib/supabase";
 import type { Item, ItemsResponse, ZaloMessage, ItemHistory } from "@/types";
@@ -63,9 +67,11 @@ export default function Home() {
   const [items, setItems] = useState<Item[]>([]);
   const [messages, setMessages] = useState<ZaloMessage[]>([]);
   const [history, setHistory] = useState<ItemHistory[]>([]);
+  const [totalWarehouses, setTotalWarehouses] = useState<number>(30);
   const [query, setQuery] = useState("");
   const [openWarehouse, setOpenWarehouse] = useState<number | null>(null);
   const [isPasteOpen, setIsPasteOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [defaultPasteWarehouse, setDefaultPasteWarehouse] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,6 +83,9 @@ export default function Home() {
         setItems(data.items || []);
         setMessages(data.messages || []);
         setHistory(data.history || []);
+        if (data.totalWarehouses && data.totalWarehouses >= 30) {
+          setTotalWarehouses(data.totalWarehouses);
+        }
         setLoading(false);
       })
       .catch(() => {
@@ -160,6 +169,30 @@ export default function Home() {
     }
   }
 
+  async function addWarehouseHandler() {
+    const res = await fetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "add_warehouse" }),
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      setTotalWarehouses(data.totalWarehouses);
+      fetchData();
+    } else {
+      throw new Error(data.error || "Không thể tạo thêm kho");
+    }
+  }
+
+  async function markAllReadHandler() {
+    await fetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "mark_all_read" }),
+    });
+    setMessages((prev) => prev.map((m) => ({ ...m, read: true })));
+  }
+
   async function onWebhook(payload: { groupId: string; message: string }) {
     const res = await fetch("/api/webhook/zalo", {
       method: "POST",
@@ -189,25 +222,21 @@ export default function Home() {
               <Boxes className="h-5 w-5 text-emerald-400" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-sm font-extrabold text-slate-900 tracking-tight sm:text-lg">
-                  KHO 30
-                </h1>
-                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 ring-1 ring-emerald-600/20 ring-inset">
-                  Độc bản
-                </span>
-              </div>
+              <h1 className="text-sm font-extrabold text-slate-900 tracking-tight sm:text-lg">
+                XƯỞNG LŨA NHỰT
+              </h1>
               <p className="text-[11px] text-slate-500 font-medium hidden md:block">
-                Tra cứu vị trí mã sản phẩm tức thời · Tự động đọc tin nhắn từ 30 nhóm Zalo
+                Tra cứu vị trí mã sản phẩm tức thời · Tự động đọc tin nhắn từ {totalWarehouses} nhóm Zalo
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-3">
-            <div className="flex items-center gap-1.5 rounded-xl bg-slate-100 px-2.5 py-1.5 border border-slate-200 text-xs font-semibold text-slate-700">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            {/* THỐNG KÊ NHANH MÃ & SỐ KHO */}
+            <div className="hidden xs:flex items-center gap-1.5 rounded-xl bg-slate-100 px-2.5 py-1.5 border border-slate-200 text-xs font-semibold text-slate-700">
               <span><strong className="font-mono text-slate-900 font-bold">{items.length}</strong> mã</span>
               <span className="text-slate-300">|</span>
-              <span><strong className="text-emerald-700 font-bold">{occupiedWarehouses}</strong>/30 kho</span>
+              <span><strong className="text-emerald-700 font-bold">{occupiedWarehouses}</strong>/{totalWarehouses} kho</span>
             </div>
 
             {/* NÚT DÁN ĐOẠN CHAT ZALO */}
@@ -225,12 +254,30 @@ export default function Home() {
               <span className="sm:hidden">Dán</span>
             </button>
 
+            {/* CHUÔNG THÔNG BÁO NHẬT KÝ ZALO (PHÂN CHIA ĐÃ ĐỌC / CHƯA ĐỌC) */}
+            <NotificationBell
+              messages={messages}
+              onOpenWarehouse={setOpenWarehouse}
+              onMarkAllRead={markAllReadHandler}
+            />
+
+            {/* LÀM MỚI DỮ LIỆU */}
             <button
               onClick={fetchData}
               title="Làm mới dữ liệu"
-              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs"
+              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer"
             >
               <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+
+            {/* NÚT MENU BÊN PHẢI (RIGHT DRAWER) */}
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(true)}
+              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-slate-900 bg-slate-900 text-white hover:bg-slate-800 transition active:scale-95 shadow-2xs cursor-pointer"
+              title="Mở menu quản lý & tiện ích bên phải"
+            >
+              <Menu className="h-4 w-4 text-white" />
             </button>
           </div>
         </div>
@@ -300,19 +347,19 @@ export default function Home() {
               </div>
             ) : (
               <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-center text-sm font-semibold text-rose-700">
-                KHÔNG TÌM THẤY MÃ SẢN PHẨM &quot;<span className="font-mono">{query.trim().toUpperCase()}</span>&quot; TRONG HỆ THỐNG 30 KHO
+                KHÔNG TÌM THẤY MÃ SẢN PHẨM &quot;<span className="font-mono">{query.trim().toUpperCase()}</span>&quot; TRONG HỆ THỐNG {totalWarehouses} KHO
               </div>
             )
           )}
         </section>
 
-        {/* SECTION 2: SƠ ĐỒ LƯỚI 30 Ô KHO TRỰC QUAN */}
+        {/* SECTION 2: SƠ ĐỒ LƯỚI CÁC Ô KHO TRỰC QUAN */}
         <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
               <Warehouse className="h-5 w-5 text-slate-700" />
               <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                Sơ Đồ 30 Ô Kho Vận Hành
+                Sơ Đồ {totalWarehouses} Ô Kho Vận Hành
               </h2>
               <span className="text-xs text-slate-400">(Nhấp vào ô kho để xem danh sách mã bên trong)</span>
             </div>
@@ -333,6 +380,7 @@ export default function Home() {
           <WarehouseGrid
             items={items}
             highlight={found ? found.warehouse : null}
+            totalWarehouses={totalWarehouses}
             onSelect={setOpenWarehouse}
           />
         </section>
@@ -340,17 +388,23 @@ export default function Home() {
         {/* SECTION 3: BẢNG TIN NHẬN DIỆN THỜI GIAN THỰC TỪ ZALO */}
         <ZaloLiveFeed 
           messages={messages} 
+          totalWarehouses={totalWarehouses}
           onOpenWarehouse={setOpenWarehouse} 
         />
 
         {/* SECTION 4: MÔ PHỎNG TEST TIN NHẮN */}
-        <ZaloSimulator messages={messages} onSend={onWebhook} items={items} />
+        <ZaloSimulator 
+          messages={messages} 
+          onSend={onWebhook} 
+          items={items} 
+          totalWarehouses={totalWarehouses}
+        />
 
       </main>
 
       {/* FOOTER */}
       <footer className="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
-        Hệ Thống Quản Lý Kho Độc Bản · Giao diện UX/UI Pro Max Nền Sáng · Lưu trữ vĩnh viễn
+        Xưởng Lũa Nhựt · Hệ Thống Quản Lý Kho Độc Bản · Nền Tảng PWA Tối Ưu Mobile
       </footer>
 
       {/* MODAL CHI TIẾT Ô KHO */}
@@ -359,6 +413,7 @@ export default function Home() {
           warehouse={openWarehouse}
           items={items}
           history={history}
+          totalWarehouses={totalWarehouses}
           onClose={() => setOpenWarehouse(null)}
           onRemove={removeSku}
           onTransfer={transferSku}
@@ -374,11 +429,24 @@ export default function Home() {
         isOpen={isPasteOpen}
         defaultWarehouse={defaultPasteWarehouse}
         existingItems={items}
+        totalWarehouses={totalWarehouses}
         onClose={() => setIsPasteOpen(false)}
         onSuccess={() => {
           fetchData();
         }}
       />
+
+      {/* MENU BÊN PHẢI (RIGHT DRAWER): QUẢN LÝ THÊM KHO, XUẤT CSV, THỐNG KÊ */}
+      <RightMenuDrawer
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        totalWarehouses={totalWarehouses}
+        items={items}
+        history={history}
+        onAddWarehouse={addWarehouseHandler}
+        onOpenPaste={() => setIsPasteOpen(true)}
+      />
     </div>
   );
 }
+

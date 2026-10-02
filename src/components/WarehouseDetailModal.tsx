@@ -28,6 +28,7 @@ export default function WarehouseDetailModal({
   warehouse,
   items,
   history = [],
+  totalWarehouses = 30,
   onClose,
   onRemove,
   onTransfer,
@@ -36,6 +37,7 @@ export default function WarehouseDetailModal({
   warehouse: number;
   items: Item[];
   history?: ItemHistory[];
+  totalWarehouses?: number;
   onClose: () => void;
   onRemove: (sku: string) => void;
   onTransfer: (sku: string, toWarehouse: number) => Promise<boolean | void>;
@@ -263,7 +265,7 @@ export default function WarehouseDetailModal({
                         onChange={(e) => setTargetWarehouse(Number(e.target.value))}
                         className="rounded-lg border border-indigo-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       >
-                        {Array.from({ length: 30 }, (_, i) => i + 1)
+                        {Array.from({ length: totalWarehouses }, (_, i) => i + 1)
                           .filter((wh) => wh !== warehouse)
                           .map((wh) => (
                             <option key={wh} value={wh}>
