@@ -11,7 +11,11 @@ import {
   Warehouse,
   History,
   Menu,
-  Sparkles
+  Sparkles,
+  ShoppingBag,
+  ArrowRightLeft,
+  RotateCcw,
+  Check
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import WarehouseDetailModal from "@/components/WarehouseDetailModal";
@@ -75,6 +79,8 @@ export default function Home() {
   const [defaultPasteWarehouse, setDefaultPasteWarehouse] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSearchTransferring, setIsSearchTransferring] = useState(false);
+  const [searchTargetWarehouse, setSearchTargetWarehouse] = useState(1);
 
   const fetchData = () => {
     fetch("/api/items", { cache: "no-store" })
@@ -369,6 +375,7 @@ export default function Home() {
           {/* BANNER THÔNG BÁO KẾT QUẢ TÌM KIẾM */}
           {query.trim() && (
             found ? (
+              <>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border-2 border-emerald-500 bg-emerald-50/80 px-5 py-4 shadow-sm">
                 <div className="flex items-center gap-3.5">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
@@ -408,15 +415,114 @@ export default function Home() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setOpenWarehouse(found.warehouse)}
-                  className="self-start sm:self-center inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition active:scale-95 shrink-0"
-                >
-                  <Warehouse className="h-4 w-4" />
-                  Mở Kho {pad(found.warehouse)}
-                </button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 self-start sm:self-center shrink-0">
+                  {found.status === "sold" ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const confirmRestock = window.confirm(`Khách trả hàng hoặc muốn nhập lại mã [${found.sku}] vào Kho ${pad(found.warehouse)}?`);
+                        if (!confirmRestock) return;
+                        await restockSku(found.sku, found.warehouse);
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
+                    >
+                      <RotateCcw className="h-4 w-4 text-emerald-600" />
+                      <span>Nhập lại</span>
+                    </button>
+                  ) : (
+                    <>
+                      {/* NÚT ĐÁNH DẤU ĐÃ BÁN NGAY */}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const confirmSold = window.confirm(
+                            `XÁC NHẬN BÁN:\nBạn có chắc chắn muốn đánh dấu mã [${found.sku}] là ĐÃ BÁN?\n(Sản phẩm sẽ ẩn khỏi kho nhưng dữ liệu và lịch sử vẫn được lưu vĩnh viễn)`
+                          );
+                          if (!confirmSold) return;
+                          await markSoldSku(found.sku, "Đã bán từ tra cứu nhanh");
+                        }}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-2xs hover:bg-amber-100 transition active:scale-95 cursor-pointer"
+                        title="Đánh dấu đã bán"
+                      >
+                        <ShoppingBag className="h-4 w-4 text-amber-600" />
+                        <span>Đã bán</span>
+                      </button>
+
+                      {/* NÚT CHUYỂN KHO NGAY */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsSearchTransferring(!isSearchTransferring);
+                          setSearchTargetWarehouse(found.warehouse === 1 ? 2 : 1);
+                        }}
+                        className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer ${
+                          isSearchTransferring
+                            ? "border-indigo-400 bg-indigo-50 text-indigo-800"
+                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                        }`}
+                        title="Chuyển mã này sang ô kho khác"
+                      >
+                        <ArrowRightLeft className="h-4 w-4 text-indigo-600" />
+                        <span>{isSearchTransferring ? "Đóng" : "Chuyển kho"}</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* NÚT MỞ KHO */}
+                  <button
+                    type="button"
+                    onClick={() => setOpenWarehouse(found.warehouse)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-2xs hover:bg-slate-800 transition active:scale-95 cursor-pointer"
+                  >
+                    <Warehouse className="h-4 w-4 text-emerald-400" />
+                    <span>Mở Kho {pad(found.warehouse)}</span>
+                  </button>
+                </div>
               </div>
+
+              {/* KHUNG CHỌN KHO ĐÍCH KHI BẤM CHUYỂN KHO TRỰC TIẾP TỪ TRA CỨU */}
+              {isSearchTransferring && found.status !== "sold" && (
+                <div className="mt-2 rounded-xl border border-indigo-200 bg-indigo-50/80 p-3 flex flex-wrap items-center justify-between gap-2 animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-indigo-950">
+                    <span>Chuyển mã [{found.sku}] từ Kho {pad(found.warehouse)} sang:</span>
+                    <select
+                      value={searchTargetWarehouse}
+                      onChange={(e) => setSearchTargetWarehouse(Number(e.target.value))}
+                      className="rounded-lg border border-indigo-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {Array.from({ length: totalWarehouses }, (_, i) => i + 1)
+                        .filter((wh) => wh !== found.warehouse)
+                        .map((wh) => (
+                          <option key={wh} value={wh}>
+                            Kho {pad(wh)}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsSearchTransferring(false)}
+                      className="px-2.5 py-1 text-xs font-medium text-slate-500 hover:text-slate-700 cursor-pointer"
+                    >
+                      Huỷ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await transferSku(found.sku, searchTargetWarehouse);
+                        setIsSearchTransferring(false);
+                      }}
+                      className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white shadow-2xs hover:bg-indigo-700 transition cursor-pointer"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      <span>Xác nhận chuyển sang Kho {pad(searchTargetWarehouse)}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
             ) : (
               <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-center text-sm font-semibold text-rose-700">
                 KHÔNG TÌM THẤY MÃ SẢN PHẨM &quot;<span className="font-mono">{query.trim().toUpperCase()}</span>&quot; TRONG HỆ THỐNG {totalWarehouses} KHO
