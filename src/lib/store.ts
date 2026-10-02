@@ -622,18 +622,36 @@ export async function transferItem(
 
 export async function getWarehouseCount(): Promise<number> {
   if (supabaseEnabled) {
-    // Nếu có supabase, có thể lưu vào settings table hoặc query max warehouse
     try {
       const sb = getSupabase();
-      const { data } = await sb!
+      // 1. Thử lấy từ bảng warehouse_settings nếu có
+      const { data, error } = await sb!
+        .from("warehouse_settings")
+        .select("total_warehouses")
+        .eq("id", "default")
+        .maybeSingle();
+
+      if (!error && data && data.total_warehouses) {
+        return Math.max(DEFAULT_TOTAL_WAREHOUSES, Number(data.total_warehouses));
+      }
+
+      // 2. Fallback: tìm kho lớn nhất đang có trong warehouse_items
+      const { data: itemData } = await sb!
         .from("warehouse_items")
         .select("warehouse")
         .order("warehouse", { ascending: false })
         .limit(1);
-      const maxWh = data && data[0]?.warehouse ? Number(data[0].warehouse) : DEFAULT_TOTAL_WAREHOUSES;
-      return Math.max(DEFAULT_TOTAL_WAREHOUSES, maxWh);
+
+      const maxItemWh = itemData && itemData[0]?.warehouse ? Number(itemData[0].warehouse) : DEFAULT_TOTAL_WAREHOUSES;
+
+      // 3. Fallback đọc thêm từ local database.json (nếu có lưu)
+      db = loadDB();
+      const localTotal = db.totalWarehouses || DEFAULT_TOTAL_WAREHOUSES;
+
+      return Math.max(DEFAULT_TOTAL_WAREHOUSES, maxItemWh, localTotal);
     } catch {
-      return DEFAULT_TOTAL_WAREHOUSES;
+      db = loadDB();
+      return db.totalWarehouses || DEFAULT_TOTAL_WAREHOUSES;
     }
   }
   db = loadDB();
@@ -643,6 +661,19 @@ export async function getWarehouseCount(): Promise<number> {
 export async function addWarehouse(): Promise<number> {
   const current = await getWarehouseCount();
   const next = current + 1;
+
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      await sb!.from("warehouse_settings").upsert(
+        { id: "default", total_warehouses: next },
+        { onConflict: "id" }
+      );
+    } catch (err) {
+      console.warn("Lưu warehouse_settings Supabase:", err);
+    }
+  }
+
   db = loadDB();
   db.totalWarehouses = next;
   saveDB(db);
