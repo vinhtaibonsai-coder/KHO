@@ -680,6 +680,29 @@ export async function addWarehouse(): Promise<number> {
   return next;
 }
 
+export async function ensureWarehouseExists(warehouseNumber: number): Promise<number> {
+  const current = await getWarehouseCount();
+  if (warehouseNumber <= current) return current;
+
+  const next = warehouseNumber;
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      await sb!.from("warehouse_settings").upsert(
+        { id: "default", total_warehouses: next },
+        { onConflict: "id" }
+      );
+    } catch (err) {
+      console.warn("Lưu warehouse_settings Supabase:", err);
+    }
+  }
+
+  db = loadDB();
+  db.totalWarehouses = next;
+  saveDB(db);
+  return next;
+}
+
 export async function markMessageRead(id: string): Promise<boolean> {
   if (supabaseEnabled) {
     const sb = getSupabase();

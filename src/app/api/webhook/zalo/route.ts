@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addQty, pushMessage, removeItem, upsertItem, findItem, transferItem, TOTAL_WAREHOUSES } from "@/lib/store";
+import { addQty, pushMessage, removeItem, upsertItem, findItem, transferItem, ensureWarehouseExists } from "@/lib/store";
 import { validateSku, extractValidSkusFromText } from "@/lib/sku-rules";
 import type { ZaloMessage } from "@/types";
 
@@ -9,7 +9,7 @@ function parseWarehouse(groupId: string): number | null {
   const m = groupId.match(/(\d+)/);
   if (!m) return null;
   const n = parseInt(m[1], 10);
-  return n >= 1 && n <= 30 ? n : null;
+  return n >= 1 ? n : null;
 }
 
 // Bóc tách cú pháp chuyển kho: CK E120.124 -> 5, CHUYEN E120.124 QUA KHO 5, CK E120.124 KHO 5, v.v.
@@ -19,7 +19,7 @@ function parseTransferCommand(text: string): { sku: string; toWarehouse: number 
   // 1. CK E120.124 5  hoặc  CK E120.124 K5  hoặc  CK E120.124 KHO 5
   // 2. CK E120.124 -> 5  hoặc  CK E120.124 > 5
   // 3. CHUYEN E120.124 QUA KHO 5  hoặc  CHUYEN E120.124 SANG KHO 5
-  const m = clean.match(/^(?:CK|CHUYEN|CHUYENKHO)\s+([A-Za-z0-9.]+)\s*(?:->|>|QUA|SANG|DEN|TO)?\s*(?:KHO|K)?\s*(\d{1,2})$/i);
+  const m = clean.match(/^(?:CK|CHUYEN|CHUYENKHO)\s+([A-Za-z0-9.]+)\s*(?:->|>|QUA|SANG|DEN|TO)?\s*(?:KHO|K)?\s*(\d{1,3})$/i);
   if (!m) return null;
 
   const rawSku = m[1].trim();
@@ -28,7 +28,7 @@ function parseTransferCommand(text: string): { sku: string; toWarehouse: number 
   const val = validateSku(rawSku);
   const sku = val.valid ? val.normalizedSku : rawSku.toUpperCase();
 
-  if (toWh < 1 || toWh > TOTAL_WAREHOUSES) return null;
+  if (toWh < 1) return null;
   return { sku, toWarehouse: toWh };
 }
 
@@ -126,6 +126,9 @@ export async function POST(req: Request) {
       await pushMessage(msg);
       return NextResponse.json({ ok: false, message: msg }, { status: 400 });
     }
+
+    // Tự động tạo thêm kho trên web và database nếu nhóm Zalo này là kho mới (VD: Kho 31, Kho 32...)
+    await ensureWarehouseExists(warehouse);
 
     // 1. Kiểm tra xem tin nhắn có chứa nhiều mã không
     const extracted = extractValidSkusFromText(body.message);

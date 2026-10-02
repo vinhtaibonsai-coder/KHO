@@ -32,19 +32,20 @@ export function hasSku(text) {
   return /(^|\s)[+\-]?[A-Za-z]{1,6}\d+(?:[.\-]\d+)*/.test(text ?? "");
 }
 
-/** "KHO 05" / "Kho 5" / "Kho-12" -> 5 / 5 / 12, không hợp lệ -> null */
+/** "KHO 05" / "Kho 5" / "Kho-12" / "Kho 31" -> 5 / 5 / 12 / 31, không hợp lệ -> null */
 export function parseWarehouseFromName(name) {
   if (!name) return null;
-  const m = name.match(/(?:kho|k)[\s_\-]*0*(\d{1,2})\b/i) ?? name.match(/\b0*(\d{1,2})\b/);
+  // Khớp: Kho 31, KHO_31, K31, v.v. (bất kỳ số nào >= 1)
+  const m = name.match(/(?:kho|k)[\s_\-]*0*(\d+)\b/i) ?? name.match(/\b0*(\d+)\b/);
   if (!m) return null;
   const n = parseInt(m[1], 10);
-  return n >= 1 && n <= 30 ? n : null;
+  return n >= 1 ? n : null;
 }
 
 /** Ưu tiên map cố định theo Group ID, sau đó suy ra từ tên nhóm */
 export function resolveWarehouse(mapping, groupId, groupName) {
   const mapped = mapping?.groups?.[groupId];
-  if (Number.isInteger(mapped) && mapped >= 1 && mapped <= 30) return mapped;
+  if (Number.isInteger(mapped) && mapped >= 1) return mapped;
   return parseWarehouseFromName(groupName);
 }
 
@@ -195,9 +196,9 @@ async function handleGroupMessage(api, message) {
   const mapping = loadMapping();
   const name = await groupName(api, groupId);
   const warehouse = resolveWarehouse(mapping, groupId, name);
-  // CHỈ NHẬN TIN NHẮN TỪ KHO 1 ĐẾN KHO 30
+  // CHỈ NHẬN TIN NHẮN TỪ CÁC NHÓM KHO (Kho 1, Kho 2, ..., Kho 31, ...)
   if (!warehouse) {
-    // Không phải nhóm kho (Kho 1 - Kho 30) -> Bỏ qua, không xử lý
+    // Không phải nhóm có chữ Kho -> Bỏ qua, không xử lý
     return;
   }
 

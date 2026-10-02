@@ -17,10 +17,10 @@ console.log("==================================================");
  */
 function extractGroupId(groupName, rawGroupId) {
   if (config[rawGroupId]) return config[rawGroupId];
-  const match = groupName ? groupName.match(/kho\s*0?(\d+)/i) : null;
+  const match = groupName ? groupName.match(/(?:kho|k)\s*0?(\d+)/i) : null;
   if (match) {
     const num = parseInt(match[1], 10);
-    if (num >= 1 && num <= 30) {
+    if (num >= 1) {
       return `KHO_${String(num).padStart(2, "0")}`;
     }
   }
