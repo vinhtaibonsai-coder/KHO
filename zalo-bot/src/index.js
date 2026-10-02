@@ -32,18 +32,36 @@ export function hasSku(text) {
   return /(^|\s)[+\-]?[A-Za-z]{1,6}\d+(?:[.\-]\d+)*/.test(text ?? "");
 }
 
-/** "KHO 05" / "Kho 5" / "Kho-12" / "Kho 31" -> 5 / 5 / 12 / 31, không hợp lệ -> null */
+/** "KHO 05" / "Kho 5" / "Nhóm Kho 31" -> 5 / 31. Bắt buộc tên nhóm phải có chữ KHO */
 export function parseWarehouseFromName(name) {
-  if (!name) return null;
-  // Khớp: Kho 31, KHO_31, K31, v.v. (bất kỳ số nào >= 1)
-  const m = name.match(/(?:kho|k)[\s_\-]*0*(\d+)\b/i) ?? name.match(/\b0*(\d+)\b/);
-  if (!m) return null;
-  const n = parseInt(m[1], 10);
-  return n >= 1 ? n : null;
+  if (!name || typeof name !== "string") return null;
+  // BẮT BUỘC TÊN NHÓM PHẢI CÓ TỪ "KHO" (không phân biệt hoa thường)
+  if (!/\bkho\b/i.test(name)) return null;
+
+  // Lấy số kho ngay sau chữ kho (ví dụ: Kho 1, Kho 05, Kho-31, Kho_12)
+  const m = name.match(/\bkho[\s_\-]*0*(\d+)\b/i);
+  if (m) {
+    const n = parseInt(m[1], 10);
+    return n >= 1 ? n : null;
+  }
+
+  // Nếu tên có chữ Kho và có số bất kỳ trong tên nhóm (VD: "Kho phân loại 2")
+  const m2 = name.match(/\b0*(\d+)\b/);
+  if (m2) {
+    const n = parseInt(m2[1], 10);
+    return n >= 1 ? n : null;
+  }
+
+  return null;
 }
 
-/** Ưu tiên map cố định theo Group ID, sau đó suy ra từ tên nhóm */
+/** Chỉ nhận nếu tên nhóm có chữ KHO hoặc đã được map hợp lệ */
 export function resolveWarehouse(mapping, groupId, groupName) {
+  // Nếu có tên nhóm, bắt buộc tên nhóm phải có từ KHO
+  if (groupName && !/\bkho\b/i.test(groupName)) {
+    return null;
+  }
+
   const mapped = mapping?.groups?.[groupId];
   if (Number.isInteger(mapped) && mapped >= 1) return mapped;
   return parseWarehouseFromName(groupName);

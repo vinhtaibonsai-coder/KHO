@@ -17,14 +17,18 @@ console.log("==================================================");
  */
 function extractGroupId(groupName, rawGroupId) {
   if (config[rawGroupId]) return config[rawGroupId];
-  const match = groupName ? groupName.match(/(?:kho|k)\s*0?(\d+)/i) : null;
+  // BẮT BUỘC TÊN NHÓM PHẢI CÓ TỪ "KHO"
+  if (!groupName || !/\bkho\b/i.test(groupName)) {
+    return null;
+  }
+  const match = groupName.match(/\bkho[\s_\-]*0*(\d+)/i) || groupName.match(/\b0*(\d+)\b/);
   if (match) {
     const num = parseInt(match[1], 10);
     if (num >= 1) {
       return `KHO_${String(num).padStart(2, "0")}`;
     }
   }
-  return rawGroupId;
+  return null;
 }
 
 /**
@@ -100,8 +104,9 @@ async function main() {
       const groupName = msg.data?.groupName || "";
       const rawGroupId = String(msg.data?.groupId || "");
       const groupId = extractGroupId(groupName, rawGroupId);
-      const text = String(msg.data?.content).trim();
+      if (!groupId) return; // Bỏ qua nếu không phải nhóm có chữ KHO
 
+      const text = String(msg.data?.content).trim();
       console.log(`📩 Nhận tin từ nhóm [${groupName || rawGroupId}]: "${text}"`);
       await forwardToWebhook(groupId, text);
     }
