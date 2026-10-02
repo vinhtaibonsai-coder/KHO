@@ -14,9 +14,15 @@ import {
   ExternalLink,
   ShieldCheck,
   RotateCw,
-  Sparkles
+  Sparkles,
+  FlaskConical,
+  Radio,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
-import type { Item, ItemHistory } from "@/types";
+import type { Item, ItemHistory, ZaloMessage } from "@/types";
+import ZaloLiveFeed from "@/components/ZaloLiveFeed";
+import ZaloSimulator from "@/components/ZaloSimulator";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -26,8 +32,11 @@ export default function RightMenuDrawer({
   totalWarehouses,
   items,
   history,
+  messages,
   onAddWarehouse,
   onOpenPaste,
+  onOpenWarehouse,
+  onSendWebhook,
   onFilterSkuType,
 }: {
   isOpen: boolean;
@@ -35,13 +44,17 @@ export default function RightMenuDrawer({
   totalWarehouses: number;
   items: Item[];
   history: ItemHistory[];
+  messages: ZaloMessage[];
   onAddWarehouse: () => Promise<void>;
   onOpenPaste: () => void;
+  onOpenWarehouse?: (warehouse: number) => void;
+  onSendWebhook?: (payload: { groupId: string; message: string }) => Promise<{ ok: boolean; message: ZaloMessage }>;
   onFilterSkuType?: (prefix: string) => void;
 }) {
   const [addingWh, setAddingWh] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
+  const [devTab, setDevTab] = useState<"live" | "sim" | null>(null);
 
   if (!isOpen) return null;
 
@@ -260,7 +273,90 @@ export default function RightMenuDrawer({
               </button>
             </div>
 
-            {/* 5. TRẠNG THÁI HỆ THỐNG */}
+            {/* 5. KHU VỰC TÍNH NĂNG ĐANG PHÁT TRIỂN & THỬ NGHIỆM */}
+            <div className="space-y-3 pt-2 border-t border-slate-200">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
+                  <FlaskConical className="h-4 w-4 text-amber-600" />
+                  Tính Năng Đang Phát Triển
+                </span>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                  Thử nghiệm (Lab)
+                </span>
+              </div>
+
+              {/* TÙY CHỌN 1: BẢNG TIN LIVE FEED NHẬT KÝ ZALO */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setDevTab(devTab === "live" ? null : "live")}
+                  className="w-full flex items-center justify-between p-3 text-left transition hover:bg-slate-100 cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Radio className="h-4 w-4 text-emerald-600" />
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block">Nhật Ký Tin Nhắn Zalo Live</span>
+                      <span className="text-[10px] text-slate-400">Xem luồng tin bot quét theo thời gian thực</span>
+                    </div>
+                  </div>
+                  {devTab === "live" ? (
+                    <ChevronUp className="h-4 w-4 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-slate-400" />
+                  )}
+                </button>
+
+                {devTab === "live" && (
+                  <div className="p-3 border-t border-slate-200 bg-white animate-in fade-in">
+                    <ZaloLiveFeed
+                      messages={messages}
+                      totalWarehouses={totalWarehouses}
+                      onOpenWarehouse={(wh) => {
+                        onClose();
+                        if (onOpenWarehouse) onOpenWarehouse(wh);
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* TÙY CHỌN 2: MÔ PHỎNG TEST TIN NHẮN (ZALO SIMULATOR) */}
+              {onSendWebhook && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setDevTab(devTab === "sim" ? null : "sim")}
+                    className="w-full flex items-center justify-between p-3 text-left transition hover:bg-slate-100 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-indigo-600" />
+                      <div>
+                        <span className="text-xs font-bold text-slate-800 block">Mô Phỏng Tin Nhắn Zalo</span>
+                        <span className="text-[10px] text-slate-400">Giả lập gửi tin từ các nhóm kho để test</span>
+                      </div>
+                    </div>
+                    {devTab === "sim" ? (
+                      <ChevronUp className="h-4 w-4 text-slate-400" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-slate-400" />
+                    )}
+                  </button>
+
+                  {devTab === "sim" && (
+                    <div className="p-3 border-t border-slate-200 bg-white animate-in fade-in">
+                      <ZaloSimulator
+                        messages={messages}
+                        onSend={onSendWebhook}
+                        items={items}
+                        totalWarehouses={totalWarehouses}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 6. TRẠNG THÁI HỆ THỐNG */}
             <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/60 text-xs text-slate-500 space-y-2">
               <div className="flex items-center gap-2 text-slate-700 font-bold">
                 <ShieldCheck className="h-4 w-4 text-emerald-600" />

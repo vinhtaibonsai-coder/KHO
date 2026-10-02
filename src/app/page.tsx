@@ -457,21 +457,6 @@ export default function Home() {
           />
         </section>
 
-        {/* SECTION 3: BẢNG TIN NHẬN DIỆN THỜI GIAN THỰC TỪ ZALO */}
-        <ZaloLiveFeed 
-          messages={messages} 
-          totalWarehouses={totalWarehouses}
-          onOpenWarehouse={setOpenWarehouse} 
-        />
-
-        {/* SECTION 4: MÔ PHỎNG TEST TIN NHẮN */}
-        <ZaloSimulator 
-          messages={messages} 
-          onSend={onWebhook} 
-          items={items} 
-          totalWarehouses={totalWarehouses}
-        />
-
       </main>
 
       {/* FOOTER */}
@@ -510,15 +495,18 @@ export default function Home() {
         }}
       />
 
-      {/* MENU BÊN PHẢI (RIGHT DRAWER): QUẢN LÝ THÊM KHO, XUẤT CSV, THỐNG KÊ */}
+      {/* MENU BÊN PHẢI (RIGHT DRAWER): QUẢN LÝ THÊM KHO, XUẤT CSV, THỐNG KÊ, TÍNH NĂNG ĐANG PHÁT TRIỂN */}
       <RightMenuDrawer
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
         totalWarehouses={totalWarehouses}
         items={items}
         history={history}
+        messages={messages}
         onAddWarehouse={addWarehouseHandler}
         onOpenPaste={() => setIsPasteOpen(true)}
+        onOpenWarehouse={setOpenWarehouse}
+        onSendWebhook={onWebhook}
       />
     </div>
   );

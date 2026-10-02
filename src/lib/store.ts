@@ -456,6 +456,18 @@ export async function markItemSold(sku: string, note: string = "Đã bán"): Pro
       createdAt: now,
     });
 
+    // Tạo thông báo vào bảng zalo_messages để hiện chuông báo đỏ
+    await pushMessage({
+      id: `sold_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      groupId: `KHO_${String(existing.warehouse).padStart(2, "0")}`,
+      warehouse: existing.warehouse,
+      message: `ĐÃ BÁN ${code}`,
+      status: "ok",
+      detail: `Mã [${code}] đã được bán thành công (Kho ${existing.warehouse})`,
+      createdAt: now,
+      read: false,
+    });
+
     return updated;
   }
 
@@ -476,6 +488,17 @@ export async function markItemSold(sku: string, note: string = "Đã bán"): Pro
     toWarehouse: null,
     note: note || "Đánh dấu đã bán",
     createdAt: now,
+  });
+
+  await pushMessage({
+    id: `sold_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    groupId: `KHO_${String(item.warehouse).padStart(2, "0")}`,
+    warehouse: item.warehouse,
+    message: `ĐÃ BÁN ${code}`,
+    status: "ok",
+    detail: `Mã [${code}] đã được bán thành công (Kho ${item.warehouse})`,
+    createdAt: now,
+    read: false,
   });
 
   return item;
@@ -527,6 +550,17 @@ export async function restockItem(sku: string, warehouse?: number, note: string 
       createdAt: now,
     });
 
+    await pushMessage({
+      id: `restock_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      groupId: `KHO_${String(targetWh).padStart(2, "0")}`,
+      warehouse: targetWh,
+      message: `NHẬP LẠI ${code}`,
+      status: "ok",
+      detail: `Khách trả / Nhập lại mã [${code}] vào Kho ${targetWh}`,
+      createdAt: now,
+      read: false,
+    });
+
     return updated;
   }
 
@@ -552,6 +586,17 @@ export async function restockItem(sku: string, warehouse?: number, note: string 
     createdAt: now,
   });
 
+  await pushMessage({
+    id: `restock_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    groupId: `KHO_${String(targetWh).padStart(2, "0")}`,
+    warehouse: targetWh,
+    message: `NHẬP LẠI ${code}`,
+    status: "ok",
+    detail: `Khách trả / Nhập lại mã [${code}] vào Kho ${targetWh}`,
+    createdAt: now,
+    read: false,
+  });
+
   return item;
 }
 
@@ -570,6 +615,16 @@ export async function removeItem(sku: string, note: string = "Xuất kho thủ c
       toWarehouse: null,
       note,
     });
+    await pushMessage({
+      id: `out_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      groupId: `KHO_${String(existing.warehouse).padStart(2, "0")}`,
+      warehouse: existing.warehouse,
+      message: `XUẤT KHO ${code}`,
+      status: "ok",
+      detail: `Đã xuất mã [${code}] ra khỏi Kho ${existing.warehouse}`,
+      createdAt: new Date().toISOString(),
+      read: false,
+    });
     return existing;
   }
   db = loadDB();
@@ -583,6 +638,16 @@ export async function removeItem(sku: string, note: string = "Xuất kho thủ c
     fromWarehouse: removed.warehouse,
     toWarehouse: null,
     note,
+  });
+  await pushMessage({
+    id: `out_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    groupId: `KHO_${String(removed.warehouse).padStart(2, "0")}`,
+    warehouse: removed.warehouse,
+    message: `XUẤT KHO ${code}`,
+    status: "ok",
+    detail: `Đã xuất mã [${code}] ra khỏi Kho ${removed.warehouse}`,
+    createdAt: new Date().toISOString(),
+    read: false,
   });
   return removed;
 }

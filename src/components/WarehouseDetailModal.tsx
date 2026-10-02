@@ -108,12 +108,20 @@ export default function WarehouseDetailModal({
     }
   }
 
+  const [actionNotice, setActionNotice] = useState<{ message: string; type: "success" | "info" } | null>(null);
+
+  const showNotice = (message: string, type: "success" | "info" = "success") => {
+    setActionNotice({ message, type });
+    setTimeout(() => setActionNotice(null), 3500);
+  };
+
   const handleRemoveItem = (sku: string) => {
     const confirmRemove = window.confirm(
       `CẢNH BÁO XUẤT KHO:\nBạn có chắc chắn muốn XUẤT / XOÁ mã [${sku}] khỏi Kho ${pad(warehouse)} không?\n\n(Nếu sản phẩm đã bán cho khách, bạn nên chọn nút "Bán" để lưu lịch sử).`
     );
     if (!confirmRemove) return;
     onRemove(sku);
+    showNotice(`Đã xuất mã [${sku}] khỏi kho thành công!`, "info");
     if (selectedSku === sku) {
       setSelectedSku(null);
     }
@@ -126,6 +134,7 @@ export default function WarehouseDetailModal({
     );
     if (!confirmSold) return;
     await onMarkSold(sku, "Đã bán cho khách");
+    showNotice(`🎉 Đã đánh dấu BÁN THÀNH CÔNG mã [${sku}]! (Đã lưu lịch sử & thông báo)`, "success");
     if (selectedSku === sku) {
       setSelectedSku(null);
     }
@@ -138,6 +147,7 @@ export default function WarehouseDetailModal({
     );
     if (!confirmRestock) return;
     await onRestock(sku, warehouse, "Khách trả hàng / Nhập lại kho");
+    showNotice(`Đã nhập lại mã [${sku}] vào Kho ${pad(warehouse)} thành công!`, "success");
     if (selectedSku === sku) {
       setSelectedSku(null);
     }
@@ -261,6 +271,24 @@ export default function WarehouseDetailModal({
             </button>
           )}
         </div>
+
+        {/* BANNER THÔNG BÁO KẾT QUẢ THAO TÁC */}
+        {actionNotice && (
+          <div className={`px-4 py-2 text-xs font-bold flex items-center justify-between border-b animate-in fade-in duration-150 ${
+            actionNotice.type === "success" 
+              ? "bg-emerald-50 text-emerald-900 border-emerald-200" 
+              : "bg-blue-50 text-blue-900 border-blue-200"
+          }`}>
+            <span>{actionNotice.message}</span>
+            <button 
+              type="button" 
+              onClick={() => setActionNotice(null)} 
+              className="text-slate-400 hover:text-slate-700 ml-2"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* NỘI DUNG CHÍNH */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 bg-slate-50/40">
