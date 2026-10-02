@@ -108,9 +108,22 @@ export default function WarehouseDetailModal({
     }
   }
 
+  const handleRemoveItem = (sku: string) => {
+    const confirmRemove = window.confirm(
+      `CẢNH BÁO XUẤT KHO:\nBạn có chắc chắn muốn XUẤT / XOÁ mã [${sku}] khỏi Kho ${pad(warehouse)} không?\n\n(Nếu sản phẩm đã bán cho khách, bạn nên chọn nút "Bán" để lưu lịch sử).`
+    );
+    if (!confirmRemove) return;
+    onRemove(sku);
+    if (selectedSku === sku) {
+      setSelectedSku(null);
+    }
+  };
+
   const handleMarkSoldItem = async (sku: string) => {
     if (!onMarkSold) return;
-    const confirmSold = window.confirm(`Bạn có chắc chắn muốn đánh dấu mã [${sku}] là ĐÃ BÁN?\n(Sản phẩm sẽ ẩn khỏi kho nhưng dữ liệu và lịch sử vẫn được lưu vĩnh viễn)`);
+    const confirmSold = window.confirm(
+      `XÁC NHẬN BÁN:\nBạn có chắc chắn muốn đánh dấu mã [${sku}] là ĐÃ BÁN?\n(Sản phẩm sẽ ẩn khỏi kho nhưng dữ liệu và lịch sử vẫn được lưu vĩnh viễn)`
+    );
     if (!confirmSold) return;
     await onMarkSold(sku, "Đã bán cho khách");
     if (selectedSku === sku) {
@@ -120,7 +133,9 @@ export default function WarehouseDetailModal({
 
   const handleRestockItem = async (sku: string) => {
     if (!onRestock) return;
-    const confirmRestock = window.confirm(`Khách trả hàng hoặc muốn nhập lại mã [${sku}] vào Kho ${pad(warehouse)}?`);
+    const confirmRestock = window.confirm(
+      `XÁC NHẬN NHẬP LẠI:\nKhách trả hàng hoặc muốn nhập lại mã [${sku}] vào Kho ${pad(warehouse)}?`
+    );
     if (!confirmRestock) return;
     await onRestock(sku, warehouse, "Khách trả hàng / Nhập lại kho");
     if (selectedSku === sku) {
@@ -339,10 +354,7 @@ export default function WarehouseDetailModal({
 
                         <button
                           type="button"
-                          onClick={() => {
-                            onRemove(selectedItem.sku);
-                            setSelectedSku(null);
-                          }}
+                          onClick={() => handleRemoveItem(selectedItem.sku)}
                           className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -647,7 +659,7 @@ export default function WarehouseDetailModal({
                           {/* NÚT XUẤT KHO */}
                           <button
                             type="button"
-                            onClick={() => onRemove(it.sku)}
+                            onClick={() => handleRemoveItem(it.sku)}
                             className="flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 p-1 text-rose-700 hover:bg-rose-100 transition cursor-pointer"
                             title="Xuất mã này ra khỏi kho"
                           >

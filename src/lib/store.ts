@@ -123,6 +123,9 @@ type ItemRow = {
   warehouse: number;
   qty: number;
   updated_at: string;
+  status?: "active" | "sold";
+  sold_at?: string | null;
+  sold_note?: string | null;
 };
 
 type MessageRow = {
@@ -139,7 +142,7 @@ type MessageRow = {
 type HistoryRow = {
   id: string;
   sku: string;
-  action: "in" | "out" | "transfer";
+  action: "in" | "out" | "transfer" | "sold" | "restock";
   from_warehouse: number | null;
   to_warehouse: number | null;
   note: string;
@@ -152,6 +155,9 @@ const rowToItem = (r: ItemRow): Item => ({
   warehouse: r.warehouse,
   qty: r.qty,
   updatedAt: r.updated_at,
+  status: r.status === "sold" ? "sold" : "active",
+  soldAt: r.sold_at || undefined,
+  soldNote: r.sold_note || undefined,
 });
 
 const rowToMessage = (r: MessageRow): ZaloMessage => ({
@@ -412,6 +418,47 @@ export async function pushHistory(entry: Omit<ItemHistory, "id" | "createdAt"> &
 export async function markItemSold(sku: string, note: string = "Đã bán"): Promise<Item | undefined> {
   const code = sku.trim().toUpperCase();
   const now = new Date().toISOString();
+
+  if (supabaseEnabled) {
+    const sb = getSupabase();
+    const existing = await findItem(code);
+    if (!existing) return undefined;
+
+    const { error } = await sb!
+      .from("warehouse_items")
+      .update({
+        status: "sold",
+        sold_at: now,
+        sold_note: note,
+        updated_at: now,
+      })
+      .eq("sku", code);
+
+    if (error) {
+      console.error("Supabase markItemSold error:", error.message);
+      throw new Error(`Supabase markItemSold: ${error.message}`);
+    }
+
+    const updated: Item = {
+      ...existing,
+      status: "sold",
+      soldAt: now,
+      soldNote: note,
+      updatedAt: now,
+    };
+
+    await pushHistory({
+      sku: code,
+      action: "sold",
+      fromWarehouse: existing.warehouse,
+      toWarehouse: null,
+      note: note || "Đánh dấu đã bán",
+      createdAt: now,
+    });
+
+    return updated;
+  }
+
   db = loadDB();
   const item = db.items.find((i) => i.sku === code);
   if (!item) return undefined;
@@ -437,6 +484,52 @@ export async function markItemSold(sku: string, note: string = "Đã bán"): Pro
 export async function restockItem(sku: string, warehouse?: number, note: string = "Khách trả / Nhập lại kho"): Promise<Item | undefined> {
   const code = sku.trim().toUpperCase();
   const now = new Date().toISOString();
+
+  if (supabaseEnabled) {
+    const sb = getSupabase();
+    const existing = await findItem(code);
+    if (!existing) return undefined;
+
+    const targetWh = warehouse || existing.warehouse;
+    const oldWh = existing.warehouse;
+
+    const { error } = await sb!
+      .from("warehouse_items")
+      .update({
+        status: "active",
+        warehouse: targetWh,
+        sold_at: null,
+        sold_note: null,
+        updated_at: now,
+      })
+      .eq("sku", code);
+
+    if (error) {
+      console.error("Supabase restockItem error:", error.message);
+      throw new Error(`Supabase restockItem: ${error.message}`);
+    }
+
+    const updated: Item = {
+      ...existing,
+      status: "active",
+      warehouse: targetWh,
+      updatedAt: now,
+      soldAt: undefined,
+      soldNote: undefined,
+    };
+
+    await pushHistory({
+      sku: code,
+      action: "restock",
+      fromWarehouse: oldWh,
+      toWarehouse: targetWh,
+      note: note || `Nhập lại kho ${targetWh}`,
+      createdAt: now,
+    });
+
+    return updated;
+  }
+
   db = loadDB();
   const item = db.items.find((i) => i.sku === code);
   if (!item) return undefined;
