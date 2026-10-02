@@ -77,11 +77,12 @@ export default function RightMenuDrawer({
     try {
       // Header CSV với BOM để Excel tiếng Việt không bị lỗi font
       const BOM = "\uFEFF";
-      const headers = ["STT", "Mã SKU", "Kho Vị Trí", "Tên Mặt Hàng", "Số Lượng", "Thời Gian Cập Nhật"];
+      const headers = ["STT", "Mã SKU", "Kho Vị Trí", "Trạng Thái", "Tên Mặt Hàng", "Số Lượng", "Thời Gian Cập Nhật"];
       const rows = items.map((it, idx) => [
         idx + 1,
         `"${it.sku}"`,
         `"Kho ${pad(it.warehouse)}"`,
+        `"${it.status === "sold" ? "Đã bán" : "Còn trong kho"}"`,
         `"${it.name}"`,
         it.qty,
         `"${new Date(it.updatedAt).toLocaleString("vi-VN")}"`,

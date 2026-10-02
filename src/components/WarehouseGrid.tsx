@@ -19,7 +19,7 @@ export default function WarehouseGrid({
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
       {Array.from({ length: totalWarehouses }, (_, i) => i + 1).map((w) => {
-        const list = items.filter((it) => it.warehouse === w);
+        const list = items.filter((it) => it.warehouse === w && it.status !== "sold");
         const count = list.length;
         const hasItem = count > 0;
         const isSelected = highlight === w;

@@ -4,9 +4,12 @@ export interface Item {
   warehouse: number;
   qty: number;
   updatedAt: string;
+  status?: "active" | "sold";
+  soldAt?: string;
+  soldNote?: string;
 }
 
-export type HistoryAction = "in" | "out" | "transfer";
+export type HistoryAction = "in" | "out" | "transfer" | "sold" | "restock";
 
 export interface ItemHistory {
   id: string;

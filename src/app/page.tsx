@@ -113,21 +113,31 @@ export default function Home() {
       })
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "zalo_messages" },
+        { event: "*", schema: "public", table: "zalo_messages" },
         (payload) => {
-          const row = payload.new as Record<string, unknown>;
-          const msg: ZaloMessage = {
-            id: String(row.id),
-            groupId: String(row.group_id),
-            warehouse: (row.warehouse as number | null) ?? null,
-            message: String(row.message),
-            status: (row.status as "ok" | "error") ?? "ok",
-            detail: String(row.detail ?? ""),
-            createdAt: String(row.created_at),
-          };
-          setMessages((prev) =>
-            prev.some((m) => m.id === msg.id) ? prev : [msg, ...prev].slice(0, 50)
-          );
+          if (payload.eventType === "INSERT") {
+            const row = payload.new as Record<string, unknown>;
+            const msg: ZaloMessage = {
+              id: String(row.id),
+              groupId: String(row.group_id),
+              warehouse: (row.warehouse as number | null) ?? null,
+              message: String(row.message),
+              status: (row.status as "ok" | "error") ?? "ok",
+              detail: String(row.detail ?? ""),
+              createdAt: String(row.created_at),
+              read: Boolean(row.read),
+            };
+            setMessages((prev) =>
+              prev.some((m) => m.id === msg.id) ? prev : [msg, ...prev].slice(0, 50)
+            );
+          } else if (payload.eventType === "UPDATE") {
+            const row = payload.new as Record<string, unknown>;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === String(row.id) ? { ...m, read: Boolean(row.read) } : m
+              )
+            );
+          }
         }
       )
       .subscribe();
@@ -152,6 +162,34 @@ export default function Home() {
     if (res.ok) {
       setItems((list) => list.filter((i) => i.sku !== sku));
       fetchData();
+    }
+  }
+
+  async function markSoldSku(sku: string, note: string = "Đã bán") {
+    const res = await fetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "mark_sold", sku, note }),
+    });
+    if (res.ok) {
+      fetchData();
+    } else {
+      const data = await res.json();
+      alert(data.error || "Không thể đánh dấu đã bán");
+    }
+  }
+
+  async function restockSku(sku: string, warehouse?: number, note: string = "Khách trả / Nhập lại kho") {
+    const res = await fetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "restock", sku, warehouse, note }),
+    });
+    if (res.ok) {
+      fetchData();
+    } else {
+      const data = await res.json();
+      alert(data.error || "Không thể nhập lại kho");
     }
   }
 
@@ -193,6 +231,21 @@ export default function Home() {
     setMessages((prev) => prev.map((m) => ({ ...m, read: true })));
   }
 
+  async function markReadHandler(id: string) {
+    try {
+      await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_read", id }),
+      });
+      setMessages((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, read: true } : m))
+      );
+    } catch (e) {
+      console.error("Lỗi khi lưu trạng thái đã đọc:", e);
+    }
+  }
+
   async function onWebhook(payload: { groupId: string; message: string }) {
     const res = await fetch("/api/webhook/zalo", {
       method: "POST",
@@ -205,11 +258,16 @@ export default function Home() {
     return data as { ok: boolean; message: ZaloMessage };
   }
 
-  // Thống kê số lượng ô kho đang có hàng
-  const occupiedWarehouses = useMemo(() => {
-    const set = new Set(items.map((i) => i.warehouse));
-    return set.size;
+  // Danh sách các mặt hàng đang còn trong kho (chưa bán)
+  const activeItems = useMemo(() => {
+    return items.filter((i) => i.status !== "sold");
   }, [items]);
+
+  // Thống kê số lượng ô kho đang có hàng thực tế
+  const occupiedWarehouses = useMemo(() => {
+    const set = new Set(activeItems.map((i) => i.warehouse));
+    return set.size;
+  }, [activeItems]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col antialiased selection:bg-emerald-100 selection:text-emerald-900">
@@ -234,7 +292,7 @@ export default function Home() {
           <div className="flex items-center gap-1.5 sm:gap-2.5">
             {/* THỐNG KÊ NHANH MÃ & SỐ KHO */}
             <div className="hidden xs:flex items-center gap-1.5 rounded-xl bg-slate-100 px-2.5 py-1.5 border border-slate-200 text-xs font-semibold text-slate-700">
-              <span><strong className="font-mono text-slate-900 font-bold">{items.length}</strong> mã</span>
+              <span><strong className="font-mono text-slate-900 font-bold">{activeItems.length}</strong> mã</span>
               <span className="text-slate-300">|</span>
               <span><strong className="text-emerald-700 font-bold">{occupiedWarehouses}</strong>/{totalWarehouses} kho</span>
             </div>
@@ -259,6 +317,7 @@ export default function Home() {
               messages={messages}
               onOpenWarehouse={setOpenWarehouse}
               onMarkAllRead={markAllReadHandler}
+              onMarkRead={markReadHandler}
             />
 
             {/* LÀM MỚI DỮ LIỆU */}
@@ -328,10 +387,23 @@ export default function Home() {
                       </span>
                     </div>
                     <div className="text-sm text-slate-700 font-medium mt-0.5">
-                      Sản phẩm hiện đang nằm cố định tại:{" "}
-                      <span className="inline-flex items-center gap-1 font-black text-emerald-700 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 text-base">
-                        KHO {pad(found.warehouse)}
-                      </span>
+                      {found.status === "sold" ? (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1 font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300 text-xs">
+                            ĐÃ BÁN (Ẩn khỏi kho)
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            Kho lưu trước đó: <strong>Kho {pad(found.warehouse)}</strong>
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          Sản phẩm hiện đang nằm cố định tại:{" "}
+                          <span className="inline-flex items-center gap-1 font-black text-emerald-700 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 text-base">
+                            KHO {pad(found.warehouse)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -417,6 +489,8 @@ export default function Home() {
           onClose={() => setOpenWarehouse(null)}
           onRemove={removeSku}
           onTransfer={transferSku}
+          onMarkSold={markSoldSku}
+          onRestock={restockSku}
           onOpenPaste={(wh) => {
             setDefaultPasteWarehouse(wh);
             setIsPasteOpen(true);

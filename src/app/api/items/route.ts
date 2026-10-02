@@ -8,7 +8,10 @@ import {
   getMessages,
   getWarehouseCount,
   markAllMessagesRead,
+  markItemSold,
+  markMessageRead,
   removeItem,
+  restockItem,
   transferItem,
   upsertItem,
 } from "@/lib/store";
@@ -54,10 +57,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true });
     }
 
+    // 3. Đánh dấu 1 thông báo cụ thể đã đọc
+    if (body.action === "mark_read" && body.id) {
+      await markMessageRead(String(body.id));
+      return NextResponse.json({ ok: true });
+    }
+
     const totalWarehouses = await getWarehouseCount();
 
     if (!body.sku || typeof body.sku !== "string") {
       return NextResponse.json({ error: "Thiếu sku" }, { status: 400 });
+    }
+
+    if (body.action === "mark_sold") {
+      const note = typeof body.note === "string" ? body.note : "Đã bán";
+      const sold = await markItemSold(body.sku, note);
+      if (!sold) {
+        return NextResponse.json({ error: `Không tìm thấy ${body.sku}` }, { status: 404 });
+      }
+      return NextResponse.json({ ok: true, sold });
+    }
+
+    if (body.action === "restock") {
+      const warehouse = body.warehouse ? Number(body.warehouse) : undefined;
+      const note = typeof body.note === "string" ? body.note : "Khách trả / Nhập lại kho";
+      const restocked = await restockItem(body.sku, warehouse, note);
+      if (!restocked) {
+        return NextResponse.json({ error: `Không tìm thấy ${body.sku}` }, { status: 404 });
+      }
+      return NextResponse.json({ ok: true, restocked });
     }
 
     if (body.action === "remove") {

@@ -27,10 +27,12 @@ export default function NotificationBell({
   messages,
   onOpenWarehouse,
   onMarkAllRead,
+  onMarkRead,
 }: {
   messages: ZaloMessage[];
   onOpenWarehouse: (warehouse: number) => void;
   onMarkAllRead?: () => void;
+  onMarkRead?: (id: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<"all" | "unread" | "read">("all");
@@ -73,7 +75,7 @@ export default function NotificationBell({
     };
   }, [isOpen]);
 
-  // Đếm số lượng chưa đọc
+  // Đếm số lượng chưa đọc (kết hợp cả cờ từ DB và readIds local)
   const unreadCount = useMemo(() => {
     return messages.filter((m) => !readIds.has(m.id) && !m.read).length;
   }, [messages, readIds]);
@@ -91,6 +93,9 @@ export default function NotificationBell({
     const next = new Set(readIds);
     next.add(id);
     saveReadIds(next);
+    if (onMarkRead) {
+      onMarkRead(id);
+    }
   };
 
   const handleMarkAll = () => {
@@ -119,9 +124,9 @@ export default function NotificationBell({
         )}
       </button>
 
-      {/* DROPDOWN MENU */}
+      {/* DROPDOWN MENU - Định vị chuẩn trên cả Mobile và Desktop */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-[340px] sm:w-[420px] max-w-[calc(100vw-24px)] rounded-2xl border border-slate-200 bg-white shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="fixed inset-x-2 top-14 sm:inset-x-auto sm:right-4 sm:top-14 sm:w-[420px] rounded-2xl border border-slate-200 bg-white shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           {/* HEADER DROPDOWN */}
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 py-3">
             <div className="flex items-center gap-2">
@@ -133,16 +138,25 @@ export default function NotificationBell({
               )}
             </div>
 
-            {unreadCount > 0 && (
+            <div className="flex items-center gap-3">
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleMarkAll}
+                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                >
+                  <CheckCheck className="h-3.5 w-3.5" />
+                  <span>Đọc tất cả</span>
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleMarkAll}
-                className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+                onClick={() => setIsOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer text-xs"
               >
-                <CheckCheck className="h-3.5 w-3.5" />
-                <span>Đọc tất cả</span>
+                ✕
               </button>
-            )}
+            </div>
           </div>
 
           {/* TABS PHÂN LOẠI */}

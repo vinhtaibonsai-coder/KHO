@@ -133,6 +133,7 @@ type MessageRow = {
   status: "ok" | "error";
   detail: string;
   created_at: string;
+  read?: boolean;
 };
 
 type HistoryRow = {
@@ -161,6 +162,7 @@ const rowToMessage = (r: MessageRow): ZaloMessage => ({
   status: r.status,
   detail: r.detail,
   createdAt: r.created_at,
+  read: typeof r.read === "boolean" ? r.read : false,
 });
 
 const rowToHistory = (r: HistoryRow): ItemHistory => ({
@@ -222,6 +224,7 @@ export async function getMessages(): Promise<ZaloMessage[]> {
 }
 
 export async function pushMessage(msg: ZaloMessage) {
+  const isRead = typeof msg.read === "boolean" ? msg.read : false;
   if (supabaseEnabled) {
     const sb = getSupabase();
     const { error } = await sb!.from("zalo_messages").upsert(
@@ -233,6 +236,7 @@ export async function pushMessage(msg: ZaloMessage) {
         status: msg.status,
         detail: msg.detail,
         created_at: msg.createdAt,
+        read: isRead,
       },
       { onConflict: "id" }
     );
@@ -240,7 +244,7 @@ export async function pushMessage(msg: ZaloMessage) {
     return;
   }
   db = loadDB();
-  db.messages.unshift(msg);
+  db.messages.unshift({ ...msg, read: isRead });
   if (db.messages.length > 50) db.messages.length = 50;
   saveDB(db);
 }
@@ -405,6 +409,59 @@ export async function pushHistory(entry: Omit<ItemHistory, "id" | "createdAt"> &
   return fullEntry;
 }
 
+export async function markItemSold(sku: string, note: string = "Đã bán"): Promise<Item | undefined> {
+  const code = sku.trim().toUpperCase();
+  const now = new Date().toISOString();
+  db = loadDB();
+  const item = db.items.find((i) => i.sku === code);
+  if (!item) return undefined;
+
+  item.status = "sold";
+  item.soldAt = now;
+  item.soldNote = note;
+  item.updatedAt = now;
+  saveDB(db);
+
+  await pushHistory({
+    sku: code,
+    action: "sold",
+    fromWarehouse: item.warehouse,
+    toWarehouse: null,
+    note: note || "Đánh dấu đã bán",
+    createdAt: now,
+  });
+
+  return item;
+}
+
+export async function restockItem(sku: string, warehouse?: number, note: string = "Khách trả / Nhập lại kho"): Promise<Item | undefined> {
+  const code = sku.trim().toUpperCase();
+  const now = new Date().toISOString();
+  db = loadDB();
+  const item = db.items.find((i) => i.sku === code);
+  if (!item) return undefined;
+
+  const targetWh = warehouse || item.warehouse;
+  const oldWh = item.warehouse;
+  item.status = "active";
+  item.warehouse = targetWh;
+  item.updatedAt = now;
+  delete item.soldAt;
+  delete item.soldNote;
+  saveDB(db);
+
+  await pushHistory({
+    sku: code,
+    action: "restock",
+    fromWarehouse: oldWh,
+    toWarehouse: targetWh,
+    note: note || `Nhập lại kho ${targetWh}`,
+    createdAt: now,
+  });
+
+  return item;
+}
+
 export async function removeItem(sku: string, note: string = "Xuất kho thủ công"): Promise<Item | undefined> {
   const code = sku.trim().toUpperCase();
   if (supabaseEnabled) {
@@ -499,10 +556,29 @@ export async function addWarehouse(): Promise<number> {
   return next;
 }
 
+export async function markMessageRead(id: string): Promise<boolean> {
+  if (supabaseEnabled) {
+    const sb = getSupabase();
+    await sb!.from("zalo_messages").update({ read: true }).eq("id", id);
+  }
+  db = loadDB();
+  const m = db.messages.find((item) => item.id === id);
+  if (m) {
+    m.read = true;
+    saveDB(db);
+  }
+  return true;
+}
+
 export async function markAllMessagesRead(): Promise<boolean> {
+  if (supabaseEnabled) {
+    const sb = getSupabase();
+    await sb!.from("zalo_messages").update({ read: true }).eq("read", false);
+  }
   db = loadDB();
   db.messages = db.messages.map((m) => ({ ...m, read: true }));
   saveDB(db);
   return true;
 }
+
 
