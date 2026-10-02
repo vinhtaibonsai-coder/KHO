@@ -32,24 +32,19 @@ export function hasSku(text) {
   return /(^|\s)[+\-]?[A-Za-z]{1,6}\d+(?:[.\-]\d+)*/.test(text ?? "");
 }
 
-/** "KHO 05" / "Kho 5" / "Nhóm Kho 31" -> 5 / 31. Bắt buộc tên nhóm phải có chữ KHO */
+/** "KHO 05" / "Kho 5" / "Nhóm Kho 31" -> 5 / 31. Bắt buộc chữ KHO đi liền với số kho */
 export function parseWarehouseFromName(name) {
   if (!name || typeof name !== "string") return null;
-  // BẮT BUỘC TÊN NHÓM PHẢI CÓ TỪ "KHO" (không phân biệt hoa thường)
-  if (!/\bkho\b/i.test(name)) return null;
 
-  // Lấy số kho ngay sau chữ kho (ví dụ: Kho 1, Kho 05, Kho-31, Kho_12)
-  const m = name.match(/\bkho[\s_\-]*0*(\d+)\b/i);
+  // Khớp chính xác: "Kho 01", "KHO 31", "Kho_12", "Kho-05", "KHO31"
+  // Không bắt các số năm ngẫu nhiên như "Hình lũa 2026", "Năm 2026"
+  const m = name.match(/\bkho[\s_\-]*0*(\d{1,3})\b/i);
   if (m) {
     const n = parseInt(m[1], 10);
-    return n >= 1 ? n : null;
-  }
-
-  // Nếu tên có chữ Kho và có số bất kỳ trong tên nhóm (VD: "Kho phân loại 2")
-  const m2 = name.match(/\b0*(\d+)\b/);
-  if (m2) {
-    const n = parseInt(m2[1], 10);
-    return n >= 1 ? n : null;
+    // Giới hạn hợp lý số kho từ 1 đến 100 để tránh bắt nhầm năm 2026
+    if (n >= 1 && n <= 100) {
+      return n;
+    }
   }
 
   return null;

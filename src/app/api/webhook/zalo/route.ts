@@ -9,7 +9,7 @@ function parseWarehouse(groupId: string): number | null {
   const m = groupId.match(/(\d+)/);
   if (!m) return null;
   const n = parseInt(m[1], 10);
-  return n >= 1 ? n : null;
+  return n >= 1 && n <= 100 ? n : null;
 }
 
 // Bóc tách cú pháp chuyển kho: CK E120.124 -> 5, CHUYEN E120.124 QUA KHO 5, CK E120.124 KHO 5, v.v.

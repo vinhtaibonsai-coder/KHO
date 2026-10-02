@@ -12,6 +12,7 @@ import {
   markMessageRead,
   removeItem,
   restockItem,
+  setWarehouseCount,
   transferItem,
   upsertItem,
 } from "@/lib/store";
@@ -45,6 +46,12 @@ export async function POST(req: Request) {
   }
 
   try {
+    // 0. Đặt lại số lượng kho
+    if (body.action === "set_warehouse_count" && body.count) {
+      const newTotal = await setWarehouseCount(Number(body.count));
+      return NextResponse.json({ ok: true, totalWarehouses: newTotal });
+    }
+
     // 1. Thêm kho mới
     if (body.action === "add_warehouse") {
       const newTotal = await addWarehouse();

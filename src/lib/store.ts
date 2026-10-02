@@ -723,6 +723,26 @@ export async function getWarehouseCount(): Promise<number> {
   return db.totalWarehouses || DEFAULT_TOTAL_WAREHOUSES;
 }
 
+export async function setWarehouseCount(count: number): Promise<number> {
+  const target = Math.max(DEFAULT_TOTAL_WAREHOUSES, count);
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      await sb!.from("warehouse_settings").upsert(
+        { id: "default", total_warehouses: target },
+        { onConflict: "id" }
+      );
+    } catch (err) {
+      console.warn("Lưu warehouse_settings Supabase:", err);
+    }
+  }
+
+  db = loadDB();
+  db.totalWarehouses = target;
+  saveDB(db);
+  return target;
+}
+
 export async function addWarehouse(): Promise<number> {
   const current = await getWarehouseCount();
   const next = current + 1;
@@ -746,6 +766,11 @@ export async function addWarehouse(): Promise<number> {
 }
 
 export async function ensureWarehouseExists(warehouseNumber: number): Promise<number> {
+  // Bỏ qua nếu số kho không hợp lệ hoặc lớn hơn 100 (để tránh bắt nhầm năm như 2026)
+  if (warehouseNumber < 1 || warehouseNumber > 100) {
+    return await getWarehouseCount();
+  }
+
   const current = await getWarehouseCount();
   if (warehouseNumber <= current) return current;
 
