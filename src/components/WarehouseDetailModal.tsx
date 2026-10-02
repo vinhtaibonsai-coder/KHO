@@ -584,38 +584,42 @@ export default function WarehouseDetailModal({
                   return (
                     <div
                       key={it.sku}
-                      className="rounded-xl border border-slate-200 bg-white p-3 hover:border-emerald-400 hover:shadow-2xs transition cursor-pointer"
-                      onClick={() => setSelectedSku(it.sku)}
+                      className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 hover:border-emerald-400 hover:shadow-2xs transition"
                     >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-xs font-bold text-slate-400">
+                      <div className="flex items-center justify-between gap-2">
+                        {/* THÔNG TIN MÃ: Bấm vào xem lịch sử */}
+                        <div 
+                          className="flex items-center gap-2.5 min-w-0 cursor-pointer flex-1"
+                          onClick={() => setSelectedSku(it.sku)}
+                          title="Bấm để xem lịch sử chi tiết"
+                        >
+                          <span className="font-mono text-[11px] font-bold text-slate-400 shrink-0">
                             #{pad(idx + 1)}
                           </span>
-                          <div>
-                            <span className="font-mono text-base font-black text-slate-900 hover:text-emerald-700 tracking-wide">
+                          <div className="min-w-0">
+                            <span className="font-mono text-base font-black text-slate-900 hover:text-emerald-700 tracking-wide block truncate">
                               {it.sku}
                             </span>
-                            <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-                              <span>Nhập: {time} - {date}</span>
-                            </div>
+                            <span className="text-[10px] text-slate-400 block truncate">
+                              {time} · {date}
+                            </span>
                           </div>
                         </div>
 
-                        {/* NÚT THAO TÁC RÕ RÀNG: ĐÃ BÁN, CHUYỂN, XUẤT */}
+                        {/* NÚT THAO TÁC RÕ RÀNG, TINH GỌN */}
                         <div 
-                          className="flex items-center gap-1.5 self-end sm:self-center"
+                          className="flex items-center gap-1 shrink-0"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {/* NÚT ĐÁNH DẤU ĐÃ BÁN */}
                           <button
                             type="button"
                             onClick={() => handleMarkSoldItem(it.sku)}
-                            className="flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
-                            title="Đánh dấu đã bán (ẩn khỏi kho nhưng vẫn lưu dữ liệu vĩnh viễn)"
+                            className="flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
+                            title="Đánh dấu đã bán"
                           >
-                            <ShoppingBag className="h-3.5 w-3.5 text-amber-600" />
-                            <span>Đã bán</span>
+                            <ShoppingBag className="h-3 w-3 text-amber-600" />
+                            <span>Bán</span>
                           </button>
 
                           {/* NÚT CHUYỂN KHO */}
@@ -629,14 +633,14 @@ export default function WarehouseDetailModal({
                                 setTargetWarehouse(warehouse === 1 ? 2 : 1);
                               }
                             }}
-                            className={`flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition cursor-pointer ${
+                            className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-bold transition cursor-pointer ${
                               isTransferringThis
                                 ? "border-indigo-400 bg-indigo-50 text-indigo-800"
                                 : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                             }`}
-                            title="Chuyển mã này sang ô kho khác"
+                            title="Chuyển sang kho khác"
                           >
-                            <ArrowRightLeft className="h-3.5 w-3.5 text-indigo-600" />
+                            <ArrowRightLeft className="h-3 w-3 text-indigo-600" />
                             <span>{isTransferringThis ? "Huỷ" : "Chuyển"}</span>
                           </button>
 
@@ -644,11 +648,10 @@ export default function WarehouseDetailModal({
                           <button
                             type="button"
                             onClick={() => onRemove(it.sku)}
-                            className="flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+                            className="flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 p-1 text-rose-700 hover:bg-rose-100 transition cursor-pointer"
                             title="Xuất mã này ra khỏi kho"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
-                            <span>Xuất</span>
                           </button>
                         </div>
                       </div>

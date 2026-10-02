@@ -126,34 +126,35 @@ export default function RightMenuDrawer({
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="absolute inset-0" onClick={onClose} />
 
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
+      <div className="fixed inset-y-0 right-0 max-w-full flex">
         <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200">
           
-          {/* HEADER MENU BÊN PHẢI */}
-          <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/90 flex items-center justify-between">
+          {/* HEADER MENU BÊN PHẢI - Thêm pt-safe / pt-12 trên mobile để không bị tai thỏ & camera che */}
+          <div className="pt-10 sm:pt-4 px-4 sm:px-5 pb-3 sm:pb-4 border-b border-slate-200 bg-white/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-10">
             <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-slate-900 text-white flex items-center justify-center">
+              <div className="h-9 w-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
                 <Settings className="h-5 w-5 text-emerald-400" />
               </div>
               <div>
-                <h2 className="text-base font-extrabold text-slate-900 tracking-tight">
+                <h2 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">
                   Menu Quản Lý & Tiện Ích
                 </h2>
-                <p className="text-xs text-slate-500 font-medium">Xưởng Lũa Nhựt</p>
+                <p className="text-[11px] text-slate-500 font-medium">Xưởng Lũa Nhựt</p>
               </div>
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer"
+              className="rounded-xl p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer border border-slate-200 bg-slate-50"
+              title="Đóng menu"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
           {/* NỘI DUNG CUỘN */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 pb-12">
 
             {/* THÔNG BÁO THÀNH CÔNG */}
             {addSuccess && (
