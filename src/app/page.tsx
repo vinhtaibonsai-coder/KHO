@@ -278,15 +278,15 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col antialiased selection:bg-emerald-100 selection:text-emerald-900">
       
-      {/* TOPBAR / HEADER THEO CHUẨN DESIGN SYSTEM SÁNG & MOBILE PWA */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2.5 sm:px-6 sm:py-3.5">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs shrink-0">
-              <Boxes className="h-5 w-5 text-emerald-400" />
+      {/* TOPBAR / HEADER THEO CHUẨN DESIGN SYSTEM SÁNG & MOBILE PWA (Hỗ trợ tai thỏ / notch) */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs pt-9 sm:pt-0">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2 sm:px-6 sm:py-3.5">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs shrink-0">
+              <Boxes className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
             </div>
-            <div>
-              <h1 className="text-sm font-extrabold text-slate-900 tracking-tight sm:text-lg">
+            <div className="min-w-0">
+              <h1 className="text-xs sm:text-base md:text-lg font-black text-slate-900 tracking-tight truncate">
                 XƯỞNG LŨA NHỰT
               </h1>
               <p className="text-[11px] text-slate-500 font-medium hidden md:block">
@@ -376,37 +376,39 @@ export default function Home() {
           {query.trim() && (
             found ? (
               <>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border-2 border-emerald-500 bg-emerald-50/80 px-5 py-4 shadow-sm">
-                <div className="flex items-center gap-3.5">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs shrink-0">
-                    <CheckCircle2 className="h-6 w-6" />
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 rounded-2xl border-2 border-emerald-500 bg-emerald-50/90 p-4 sm:p-5 shadow-sm">
+                {/* THÔNG TIN VỊ TRÍ TÌM THẤY */}
+                <div className="flex items-start sm:items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs shrink-0 mt-0.5 sm:mt-0">
+                    <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
                   </div>
-                  <div>
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <span className="text-xs font-semibold text-emerald-800 uppercase tracking-wide">
-                        Đã tìm thấy vị trí:
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2">
+                      <span className="text-[11px] sm:text-xs font-bold text-emerald-800 uppercase tracking-wide">
+                        ĐÃ TÌM THẤY:
                       </span>
-                      <span className="font-mono text-lg sm:text-xl font-bold text-slate-900 tracking-wider">
+                      <span className="font-mono text-xl sm:text-2xl font-black text-slate-900 tracking-wider">
                         {found.sku}
                       </span>
-                      <span className="text-xs text-slate-500 font-medium">
+                      <span className="text-[11px] text-slate-400 font-medium">
                         (Nhập lúc {fmt(found.updatedAt)})
                       </span>
                     </div>
-                    <div className="text-sm text-slate-700 font-medium mt-0.5">
+
+                    <div className="text-xs sm:text-sm text-slate-700 font-medium mt-1">
                       {found.status === "sold" ? (
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-flex items-center gap-1 font-bold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300 text-xs">
+                          <span className="inline-flex items-center gap-1 font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 text-[11px]">
                             ĐÃ BÁN (Ẩn khỏi kho)
                           </span>
-                          <span className="text-xs text-slate-500">
+                          <span className="text-[11px] text-slate-500">
                             Kho lưu trước đó: <strong>Kho {pad(found.warehouse)}</strong>
                           </span>
                         </div>
                       ) : (
-                        <div>
-                          Sản phẩm hiện đang nằm cố định tại:{" "}
-                          <span className="inline-flex items-center gap-1 font-black text-emerald-700 bg-emerald-100/90 px-2.5 py-0.5 rounded-lg border border-emerald-300 text-base">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-slate-600">Đang nằm cố định tại:</span>
+                          <span className="inline-flex items-center gap-1 font-black text-emerald-800 bg-emerald-200/80 px-2.5 py-0.5 rounded-lg border border-emerald-400 text-sm">
                             KHO {pad(found.warehouse)}
                           </span>
                         </div>
@@ -415,7 +417,8 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 self-start sm:self-center shrink-0">
+                {/* CỤM NÚT THAO TÁC CÙNG HÀNG, ĐỀU NHAU, KHÔNG LỆCH */}
+                <div className="flex items-center gap-1.5 sm:gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-emerald-200/60 shrink-0 flex-wrap">
                   {found.status === "sold" ? (
                     <button
                       type="button"
@@ -424,14 +427,14 @@ export default function Home() {
                         if (!confirmRestock) return;
                         await restockSku(found.sku, found.warehouse);
                       }}
-                      className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-50 transition active:scale-95 cursor-pointer"
                     >
-                      <RotateCcw className="h-4 w-4 text-emerald-600" />
+                      <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
                       <span>Nhập lại</span>
                     </button>
                   ) : (
                     <>
-                      {/* NÚT ĐÁNH DẤU ĐÃ BÁN NGAY */}
+                      {/* NÚT ĐÁNH DẤU ĐÃ BÁN */}
                       <button
                         type="button"
                         onClick={async () => {
@@ -441,28 +444,28 @@ export default function Home() {
                           if (!confirmSold) return;
                           await markSoldSku(found.sku, "Đã bán từ tra cứu nhanh");
                         }}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 shadow-2xs hover:bg-amber-100 transition active:scale-95 cursor-pointer"
+                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border border-amber-300 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer"
                         title="Đánh dấu đã bán"
                       >
-                        <ShoppingBag className="h-4 w-4 text-amber-600" />
+                        <ShoppingBag className="h-3.5 w-3.5" />
                         <span>Đã bán</span>
                       </button>
 
-                      {/* NÚT CHUYỂN KHO NGAY */}
+                      {/* NÚT CHUYỂN KHO */}
                       <button
                         type="button"
                         onClick={() => {
                           setIsSearchTransferring(!isSearchTransferring);
                           setSearchTargetWarehouse(found.warehouse === 1 ? 2 : 1);
                         }}
-                        className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer ${
+                        className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border px-3 py-2 text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer ${
                           isSearchTransferring
-                            ? "border-indigo-400 bg-indigo-50 text-indigo-800"
-                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                            ? "border-indigo-500 bg-indigo-600 text-white"
+                            : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
                         }`}
                         title="Chuyển mã này sang ô kho khác"
                       >
-                        <ArrowRightLeft className="h-4 w-4 text-indigo-600" />
+                        <ArrowRightLeft className="h-3.5 w-3.5" />
                         <span>{isSearchTransferring ? "Đóng" : "Chuyển kho"}</span>
                       </button>
                     </>
@@ -472,9 +475,9 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => setOpenWarehouse(found.warehouse)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-2xs hover:bg-slate-800 transition active:scale-95 cursor-pointer"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-2xs hover:bg-slate-800 transition active:scale-95 cursor-pointer"
                   >
-                    <Warehouse className="h-4 w-4 text-emerald-400" />
+                    <Warehouse className="h-3.5 w-3.5 text-emerald-400" />
                     <span>Mở Kho {pad(found.warehouse)}</span>
                   </button>
                 </div>
