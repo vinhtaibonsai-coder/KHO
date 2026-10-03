@@ -5,6 +5,7 @@ import { Zalo, ThreadType, LoginQRCallbackEventType } from "zca-js";
 import pngjs from "pngjs";
 import jsQR from "jsqr";
 import qrcodeTerminal from "qrcode-terminal";
+import { syncRecentGroupHistory } from "./sync-history.js";
 
 const { PNG } = pngjs;
 
@@ -395,7 +396,31 @@ async function main() {
     /* bỏ qua */
   }
   console.log(`[login] Thành công${uid ? ` (uid ${uid})` : ""}. Webhook: ${WEBHOOK_URL}`);
+
+  // 1. Tự động đồng bộ tin nhắn đã gửi trong lúc tắt máy (Catch-up)
+  console.log("[catch-up] Bắt đầu tự động quét các tin nhắn trong lúc tắt máy...");
+  try {
+    await syncRecentGroupHistory(api, 50);
+  } catch (syncErr) {
+    console.warn("[catch-up] Lỗi khi quét lịch sử:", syncErr.message);
+  }
+
+  // 2. Bắt đầu lắng nghe tin nhắn trực tiếp
   startListener(api);
+
+  // 3. Heartbeat định kỳ 20 giây gửi tín hiệu ping để web hiển thị bot đang chạy
+  const sendHeartbeat = async () => {
+    try {
+      await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "heartbeat" }),
+      });
+    } catch {}
+  };
+  // Gửi ngay 1 lần đầu
+  sendHeartbeat();
+  setInterval(sendHeartbeat, 20000);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

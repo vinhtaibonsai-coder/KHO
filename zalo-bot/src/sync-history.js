@@ -130,6 +130,81 @@ async function main() {
   console.log(`- Tổng số tin nhắn có chứa mã SKU tìm thấy: ${totalParsed}`);
   console.log(`- Tổng số mã đã nạp vào Kho & Supabase: ${totalImported}`);
   console.log("==========================================================");
+  return { totalParsed, totalImported };
 }
 
-main().catch(console.error);
+export async function syncRecentGroupHistory(api, limit = 50) {
+  try {
+    console.log(`\n🔄 [tự động] Đang quét tin nhắn các nhóm Kho trong lúc tắt máy (tối đa ${limit} tin/nhóm)...`);
+    const allGroups = await api.getAllGroups();
+    const groupIds = Object.keys(allGroups?.gridVerMap || allGroups?.gridInfoMap || {});
+    
+    let mapping = { groups: {} };
+    try {
+      mapping = JSON.parse(fs.readFileSync(MAPPING_FILE, "utf8"));
+    } catch {}
+
+    const groupNameMap = new Map();
+    for (let i = 0; i < groupIds.length; i += 20) {
+      const chunk = groupIds.slice(i, i + 20);
+      try {
+        const info = await api.getGroupInfo(chunk);
+        if (info?.gridInfoMap) {
+          for (const [gid, gdata] of Object.entries(info.gridInfoMap)) {
+            if (gdata?.name) groupNameMap.set(gid, gdata.name);
+          }
+        }
+      } catch {}
+      await sleep(50);
+    }
+
+    let parsed = 0;
+    let imported = 0;
+
+    for (const gid of groupIds) {
+      const gName = groupNameMap.get(gid) || "";
+      const wh = resolveWarehouse(mapping, gid, gName);
+      if (!wh) continue;
+
+      try {
+        const history = await api.getGroupChatHistory(gid, limit);
+        const msgs = history?.groupMsgs || [];
+        msgs.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
+        for (const m of msgs) {
+          let text = "";
+          if (typeof m.content === "string") text = m.content.trim();
+          else if (typeof m.msg === "string") text = m.msg.trim();
+          else if (m.content?.title) text = String(m.content.title).trim();
+          else if (m.content?.description) text = String(m.content.description).trim();
+
+          if (text && hasSku(text)) {
+            parsed++;
+            try {
+              const res = await fetch(WEBHOOK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  groupId: `KHO_${String(wh).padStart(2, "0")}`,
+                  message: text.trim(),
+                }),
+              });
+              const data = await res.json();
+              if (data.ok) imported++;
+            } catch {}
+            await sleep(100);
+          }
+        }
+      } catch {}
+    }
+    console.log(`✅ [tự động] Đã đồng bộ xong lịch sử: nạp ${imported}/${parsed} mã từ các nhóm Kho.`);
+    return { parsed, imported };
+  } catch (err) {
+    console.warn(`[sync] Bỏ qua quét lịch sử do lỗi: ${err.message}`);
+    return { parsed: 0, imported: 0 };
+  }
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch(console.error);
+}

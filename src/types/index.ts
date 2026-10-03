@@ -37,5 +37,9 @@ export interface ItemsResponse {
   messages: ZaloMessage[];
   history: ItemHistory[];
   totalWarehouses: number;
+  botStatus?: {
+    online: boolean;
+    lastPing: string | null;
+  };
 }
 

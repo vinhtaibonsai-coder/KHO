@@ -33,6 +33,7 @@ export default function RightMenuDrawer({
   items,
   history,
   messages,
+  botStatus,
   onAddWarehouse,
   onOpenPaste,
   onOpenWarehouse,
@@ -45,6 +46,7 @@ export default function RightMenuDrawer({
   items: Item[];
   history: ItemHistory[];
   messages: ZaloMessage[];
+  botStatus?: { online: boolean; lastPing: string | null };
   onAddWarehouse: () => Promise<void>;
   onOpenPaste: () => void;
   onOpenWarehouse?: (warehouse: number) => void;
@@ -357,16 +359,56 @@ export default function RightMenuDrawer({
             </div>
 
             {/* 6. TRẠNG THÁI HỆ THỐNG */}
-            <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/60 text-xs text-slate-500 space-y-2">
-              <div className="flex items-center gap-2 text-slate-700 font-bold">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                <span>Trạng thái kết nối</span>
+            <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/60 text-xs text-slate-500 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-700 font-bold">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <span>Trạng thái kết nối</span>
+                </div>
+                {botStatus ? (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      botStatus.online
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                        : "bg-amber-100 text-amber-800 border border-amber-300"
+                    }`}
+                  >
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        botStatus.online ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                      }`}
+                    />
+                    {botStatus.online ? "Bot Đang Chạy" : "Bot Đang Tắt"}
+                  </span>
+                ) : null}
               </div>
-              <p className="text-[11px] leading-relaxed">
-                • Zalo Bot: Đang quét tin nhắn tự động và đồng bộ thời gian thực.<br />
-                • Hệ thống lưu trữ: Tự động ghi nhận và bảo lưu vĩnh viễn.<br />
-                • Ứng dụng PWA: Đã kích hoạt chế độ App di động.
-              </p>
+
+              <div className="text-[11px] leading-relaxed space-y-1">
+                <div className="flex items-start gap-1.5">
+                  <span className={botStatus?.online ? "text-emerald-600 font-bold" : "text-amber-600 font-bold"}>•</span>
+                  <span>
+                    <strong>Zalo Bot trên máy:</strong>{" "}
+                    {botStatus?.online ? (
+                      <span className="text-emerald-700 font-semibold">Đang hoạt động trực tiếp (nghe tin nhắn & tự đồng bộ).</span>
+                    ) : (
+                      <span className="text-amber-700">Chưa bật hoặc đang tắt máy. Khi bật lại sẽ tự quét nạp tin nhắn cũ.</span>
+                    )}
+                  </span>
+                </div>
+                {botStatus?.lastPing && (
+                  <div className="text-[10px] text-slate-400 pl-3">
+                    Lần phát tín hiệu cuối: {new Date(botStatus.lastPing).toLocaleTimeString("vi-VN")} - {new Date(botStatus.lastPing).toLocaleDateString("vi-VN")}
+                  </div>
+                )}
+                <div className="flex items-start gap-1.5">
+                  <span className="text-emerald-600 font-bold">•</span>
+                  <span><strong>Hệ thống cơ sở dữ liệu:</strong> Hoạt động ổn định trên Supabase Cloud.</span>
+                </div>
+                <div className="flex items-start gap-1.5">
+                  <span className="text-emerald-600 font-bold">•</span>
+                  <span><strong>Chế độ PWA:</strong> Đã kích hoạt trên trình duyệt & điện thoại.</span>
+                </div>
+              </div>
             </div>
 
           </div>

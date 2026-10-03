@@ -72,6 +72,7 @@ export default function Home() {
   const [messages, setMessages] = useState<ZaloMessage[]>([]);
   const [history, setHistory] = useState<ItemHistory[]>([]);
   const [totalWarehouses, setTotalWarehouses] = useState<number>(30);
+  const [botStatus, setBotStatus] = useState<{ online: boolean; lastPing: string | null } | undefined>(undefined);
   const [query, setQuery] = useState("");
   const [openWarehouse, setOpenWarehouse] = useState<number | null>(null);
   const [isPasteOpen, setIsPasteOpen] = useState(false);
@@ -89,6 +90,9 @@ export default function Home() {
         setItems(data.items || []);
         setMessages(data.messages || []);
         setHistory(data.history || []);
+        if (data.botStatus) {
+          setBotStatus(data.botStatus);
+        }
         if (data.totalWarehouses && data.totalWarehouses >= 30) {
           setTotalWarehouses(data.totalWarehouses);
         }
@@ -102,6 +106,17 @@ export default function Home() {
 
   useEffect(() => {
     fetchData();
+    // Tự động kiểm tra trạng thái bot mỗi 15 giây
+    const botInterval = setInterval(() => {
+      fetch("/api/items", { cache: "no-store" })
+        .then((r) => r.json() as Promise<ItemsResponse>)
+        .then((data) => {
+          if (data.botStatus) setBotStatus(data.botStatus);
+        })
+        .catch(() => {});
+    }, 15000);
+
+    return () => clearInterval(botInterval);
   }, []);
 
   // Lắng nghe Realtime của Supabase: có mã mới là giao diện tự nhảy số
@@ -317,6 +332,34 @@ export default function Home() {
               <span className="hidden sm:inline">Dán Chat</span>
               <span className="sm:hidden">Dán</span>
             </button>
+
+            {/* HIỂN THỊ TRẠNG THÁI BOT ZALO TRÊN MÁY TÍNH */}
+            <div
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border transition ${
+                botStatus?.online
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
+                  : "bg-slate-100 text-slate-500 border-slate-200"
+              }`}
+              title={
+                botStatus?.online
+                  ? `Bot Zalo trên máy tính: ĐANG CHẠY\n(Phát tín hiệu lúc ${
+                      botStatus.lastPing ? new Date(botStatus.lastPing).toLocaleTimeString("vi-VN") : "mới đây"
+                    })`
+                  : "Bot Zalo trên máy tính: ĐANG TẮT\n(Khi bật bot lên, máy sẽ tự động đồng bộ lại các tin nhắn cũ)"
+              }
+            >
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  botStatus?.online ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
+                }`}
+              />
+              <span className="hidden md:inline font-mono">
+                {botStatus?.online ? "Bot Zalo Online" : "Bot Zalo Offline"}
+              </span>
+              <span className="md:hidden font-mono">
+                {botStatus?.online ? "Bot Bật" : "Bot Tắt"}
+              </span>
+            </div>
 
             {/* CHUÔNG THÔNG BÁO NHẬT KÝ ZALO (PHÂN CHIA ĐÃ ĐỌC / CHƯA ĐỌC) */}
             <NotificationBell
@@ -612,6 +655,7 @@ export default function Home() {
         items={items}
         history={history}
         messages={messages}
+        botStatus={botStatus}
         onAddWarehouse={addWarehouseHandler}
         onOpenPaste={() => setIsPasteOpen(true)}
         onOpenWarehouse={setOpenWarehouse}

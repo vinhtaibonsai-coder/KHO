@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addQty, pushMessage, removeItem, upsertItem, findItem, transferItem, ensureWarehouseExists } from "@/lib/store";
+import { addQty, pushMessage, removeItem, upsertItem, findItem, transferItem, ensureWarehouseExists, recordBotPing } from "@/lib/store";
 import { validateSku, extractValidSkusFromText } from "@/lib/sku-rules";
 import type { ZaloMessage } from "@/types";
 
@@ -78,6 +78,13 @@ function parseMessage(text: string): { action: "in" | "out" | "assign"; sku: str
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
+
+  // Nhận tín hiệu heartbeat giữ trạng thái bot online
+  if (body?.action === "heartbeat" || body?.message === "__PING__") {
+    const pingTime = await recordBotPing();
+    return NextResponse.json({ ok: true, heartbeat: true, timestamp: pingTime });
+  }
+
   if (!body?.groupId || !body?.message) {
     return NextResponse.json({ ok: false, error: "Thiếu groupId hoặc message" }, { status: 400 });
   }

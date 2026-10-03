@@ -818,4 +818,74 @@ export async function markAllMessagesRead(): Promise<boolean> {
   return true;
 }
 
+export async function recordBotPing(): Promise<string> {
+  const now = new Date().toISOString();
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      await sb!.from("zalo_messages").upsert(
+        {
+          id: "bot_heartbeat",
+          group_id: "SYSTEM",
+          warehouse: null,
+          message: "PING",
+          status: "ok",
+          detail: "Bot Zalo đang chạy trên máy",
+          created_at: now,
+          read: true,
+        },
+        { onConflict: "id" }
+      );
+    } catch (err) {
+      console.warn("recordBotPing supabase error:", err);
+    }
+  }
+
+  // Luôn lưu local làm dự phòng
+  try {
+    const pingFile = path.join(DATA_DIR, ".bot-ping.json");
+    fs.writeFileSync(pingFile, JSON.stringify({ lastPing: now }), "utf8");
+  } catch {}
+
+  return now;
+}
+
+export async function getBotStatus(): Promise<{ online: boolean; lastPing: string | null }> {
+  let lastPingIso: string | null = null;
+
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      const { data } = await sb!
+        .from("zalo_messages")
+        .select("created_at")
+        .eq("id", "bot_heartbeat")
+        .maybeSingle();
+      if (data?.created_at) {
+        lastPingIso = data.created_at;
+      }
+    } catch {}
+  }
+
+  if (!lastPingIso) {
+    try {
+      const pingFile = path.join(DATA_DIR, ".bot-ping.json");
+      if (fs.existsSync(pingFile)) {
+        const parsed = JSON.parse(fs.readFileSync(pingFile, "utf8"));
+        lastPingIso = parsed.lastPing || null;
+      }
+    } catch {}
+  }
+
+  if (!lastPingIso) {
+    return { online: false, lastPing: null };
+  }
+
+  const diffMs = Date.now() - new Date(lastPingIso).getTime();
+  // Nếu bot gửi tín hiệu trong vòng 60 giây qua -> Đang chạy Online
+  const online = diffMs >= 0 && diffMs <= 60000;
+
+  return { online, lastPing: lastPingIso };
+}
+
 
