@@ -337,7 +337,7 @@ export default function NotificationBell({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="relative flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer"
+        className="relative flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer z-50"
         title="Thông báo nhật ký Zalo"
       >
         <Bell className="h-4 w-4" />
@@ -348,9 +348,18 @@ export default function NotificationBell({
         )}
       </button>
 
+      {/* LỚP NỀN MỜ (BACKDROP OVERLAY) - Che mờ toàn bộ giao diện bên dưới, bấm ra ngoài thì đóng */}
+      {isOpen && (
+        <div 
+          onClick={() => setIsOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+          aria-hidden="true"
+        />
+      )}
+
       {/* DROPDOWN MENU - Định vị chuẩn trên cả Mobile và Desktop */}
       {isOpen && (
-        <div className="fixed inset-x-2 top-14 sm:inset-x-auto sm:right-4 sm:top-14 sm:w-[480px] rounded-2xl border border-slate-200 bg-white shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="fixed inset-x-2 top-14 sm:inset-x-auto sm:right-4 sm:top-14 sm:w-[480px] rounded-2xl border border-slate-200/90 bg-white shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
           
           {/* HEADER DROPDOWN */}
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/90 px-4 py-3">
