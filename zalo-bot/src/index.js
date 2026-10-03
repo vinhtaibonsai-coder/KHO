@@ -262,22 +262,23 @@ async function handleGroupMessage(api, message) {
 
     // 2. GỬI BÁO CÁO CHI TIẾT RIÊNG VÀO "CLOUD CỦA TÔI" (MY DOCUMENTS)
     try {
-      const ownId = api.getOwnId ? api.getOwnId() : null;
+      const ctx = api.getContext ? api.getContext() : null;
+      const send2meId = ctx?.loginInfo?.send2me_id || (api.getOwnId ? api.getOwnId() : null);
 
       if (res.duplicate && res.message?.detail) {
-        const warningText = `🚫 [KHO ${pad(warehouse)} - ĐÃ XÓA TIN NHẮN TRÙNG]\n${res.message.detail}\n👉 Nội dung vi phạm: "${text}"\n(Đã tự động xóa khỏi nhóm "${name || groupId}" để tránh người khác tìm nhầm)`;
+        const warningText = `🚫 [KHO ${pad(warehouse)} - PHÁT HIỆN TRÙNG MÃ]\n${res.message.detail}\n👉 Tin nhắn: "${text}"\n👉 Nhóm gửi: "${name || groupId}"`;
         
-        if (ownId) {
-          await api.sendMessage(warningText, ownId, ThreadType.User);
-          console.log(`[bot-reply] Đã gửi thông báo xóa tin trùng vào "Cloud của tôi" (UID: ${ownId})`);
+        if (send2meId) {
+          await api.sendMessage(warningText, send2meId, ThreadType.User);
+          console.log(`[bot-reply] Đã gửi thông báo trùng vào "Cloud của tôi" (send2meId: ${send2meId})`);
         }
       } else if (Array.isArray(res.duplicates) && res.duplicates.length > 0) {
         const dupList = res.duplicates.join("\n👉 ");
-        const warningText = `🚫 [KHO ${pad(warehouse)} - CẢNH BÁO TRÙNG MÃ]\nCác mã sau đã tồn tại ở kho khác nên bị từ chối:\n👉 ${dupList}\n👉 Nội dung: "${text}"\n(Phát hiện trong nhóm "${name || groupId}")`;
+        const warningText = `🚫 [KHO ${pad(warehouse)} - CẢNH BÁO TRÙNG MÃ]\nCác mã sau đã tồn tại ở kho khác nên bị từ chối:\n👉 ${dupList}\n👉 Tin nhắn: "${text}"\n👉 Nhóm gửi: "${name || groupId}"`;
         
-        if (ownId) {
-          await api.sendMessage(warningText, ownId, ThreadType.User);
-          console.log(`[bot-reply] Đã gửi thông báo danh sách trùng vào "Cloud của tôi" (UID: ${ownId})`);
+        if (send2meId) {
+          await api.sendMessage(warningText, send2meId, ThreadType.User);
+          console.log(`[bot-reply] Đã gửi thông báo danh sách trùng vào "Cloud của tôi" (send2meId: ${send2meId})`);
         }
       }
     } catch (replyErr) {
@@ -296,10 +297,10 @@ async function handleDirectMessage(api, message) {
     text = String(message.data.content.title).trim();
   }
 
-  if (!text) return;
-
+  const ctx = api.getContext ? api.getContext() : null;
+  const send2meId = ctx?.loginInfo?.send2me_id || (api.getOwnId ? api.getOwnId() : null);
   const ownId = api.getOwnId ? api.getOwnId() : null;
-  const isMyDocs = message.threadId === ownId || message.isSelf;
+  const isMyDocs = message.threadId === send2meId || message.threadId === ownId || message.isSelf;
 
   // Kiểm tra cú pháp lệnh chuyển kho (CK ... hoặc CHUYEN ...)
   const isTransfer = /^(?:CK|CHUYEN|CHUYENKHO)\s+/i.test(text);
@@ -314,8 +315,9 @@ async function handleDirectMessage(api, message) {
         : `❌ THẤT BẠI:\n${res.message.detail}`;
       
       try {
-        if (ownId) {
-          await api.sendMessage(replyMsg, ownId, ThreadType.User);
+        const targetId = send2meId || ownId;
+        if (targetId) {
+          await api.sendMessage(replyMsg, targetId, ThreadType.User);
         }
       } catch (err) {
         console.error("[my-docs] Lỗi gửi phản hồi kết quả chuyển kho:", err.message);
