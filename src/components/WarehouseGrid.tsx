@@ -8,21 +8,33 @@ const pad = (n: number) => String(n).padStart(2, "0");
 export default function WarehouseGrid({
   items,
   highlight,
+  highlightWarehouses,
+  query = "",
   totalWarehouses = 30,
   onSelect,
 }: {
   items: Item[];
   highlight: number | null;
+  highlightWarehouses?: number[];
+  query?: string;
   totalWarehouses?: number;
   onSelect: (warehouse: number) => void;
 }) {
+  const cleanQuery = query.trim().toUpperCase();
+
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
       {Array.from({ length: totalWarehouses }, (_, i) => i + 1).map((w) => {
         const list = items.filter((it) => it.warehouse === w && it.status !== "sold");
         const count = list.length;
         const hasItem = count > 0;
-        const isSelected = highlight === w;
+        const isSelected = highlight === w || (highlightWarehouses && highlightWarehouses.includes(w));
+
+        // Nếu đang tìm kiếm, ưu tiên hiển thị những mã khớp với query trước
+        const matchedList = cleanQuery ? list.filter((it) => it.sku.toUpperCase().includes(cleanQuery)) : [];
+        const displayList = cleanQuery && matchedList.length > 0
+          ? [...matchedList, ...list.filter((it) => !it.sku.toUpperCase().includes(cleanQuery))]
+          : list;
 
         return (
           <button
@@ -68,17 +80,24 @@ export default function WarehouseGrid({
             <div className="my-2 space-y-1">
               {hasItem ? (
                 <div className="flex flex-wrap gap-1">
-                  {list.slice(0, 2).map((it) => (
-                    <span
-                      key={it.sku}
-                      className="inline-block rounded bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-700 border border-emerald-200/80 shadow-2xs truncate max-w-full"
-                    >
-                      {it.sku}
-                    </span>
-                  ))}
-                  {count > 2 && (
+                  {displayList.slice(0, 3).map((it) => {
+                    const isMatched = cleanQuery && it.sku.toUpperCase().includes(cleanQuery);
+                    return (
+                      <span
+                        key={it.sku}
+                        className={`inline-block rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold border shadow-2xs truncate max-w-full ${
+                          isMatched
+                            ? "bg-emerald-600 text-white border-emerald-700 font-bold ring-1 ring-emerald-300"
+                            : "bg-white text-slate-700 border-emerald-200/80"
+                        }`}
+                      >
+                        {it.sku}
+                      </span>
+                    );
+                  })}
+                  {count > 3 && (
                     <span className="text-[10px] font-medium text-emerald-700 bg-emerald-100/60 rounded px-1 py-0.5">
-                      +{count - 2}
+                      +{count - 3}
                     </span>
                   )}
                 </div>
