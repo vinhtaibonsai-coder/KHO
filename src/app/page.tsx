@@ -138,18 +138,24 @@ export default function Home() {
         (payload) => {
           if (payload.eventType === "INSERT") {
             const row = payload.new as Record<string, unknown>;
+            const rawMsg = String(row.message ?? "").trim();
+            const rowId = String(row.id ?? "");
+            const groupId = String(row.group_id ?? "");
+            if (rowId === "bot_heartbeat" || rawMsg.toUpperCase() === "PING" || groupId === "SYSTEM") {
+              return;
+            }
             const msg: ZaloMessage = {
-              id: String(row.id),
-              groupId: String(row.group_id),
+              id: rowId,
+              groupId: groupId,
               warehouse: (row.warehouse as number | null) ?? null,
-              message: String(row.message),
+              message: rawMsg,
               status: (row.status as "ok" | "error") ?? "ok",
               detail: String(row.detail ?? ""),
               createdAt: String(row.created_at),
               read: Boolean(row.read),
             };
             setMessages((prev) =>
-              prev.some((m) => m.id === msg.id) ? prev : [msg, ...prev].slice(0, 50)
+              prev.some((m) => m.id === msg.id) ? prev : [msg, ...prev].slice(0, 100)
             );
           } else if (payload.eventType === "UPDATE") {
             const row = payload.new as Record<string, unknown>;

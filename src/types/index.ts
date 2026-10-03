@@ -21,6 +21,8 @@ export interface ItemHistory {
   createdAt: string;
 }
 
+export type NotificationCategory = "all" | "in" | "out" | "duplicate" | "sold" | "error" | "system";
+
 export interface ZaloMessage {
   id: string;
   groupId: string;

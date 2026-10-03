@@ -220,13 +220,14 @@ export async function getMessages(): Promise<ZaloMessage[]> {
     const { data, error } = await sb!
       .from("zalo_messages")
       .select("*")
+      .neq("id", "bot_heartbeat")
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(100);
     if (error) throw new Error(`Supabase getMessages: ${error.message}`);
     return (data ?? []).map(rowToMessage);
   }
   db = loadDB();
-  return db.messages;
+  return db.messages.filter((m) => m.id !== "bot_heartbeat");
 }
 
 export async function pushMessage(msg: ZaloMessage) {
