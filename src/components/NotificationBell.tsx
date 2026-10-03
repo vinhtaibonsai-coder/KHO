@@ -11,7 +11,9 @@ import {
   ShieldAlert,
   Tag,
   AlertTriangle,
-  Cpu
+  Cpu,
+  Search,
+  X
 } from "lucide-react";
 import type { ZaloMessage, NotificationCategory } from "@/types";
 
@@ -23,6 +25,28 @@ const fmtFullTime = (iso: string) => {
   const date = `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
   return `${time} ${date}`;
 };
+
+// Hàm tô sáng (highlight) từ khóa tìm kiếm trong chuỗi văn bản
+function HighlightText({ text, highlight }: { text: string; highlight: string }) {
+  if (!highlight.trim() || !text) return <>{text}</>;
+  const escaped = highlight.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escaped})`, "gi");
+  const parts = text.split(regex);
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <mark key={i} className="bg-yellow-200 text-amber-950 font-bold px-0.5 rounded">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+}
 
 // Hàm phân loại thông báo chuẩn xác với thứ tự ưu tiên tối ưu:
 // duplicate -> sold -> error -> out -> in (hoặc system nếu là tin hệ thống)
@@ -149,8 +173,17 @@ export default function NotificationBell({
   const [isOpen, setIsOpen] = useState(false);
   const [readTab, setReadTab] = useState<"all" | "unread" | "read">("all");
   const [categoryTab, setCategoryTab] = useState<NotificationCategory>("all");
+  const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus ô tìm kiếm khi mở dropdown nếu muốn hoặc khi người dùng click
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchKeyword("");
+    }
+  }, [isOpen]);
 
   // Lưu và đồng bộ trạng thái đã đọc từ localStorage
   useEffect(() => {
@@ -203,17 +236,60 @@ export default function NotificationBell({
     return cleanMessages.filter((m) => !readIds.has(m.id) && !m.read).length;
   }, [cleanMessages, readIds]);
 
-  // Danh sách tin đã lọc theo trạng thái đọc (readTab)
-  const readFilteredMessages = useMemo(() => {
+  // Lọc theo từ khóa tìm kiếm (mã sản phẩm, tên kho, chi tiết, tin nhắn...)
+  const searchedMessages = useMemo(() => {
+    const q = searchKeyword.trim().toUpperCase();
+    if (!q) return cleanMessages;
     return cleanMessages.filter((m) => {
+      const msgUpper = (m.message || "").toUpperCase();
+      const detailUpper = (m.detail || "").toUpperCase();
+      const whUpper = m.warehouse !== null && m.warehouse !== undefined 
+        ? `KHO ${m.warehouse} KHO ${pad(m.warehouse)} ${pad(m.warehouse)}` 
+        : "CHUNG";
+      return (
+        msgUpper.includes(q) ||
+        detailUpper.includes(q) ||
+        whUpper.includes(q)
+      );
+    });
+  }, [cleanMessages, searchKeyword]);
+
+  // Đếm số lượng theo trạng thái đọc dựa trên kết quả tìm kiếm hiện tại
+  const readStats = useMemo(() => {
+    let unread = 0;
+    let read = 0;
+    for (const m of searchedMessages) {
+      const isRead = readIds.has(m.id) || !!m.read;
+      if (isRead) read++;
+      else unread++;
+    }
+    return {
+      all: searchedMessages.length,
+      unread,
+      read,
+    };
+  }, [searchedMessages, readIds]);
+
+  // Danh sách tin đã lọc theo trạng thái đọc (readTab) kết hợp từ khóa tìm kiếm
+  const readFilteredMessages = useMemo(() => {
+    return searchedMessages.filter((m) => {
       const isRead = readIds.has(m.id) || !!m.read;
       if (readTab === "unread") return !isRead;
       if (readTab === "read") return isRead;
       return true;
     });
-  }, [cleanMessages, readTab, readIds]);
+  }, [searchedMessages, readTab, readIds]);
 
-  // Đếm số lượng cho từng danh mục đồng bộ theo readTab đang chọn
+  // Map phân loại tin 1 lần duy nhất cho toàn bộ danh sách hiện tại (tránh gọi categorize nhiều lần)
+  const messageCategoryMap = useMemo(() => {
+    const map = new Map<string, Exclude<NotificationCategory, "all">>();
+    for (const m of readFilteredMessages) {
+      map.set(m.id, categorizeMessage(m));
+    }
+    return map;
+  }, [readFilteredMessages]);
+
+  // Đếm số lượng cho từng danh mục đồng bộ theo readTab và searchKeyword
   const categoryCounts = useMemo(() => {
     const counts: Record<NotificationCategory, number> = {
       all: readFilteredMessages.length,
@@ -225,17 +301,17 @@ export default function NotificationBell({
       system: 0,
     };
     for (const m of readFilteredMessages) {
-      const cat = categorizeMessage(m);
+      const cat = messageCategoryMap.get(m.id) || "in";
       counts[cat]++;
     }
     return counts;
-  }, [readFilteredMessages]);
+  }, [readFilteredMessages, messageCategoryMap]);
 
-  // Danh sách thông báo cuối cùng sau khi lọc cả readTab và categoryTab
+  // Danh sách thông báo cuối cùng sau khi lọc cả searchKeyword, readTab và categoryTab
   const filteredMessages = useMemo(() => {
     if (categoryTab === "all") return readFilteredMessages;
-    return readFilteredMessages.filter((m) => categorizeMessage(m) === categoryTab);
-  }, [readFilteredMessages, categoryTab]);
+    return readFilteredMessages.filter((m) => (messageCategoryMap.get(m.id) || "in") === categoryTab);
+  }, [readFilteredMessages, categoryTab, messageCategoryMap]);
 
   const handleMarkItemRead = (id: string) => {
     const next = new Set(readIds);
@@ -308,6 +384,34 @@ export default function NotificationBell({
             </div>
           </div>
 
+          {/* THANH TÌM KIẾM MÃ / THÔNG BÁO */}
+          <div className="px-3 py-2 bg-slate-50/70 border-b border-slate-100">
+            <div className="relative flex items-center">
+              <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+                placeholder="Tìm mã sản phẩm (vd: 192, 100a), tên kho, nội dung..."
+                className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition shadow-2xs"
+              />
+              {searchKeyword && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchKeyword("");
+                    searchInputRef.current?.focus();
+                  }}
+                  className="absolute right-2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 cursor-pointer"
+                  title="Xóa tìm kiếm"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* TẦNG 1: LỌC TRẠNG THÁI ĐỌC */}
           <div className="flex border-b border-slate-100 bg-slate-50/50 px-3 py-1.5 gap-1.5 text-xs">
             <button
@@ -319,7 +423,7 @@ export default function NotificationBell({
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              Tất cả ({cleanMessages.length})
+              Tất cả ({readStats.all})
             </button>
             <button
               type="button"
@@ -330,7 +434,7 @@ export default function NotificationBell({
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              Chưa đọc ({unreadCount})
+              Chưa đọc ({readStats.unread})
             </button>
             <button
               type="button"
@@ -341,7 +445,7 @@ export default function NotificationBell({
                   : "text-slate-500 hover:text-slate-800"
               }`}
             >
-              Đã đọc ({cleanMessages.length - unreadCount})
+              Đã đọc ({readStats.read})
             </button>
           </div>
 
@@ -397,8 +501,26 @@ export default function NotificationBell({
           {/* DANH SÁCH THÔNG BÁO ĐÃ ĐƯỢC PHÂN LOẠI */}
           <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100">
             {filteredMessages.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">
-                Không có thông báo nào trong mục này
+              <div className="py-12 px-4 text-center text-xs text-slate-400">
+                {searchKeyword ? (
+                  <div>
+                    <p className="font-semibold text-slate-600 mb-1">
+                      Không tìm thấy thông báo nào khớp với &quot;{searchKeyword}&quot;
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      Thử đổi từ khóa hoặc xóa tìm kiếm để xem tất cả
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSearchKeyword("")}
+                      className="mt-3 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg cursor-pointer transition text-xs"
+                    >
+                      Xóa tìm kiếm
+                    </button>
+                  </div>
+                ) : (
+                  "Không có thông báo nào trong mục này"
+                )}
               </div>
             ) : (
               filteredMessages.map((m) => {
@@ -440,7 +562,7 @@ export default function NotificationBell({
 
                           {m.warehouse ? (
                             <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
-                              Kho {pad(m.warehouse)}
+                              <HighlightText text={`Kho ${pad(m.warehouse)}`} highlight={searchKeyword} />
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1 rounded">
@@ -448,8 +570,8 @@ export default function NotificationBell({
                             </span>
                           )}
 
-                          <span className="font-mono text-xs font-bold text-slate-800 truncate max-w-[170px]">
-                            {m.message}
+                          <span className="font-mono text-xs font-bold text-slate-800 truncate max-w-[200px]">
+                            <HighlightText text={m.message} highlight={searchKeyword} />
                           </span>
                         </div>
 
@@ -459,7 +581,7 @@ export default function NotificationBell({
                       </div>
 
                       <p className={`text-[11px] leading-relaxed line-clamp-2 ${cat === "duplicate" ? "text-purple-900 font-semibold" : cat === "sold" ? "text-amber-900 font-semibold" : cat === "error" ? "text-rose-700" : "text-slate-600"}`}>
-                        {m.detail}
+                        <HighlightText text={m.detail} highlight={searchKeyword} />
                       </p>
 
                       <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
