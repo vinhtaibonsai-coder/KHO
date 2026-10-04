@@ -6,7 +6,8 @@ const scryptAsync = promisify(scrypt);
 
 export async function verifyPin(pin: string, encodedHash: string | undefined): Promise<boolean> {
   if (!encodedHash || !pin) return false;
-  const [algorithm, saltHex, hashHex, extra] = encodedHash.split("$");
+  const separator = encodedHash.includes(":") ? ":" : "$";
+  const [algorithm, saltHex, hashHex, extra] = encodedHash.split(separator);
   if (algorithm !== "scrypt" || !saltHex || !hashHex || extra) return false;
   if (!/^[0-9a-f]+$/i.test(saltHex) || !/^[0-9a-f]{128}$/i.test(hashHex)) return false;
   try {
