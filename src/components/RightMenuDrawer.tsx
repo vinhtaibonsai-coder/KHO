@@ -20,7 +20,8 @@ import {
   Radio,
   ChevronDown,
   ChevronUp,
-  LogOut
+  LogOut,
+  KeyRound
 } from "lucide-react";
 import type { Item, ItemHistory, ZaloMessage } from "@/types";
 import ZaloLiveFeed from "@/components/ZaloLiveFeed";
@@ -59,6 +60,11 @@ export default function RightMenuDrawer({
   const [exporting, setExporting] = useState(false);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const [devTab, setDevTab] = useState<"live" | "sim" | null>(null);
+  const [showChangePinModal, setShowChangePinModal] = useState(false);
+  const [currentPinInput, setCurrentPinInput] = useState("");
+  const [newPinInput, setNewPinInput] = useState("");
+  const [pinChangeError, setPinChangeError] = useState("");
+  const [pinChangeLoading, setPinChangeLoading] = useState(false);
 
   // Khóa cứng cuộn trang nền ngoài chuẩn Mobile PWA (iOS Safari & Android Chrome)
   useEffect(() => {
@@ -170,6 +176,37 @@ export default function RightMenuDrawer({
     window.location.assign("/login");
   };
 
+  const handleChangePin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinChangeError("");
+    if (!/^\d{4}$/.test(newPinInput)) {
+      setPinChangeError("Mã PIN mới phải gồm đúng 4 chữ số");
+      return;
+    }
+
+    setPinChangeLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPin: currentPinInput, newPin: newPinInput }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Không thể đổi mã PIN");
+      }
+      setAddSuccess("Đã cập nhật mã PIN mới vào hệ thống thành công!");
+      setTimeout(() => setAddSuccess(null), 5000);
+      setShowChangePinModal(false);
+      setCurrentPinInput("");
+      setNewPinInput("");
+    } catch (err) {
+      setPinChangeError(err instanceof Error ? err.message : "Lỗi đổi mã PIN");
+    } finally {
+      setPinChangeLoading(false);
+    }
+  };
+
   return createPortal(
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 touch-none overscroll-none">
       <div className="absolute inset-0" onClick={onClose} />
@@ -211,14 +248,16 @@ export default function RightMenuDrawer({
             onTouchMove={(e) => e.stopPropagation()}
           >
 
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
-            >
-              <LogOut className="h-4 w-4" />
-              Đăng xuất
-            </button>
+            <div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+              >
+                <LogOut className="h-4 w-4" />
+                Đăng xuất
+              </button>
+            </div>
 
             {/* THÔNG BÁO THÀNH CÔNG */}
             {addSuccess && (
@@ -468,6 +507,86 @@ export default function RightMenuDrawer({
           </div>
         </div>
       </div>
+
+      {/* POPUP ĐỔI MÃ PIN */}
+      {showChangePinModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div 
+            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <KeyRound className="h-4 w-4" />
+                </div>
+                <h3 className="font-extrabold text-sm text-slate-900">Đổi Mã PIN Hệ Thống</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowChangePinModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleChangePin} className="mt-4 space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Mã PIN hiện tại</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={currentPinInput}
+                  onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Nhập 4 số PIN cũ"
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-center text-lg tracking-[0.3em] font-mono outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Mã PIN mới (4 số)</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={newPinInput}
+                  onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Nhập 4 số PIN mới"
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-center text-lg tracking-[0.3em] font-mono outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                  required
+                />
+              </div>
+
+              {pinChangeError && (
+                <p className="text-xs text-rose-600 font-bold bg-rose-50 border border-rose-200 p-2 rounded-lg text-center">
+                  {pinChangeError}
+                </p>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowChangePinModal(false)}
+                  className="flex-1 rounded-xl border border-slate-200 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={pinChangeLoading || currentPinInput.length !== 4 || newPinInput.length !== 4}
+                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer shadow-sm shadow-emerald-500/30"
+                >
+                  {pinChangeLoading ? "Đang lưu..." : "Lưu mã PIN"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>,
     document.body
   );

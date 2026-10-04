@@ -1,9 +1,108 @@
 import "server-only";
-import { scrypt, timingSafeEqual } from "node:crypto";
+import { scrypt, randomBytes, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+import fs from "fs";
+import path from "path";
+import { getSupabase, supabaseEnabled } from "./supabase-server";
 
 const scryptAsync = promisify(scrypt);
+const DATA_DIR = path.join(process.cwd(), "data");
+const SETTINGS_FILE = path.join(DATA_DIR, "system_settings.json");
 
+/**
+ * Tạo mã hash scrypt chuẩn từ chuỗi PIN thô
+ */
+export async function hashPin(pin: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const hash = (await scryptAsync(pin, Buffer.from(salt, "hex"), 64)) as Buffer;
+  return `scrypt:${salt}:${hash.toString("hex")}`;
+}
+
+/**
+ * Đọc mã PIN hash hiện tại:
+ * 1. Ưu tiên đọc từ Supabase (bảng warehouse_settings -> system_pin_hash)
+ * 2. Đọc từ file local data/system_settings.json
+ * 3. Fallback đọc từ biến môi trường APP_PIN_HASH
+ */
+export async function getActivePinHash(): Promise<string | undefined> {
+  // 1. Thử lấy từ Supabase
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      if (sb) {
+        const { data, error } = await sb
+          .from("warehouse_settings")
+          .select("system_pin_hash")
+          .eq("id", "default")
+          .maybeSingle();
+
+        if (!error && data?.system_pin_hash) {
+          return String(data.system_pin_hash).trim();
+        }
+      }
+    } catch {
+      // Ignored, fallback to local file
+    }
+  }
+
+  // 2. Thử lấy từ file local
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
+      if (parsed?.pinHash) {
+        return String(parsed.pinHash).trim();
+      }
+    }
+  } catch {
+    // Ignored
+  }
+
+  // 3. Fallback từ biến môi trường
+  return process.env.APP_PIN_HASH?.trim();
+}
+
+/**
+ * Cập nhật mã PIN mới vào Database (Supabase + Local file fallback)
+ */
+export async function updatePinInDatabase(newPin: string): Promise<string> {
+  const newHash = await hashPin(newPin);
+
+  // 1. Lưu vào Supabase
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      if (sb) {
+        await sb.from("warehouse_settings").upsert(
+          { id: "default", system_pin_hash: newHash },
+          { onConflict: "id" }
+        );
+      }
+    } catch (err) {
+      console.warn("Lỗi lưu PIN vào Supabase warehouse_settings:", err);
+    }
+  }
+
+  // 2. Lưu vào local file
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const current = fs.existsSync(SETTINGS_FILE)
+      ? JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"))
+      : {};
+    current.pinHash = newHash;
+    current.updatedAt = new Date().toISOString();
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(current, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Lỗi lưu PIN vào file system_settings.json:", err);
+  }
+
+  return newHash;
+}
+
+/**
+ * Kiểm tra mã PIN người dùng nhập
+ */
 export async function verifyPin(pin: string, encodedHash: string | undefined): Promise<boolean> {
   if (!encodedHash || !pin) return false;
   const separator = encodedHash.includes(":") ? ":" : "$";

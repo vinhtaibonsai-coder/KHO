@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Delete, ArrowRight, Sparkles, KeyRound, AlertCircle } from "lucide-react";
+import { ShieldCheck, Delete, KeyRound, AlertCircle, Sparkles } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,7 +10,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [shake, setShake] = useState<boolean>(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto redirect nếu đã có session hợp lệ
   useEffect(() => {
@@ -21,7 +20,7 @@ export default function LoginPage() {
       .catch(() => undefined);
   }, [router]);
 
-  // Haptic feedback nhẹ nhàng khi bấm phím trên điện thoại
+  // Haptic vibration feedback nhẹ nhàng khi chạm phím trên smartphone
   const triggerHaptic = (pattern: number | number[] = 15) => {
     if (typeof window !== "undefined" && "vibrate" in navigator) {
       try {
@@ -69,12 +68,12 @@ export default function LoginPage() {
         body: JSON.stringify({ pin: codeToVerify }),
       });
       const data = await response.json().catch(() => ({}));
-      
+
       if (!response.ok) {
         throw new Error(data.error || "Mã PIN không chính xác");
       }
 
-      // Đăng nhập thành công! Haptic thành công & chuyển trang
+      // Đăng nhập thành công! Rung xúc giác báo thành công & chuyển trang
       triggerHaptic([30, 50, 40]);
       router.replace("/");
       router.refresh();
@@ -113,44 +112,44 @@ export default function LoginPage() {
   ];
 
   return (
-    <main className="relative min-h-[100dvh] w-full flex flex-col justify-between items-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white select-none overflow-hidden px-4 py-6 sm:py-10">
-      {/* Decorative Glow Elements */}
-      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-80 h-80 bg-emerald-500/15 rounded-full blur-[100px] pointer-events-none" />
-      <div className="absolute -bottom-32 left-1/2 -translate-x-1/2 w-80 h-80 bg-teal-500/10 rounded-full blur-[100px] pointer-events-none" />
+    <main className="relative min-h-[100dvh] w-full flex flex-col justify-between items-center bg-gradient-to-b from-slate-50 via-emerald-50/30 to-slate-100 text-slate-800 select-none overflow-hidden px-4 py-6 sm:py-10">
+      {/* Decorative Light Background Accents */}
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-400/15 rounded-full blur-[90px] pointer-events-none" />
+      <div className="absolute -bottom-32 left-1/2 -translate-x-1/2 w-96 h-96 bg-teal-400/10 rounded-full blur-[90px] pointer-events-none" />
 
-      {/* Top Header / Branding */}
+      {/* Top Header / Branding - Theme Sáng */}
       <header className="relative z-10 flex flex-col items-center text-center mt-2 sm:mt-6">
         <div className="relative mb-3 flex items-center justify-center">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-[2px] shadow-lg shadow-emerald-500/25">
-            <div className="w-full h-full rounded-[22px] bg-slate-950/80 backdrop-blur-md flex items-center justify-center">
-              <ShieldCheck className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-400" />
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-500 p-[2px] shadow-xl shadow-emerald-500/20">
+            <div className="w-full h-full rounded-[22px] bg-white flex items-center justify-center shadow-inner">
+              <ShieldCheck className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-600" />
             </div>
           </div>
           <span className="absolute -bottom-1 -right-1 flex h-5 w-5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-500 items-center justify-center text-[10px] font-bold text-slate-950">✓</span>
+            <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-600 items-center justify-center text-[10px] font-bold text-white shadow-sm">✓</span>
           </span>
         </div>
 
-        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-1.5">
+        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 flex items-center gap-1.5">
           Xưởng Lũa Nhựt
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-[280px]">
-          Hệ thống quản lý kho & định vị sản phẩm nội bộ
+        <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 max-w-[280px]">
+          Quản lý định vị sản phẩm & kho hàng thời gian thực
         </p>
       </header>
 
       {/* Center PIN Display & Status */}
       <div className="relative z-10 w-full max-w-xs flex flex-col items-center my-auto">
-        <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
+        <div className="flex items-center gap-1.5 mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+          <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
           <span>Nhập mã PIN truy cập</span>
         </div>
 
-        {/* PIN Indicators (4 Dots / Digits) */}
-        <div 
-          className={`flex items-center justify-center gap-4 py-3 px-6 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl transition-transform duration-200 ${
-            shake ? "translate-x-[-10px] animate-pulse border-rose-500/60" : ""
+        {/* PIN Indicators (4 Dots / Digits) - Light Glass Style */}
+        <div
+          className={`flex items-center justify-center gap-4 py-3.5 px-7 rounded-2xl bg-white/90 border border-slate-200/90 shadow-lg shadow-slate-200/50 backdrop-blur-xl transition-all duration-200 ${
+            shake ? "-translate-x-2 animate-pulse border-rose-400 shadow-rose-200/50" : ""
           }`}
         >
           {[0, 1, 2, 3].map((index) => {
@@ -159,16 +158,16 @@ export default function LoginPage() {
             return (
               <div
                 key={index}
-                className={`relative w-4 h-4 sm:w-5 sm:h-5 rounded-full transition-all duration-300 flex items-center justify-center ${
+                className={`relative w-4 h-4 sm:w-5 sm:h-5 rounded-full transition-all duration-250 flex items-center justify-center ${
                   isFilled
-                    ? "bg-emerald-400 shadow-md shadow-emerald-500/50 scale-110"
+                    ? "bg-emerald-600 shadow-md shadow-emerald-500/40 scale-110"
                     : isCurrent
-                    ? "border-2 border-emerald-400/80 bg-emerald-500/20 scale-105"
-                    : "border-2 border-slate-700 bg-slate-800/60"
+                    ? "border-2 border-emerald-500 bg-emerald-50 scale-105"
+                    : "border-2 border-slate-300 bg-slate-100"
                 }`}
               >
                 {isFilled && (
-                  <span className="absolute w-1.5 h-1.5 bg-slate-950 rounded-full" />
+                  <span className="w-1.5 h-1.5 bg-white rounded-full" />
                 )}
               </div>
             );
@@ -176,36 +175,36 @@ export default function LoginPage() {
         </div>
 
         {/* Notification / Error message */}
-        <div className="min-h-[28px] mt-3 flex items-center justify-center text-center">
+        <div className="min-h-[30px] mt-3.5 flex items-center justify-center text-center">
           {loading ? (
-            <p className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-emerald-400 animate-pulse">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <p className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-emerald-700 animate-pulse">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
               Đang xác thực thông tin...
             </p>
           ) : error ? (
-            <p className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-rose-400 bg-rose-950/40 border border-rose-800/60 px-3 py-1 rounded-full">
-              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            <p className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3.5 py-1 rounded-full shadow-sm">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-600" />
               {error}
             </p>
           ) : (
-            <p className="text-[11px] sm:text-xs text-slate-500">
-              Nhấn 4 số mã bảo mật được cấp
+            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">
+              Chạm 4 số mã bảo mật được cấp
             </p>
           )}
         </div>
       </div>
 
-      {/* Modern Custom On-Screen Keypad */}
+      {/* Modern Custom On-Screen Keypad - Giao Diện Sáng Tinh Tế */}
       <div className="relative z-10 w-full max-w-[290px] sm:max-w-[320px] mb-2 sm:mb-6">
         <div className="grid grid-cols-3 gap-3 sm:gap-4 place-items-center">
-          {keypadNumbers.map((row, rIdx) =>
+          {keypadNumbers.map((row) =>
             row.map((num) => (
               <button
                 key={num}
                 type="button"
                 onClick={() => handleKeyPress(num)}
                 disabled={loading}
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-xl sm:text-2xl font-bold text-slate-100 flex flex-col items-center justify-center active:scale-95 active:bg-emerald-600/30 transition-all duration-150 backdrop-blur-md shadow-md shadow-black/20"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-emerald-400 text-xl sm:text-2xl font-extrabold text-slate-800 hover:text-emerald-700 flex flex-col items-center justify-center active:scale-95 active:bg-emerald-50 transition-all duration-150 shadow-md shadow-slate-200/60 active:shadow-inner cursor-pointer"
               >
                 <span>{num}</span>
               </button>
@@ -217,7 +216,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleClear}
             disabled={loading || pin.length === 0}
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-900/40 hover:bg-slate-800/80 text-xs font-bold text-slate-400 hover:text-slate-200 flex items-center justify-center active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none"
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-100 hover:bg-slate-200/80 text-[11px] font-bold text-slate-600 hover:text-slate-800 flex items-center justify-center active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
           >
             XÓA HẾT
           </button>
@@ -226,7 +225,7 @@ export default function LoginPage() {
             type="button"
             onClick={() => handleKeyPress("0")}
             disabled={loading}
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/40 text-xl sm:text-2xl font-bold text-slate-100 flex items-center justify-center active:scale-95 active:bg-emerald-600/30 transition-all duration-150 backdrop-blur-md shadow-md shadow-black/20"
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-emerald-400 text-xl sm:text-2xl font-extrabold text-slate-800 hover:text-emerald-700 flex items-center justify-center active:scale-95 active:bg-emerald-50 transition-all duration-150 shadow-md shadow-slate-200/60 active:shadow-inner cursor-pointer"
           >
             0
           </button>
@@ -235,7 +234,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleDelete}
             disabled={loading || pin.length === 0}
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-900/40 hover:bg-slate-800/80 text-slate-300 hover:text-rose-400 flex items-center justify-center active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none"
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 flex items-center justify-center active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
           >
             <Delete className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
@@ -244,8 +243,8 @@ export default function LoginPage() {
 
       {/* Footer Info */}
       <footer className="relative z-10 text-center pb-2">
-        <p className="text-[11px] text-slate-600">
-          Chỉ dành cho nhân viên thủ kho và quản lý được cấp quyền
+        <p className="text-[11px] text-slate-400 font-medium">
+          Dành riêng cho nhân viên thủ kho & quản lý Xưởng Lũa Nhựt
         </p>
       </footer>
     </main>
