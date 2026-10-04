@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { 
   ClipboardPaste, 
   Sparkles, 
@@ -37,12 +38,40 @@ export default function PasteImportModal({
   const [status, setStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
 
   // Luôn đồng bộ kho đích được chọn với kho mở modal (defaultWarehouse)
-  useEffect(() => {
+  const [wasOpen, setWasOpen] = useState(isOpen);
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen);
     if (isOpen) {
       setWarehouse(defaultWarehouse);
       setStatus(null);
     }
-  }, [isOpen, defaultWarehouse]);
+  }
+
+  // Khóa cứng cuộn trang nền ngoài chuẩn Mobile PWA (iOS Safari & Android Chrome)
+  useEffect(() => {
+    if (!isOpen) return;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalBodyPosition = document.body.style.position;
+    const originalBodyTop = document.body.style.top;
+    const originalBodyWidth = document.body.style.width;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      document.body.style.position = originalBodyPosition;
+      document.body.style.top = originalBodyTop;
+      document.body.style.width = originalBodyWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [isOpen]);
 
   // Tự động phân loại xem trước: Mã Hợp Lệ, Mã Trùng Kho Khác, Mã Lỗi/Sai Chuẩn
   const analysis = useMemo(() => {
@@ -123,13 +152,15 @@ export default function PasteImportModal({
     }
   }
 
-  return (
+  if (!isOpen || typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200 touch-none overscroll-none"
       onClick={onClose}
     >
       <div
-        className="max-h-[92vh] w-full max-w-2xl flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden"
+        className="max-h-[88vh] sm:max-h-[90vh] h-[88vh] sm:h-auto w-full max-w-2xl flex flex-col rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER */}
@@ -158,7 +189,11 @@ export default function PasteImportModal({
         </div>
 
         {/* BODY */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div 
+          className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 overscroll-contain touch-pan-y"
+          style={{ WebkitOverflowScrolling: "touch" }}
+          onTouchMove={(e) => e.stopPropagation()}
+        >
           {/* CHỌN KHO ĐÍCH */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
@@ -351,7 +386,10 @@ export default function PasteImportModal({
         </div>
 
         {/* FOOTER */}
-        <div className="border-t border-slate-200 bg-slate-50 px-6 py-3.5 flex justify-between items-center">
+        <div 
+          className="border-t border-slate-200 bg-slate-50 px-4 sm:px-6 py-3.5 flex justify-between items-center shrink-0"
+          style={{ paddingBottom: "max(14px, env(safe-area-inset-bottom))" }}
+        >
           <button
             type="button"
             onClick={onClose}
@@ -377,6 +415,7 @@ export default function PasteImportModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -20,6 +20,19 @@ import type { ZaloMessage, NotificationCategory } from "@/types";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+const READ_IDS_KEY = "lua_nhut_read_notifications";
+
+function loadReadIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const stored = window.localStorage.getItem(READ_IDS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch (e) {
+    console.warn("Lỗi đọc read_notifications từ localStorage", e);
+    return new Set();
+  }
+}
+
 const fmtFullTime = (iso: string) => {
   const d = new Date(iso);
   const time = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
@@ -175,32 +188,8 @@ export default function NotificationBell({
   const [readTab, setReadTab] = useState<"all" | "unread" | "read">("all");
   const [categoryTab, setCategoryTab] = useState<NotificationCategory>("all");
   const [searchKeyword, setSearchKeyword] = useState<string>("");
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
-  const [mounted, setMounted] = useState(false);
+  const [readIds, setReadIds] = useState<Set<string>>(loadReadIds);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Focus ô tìm kiếm khi mở dropdown nếu muốn hoặc khi người dùng click
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchKeyword("");
-    }
-  }, [isOpen]);
-
-  // Lưu và đồng bộ trạng thái đã đọc từ localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("lua_nhut_read_notifications");
-      if (stored) {
-        setReadIds(new Set(JSON.parse(stored)));
-      }
-    } catch (e) {
-      console.warn("Lỗi đọc read_notifications từ localStorage", e);
-    }
-  }, []);
 
   const saveReadIds = (newSet: Set<string>) => {
     setReadIds(newSet);
@@ -211,24 +200,38 @@ export default function NotificationBell({
     }
   };
 
-  // Khóa scroll trang khi mở thông báo để tránh scroll lộ kho phía dưới
+  // Khóa cứng cuộn trang nền ngoài chuẩn Mobile PWA (iOS Safari & Android Chrome)
   useEffect(() => {
-    if (isOpen) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
-    }
+    if (!isOpen) return;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalBodyPosition = document.body.style.position;
+    const originalBodyTop = document.body.style.top;
+    const originalBodyWidth = document.body.style.width;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      document.body.style.position = originalBodyPosition;
+      document.body.style.top = originalBodyTop;
+      document.body.style.width = originalBodyWidth;
+      window.scrollTo(0, scrollY);
+    };
   }, [isOpen]);
 
-  // Lọc bỏ tin PING rác (chặn triệt để cả hoa lẫn thường)
+  // Lọc bỏ tin PING rác & heartbeat kỹ thuật (giữ lại các thông báo cấu hình/hệ thống thực thụ)
   const cleanMessages = useMemo(() => {
     return messages.filter(
       (m) =>
         m.id !== "bot_heartbeat" &&
-        (m.message || "").trim().toUpperCase() !== "PING" &&
-        m.groupId !== "SYSTEM"
+        (m.message || "").trim().toUpperCase() !== "PING"
     );
   }, [messages]);
 
@@ -337,7 +340,10 @@ export default function NotificationBell({
       {/* NÚT CHUÔNG THÔNG BÁO */}
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => {
+          setIsOpen((prev) => !prev);
+          setSearchKeyword("");
+        }}
         className="relative flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer"
         title="Thông báo nhật ký Zalo"
       >
@@ -350,18 +356,21 @@ export default function NotificationBell({
       </button>
 
       {/* MODAL THÔNG BÁO - PORTAL RA TRỰC TIẾP DOCUMENT.BODY (CHẮC CHẮN PHỦ KÍN TOÀN MÀN HÌNH) */}
-      {isOpen && mounted && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9999] flex flex-col justify-start sm:justify-start items-center p-2 sm:p-4 animate-in fade-in duration-150">
+      {isOpen && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex flex-col justify-start sm:justify-start items-center p-2 sm:p-4 animate-in fade-in duration-150 touch-none overscroll-none">
           
           {/* LỚP NỀN MỜ CHE TOÀN BỘ MÀN HÌNH & THÔNG TIN KHO BÊN DƯỚI */}
           <div 
             onClick={() => setIsOpen(false)}
-            className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm cursor-pointer"
+            className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm cursor-pointer touch-none"
             aria-hidden="true"
           />
 
           {/* KHUNG THÔNG BÁO NỔI */}
-          <div className="relative z-10 w-full max-w-lg mt-12 sm:mt-14 rounded-2xl border border-slate-200/90 bg-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[80vh] animate-in zoom-in-95 duration-150">
+          <div 
+            className="relative z-10 w-full max-w-lg mt-12 sm:mt-14 rounded-2xl border border-slate-200/90 bg-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[80vh] animate-in zoom-in-95 duration-150 overscroll-contain"
+            onClick={(e) => e.stopPropagation()}
+          >
             
             {/* HEADER MODAL */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/90 px-4 py-3 shrink-0">
@@ -388,7 +397,8 @@ export default function NotificationBell({
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="rounded-lg p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition cursor-pointer text-xs"
+                  className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition active:scale-95 cursor-pointer text-sm font-bold flex items-center justify-center min-w-[36px] min-h-[36px]"
+                  title="Đóng thông báo"
                 >
                   ✕
                 </button>
@@ -460,57 +470,65 @@ export default function NotificationBell({
               </button>
             </div>
 
-            {/* TẦNG 2: THANH CUỘN 6 DANH MỤC PHÂN LOẠI CHI TIẾT */}
-            <div className="flex items-center gap-1.5 overflow-x-auto px-3 py-2 border-b border-slate-100 bg-white no-scrollbar text-xs shrink-0">
-              <button
-                type="button"
-                onClick={() => setCategoryTab("all")}
-                className={`shrink-0 px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
-                  categoryTab === "all"
-                    ? "bg-slate-900 text-white shadow-2xs"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                Tất cả
-              </button>
+            {/* TẦNG 2: THANH CUỘN 6 DANH MỤC PHÂN LOẠI CHI TIẾT CÓ TÍN HIỆU CUỘN MỜ MÉP */}
+            <div className="relative border-b border-slate-100 bg-white shrink-0">
+              <div className="flex items-center gap-1.5 overflow-x-auto px-3 py-2.5 no-scrollbar text-xs">
+                <button
+                  type="button"
+                  onClick={() => setCategoryTab("all")}
+                  className={`shrink-0 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer active:scale-95 ${
+                    categoryTab === "all"
+                      ? "bg-slate-900 text-white shadow-2xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  Tất cả
+                </button>
 
-              {(Object.keys(CATEGORY_CONFIG) as Array<Exclude<NotificationCategory, "all">>).map((key) => {
-                const cfg = CATEGORY_CONFIG[key];
-                const Icon = cfg.icon;
-                const count = categoryCounts[key];
-                const isSelected = categoryTab === key;
+                {(Object.keys(CATEGORY_CONFIG) as Array<Exclude<NotificationCategory, "all">>).map((key) => {
+                  const cfg = CATEGORY_CONFIG[key];
+                  const Icon = cfg.icon;
+                  const count = categoryCounts[key];
+                  const isSelected = categoryTab === key;
 
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setCategoryTab(key)}
-                    className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold transition cursor-pointer border ${
-                      isSelected
-                        ? `${cfg.badgeBg} ${cfg.badgeText} ${cfg.border} ring-2 ring-slate-400/20 shadow-2xs`
-                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                    }`}
-                  >
-                    <Icon className="h-3 w-3" />
-                    <span>{cfg.label}</span>
-                    {count > 0 && (
-                      <span
-                        className={`ml-0.5 rounded-full px-1.5 py-0.1 text-[10px] font-extrabold ${
-                          isSelected
-                            ? "bg-white/80"
-                            : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setCategoryTab(key)}
+                      className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer border active:scale-95 ${
+                        isSelected
+                          ? `${cfg.badgeBg} ${cfg.badgeText} ${cfg.border} ring-2 ring-slate-400/20 shadow-2xs`
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span>{cfg.label}</span>
+                      {count > 0 && (
+                        <span
+                          className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
+                            isSelected
+                              ? "bg-white/90"
+                              : "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Hiệu ứng gradient mờ mép phải báo hiệu còn nội dung cuộn */}
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent" />
             </div>
 
             {/* DANH SÁCH THÔNG BÁO ĐÃ ĐƯỢC PHÂN LOẠI */}
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+            <div 
+              className="flex-1 overflow-y-auto divide-y divide-slate-100 overscroll-contain touch-pan-y"
+              style={{ WebkitOverflowScrolling: "touch" }}
+              onTouchMove={(e) => e.stopPropagation()}
+            >
               {filteredMessages.length === 0 ? (
                 <div className="py-12 px-4 text-center text-xs text-slate-400">
                   {searchKeyword ? (
@@ -524,7 +542,7 @@ export default function NotificationBell({
                       <button
                         type="button"
                         onClick={() => setSearchKeyword("")}
-                        className="mt-3 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg cursor-pointer transition text-xs"
+                        className="mt-3 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg cursor-pointer transition text-xs"
                       >
                         Xóa tìm kiếm
                       </button>
@@ -543,20 +561,14 @@ export default function NotificationBell({
                   return (
                     <div
                       key={m.id}
-                      onClick={() => {
-                        handleMarkItemRead(m.id);
-                        if (m.warehouse) {
-                          onOpenWarehouse(m.warehouse);
-                          setIsOpen(false);
-                        }
-                      }}
-                      className={`p-3 flex items-start gap-2.5 transition cursor-pointer hover:bg-slate-50 ${
-                        !isRead ? "bg-emerald-50/20" : "bg-white"
+                      onClick={() => handleMarkItemRead(m.id)}
+                      className={`p-3.5 flex items-start gap-3 transition cursor-pointer hover:bg-slate-50 ${
+                        !isRead ? "bg-amber-50/30" : "bg-white"
                       }`}
                     >
                       {/* ICON DANH MỤC */}
                       <div
-                        className={`mt-0.5 p-1.5 rounded-lg border shrink-0 ${cfg.badgeBg} ${cfg.badgeText} ${cfg.border}`}
+                        className={`mt-0.5 p-2 rounded-xl border shrink-0 ${cfg.badgeBg} ${cfg.badgeText} ${cfg.border}`}
                         title={cfg.label}
                       >
                         <Icon className="h-4 w-4" />
@@ -567,43 +579,55 @@ export default function NotificationBell({
                         <div className="flex items-center justify-between gap-1 mb-1">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             {/* BADGE PHÂN LOẠI */}
-                            <span className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-1.5 py-0.2 rounded border ${cfg.badgeBg} ${cfg.badgeText} ${cfg.border}`}>
+                            <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-md border ${cfg.badgeBg} ${cfg.badgeText} ${cfg.border}`}>
                               {cfg.label}
                             </span>
 
                             {m.warehouse ? (
-                              <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200">
+                              <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
                                 <HighlightText text={`Kho ${pad(m.warehouse)}`} highlight={searchKeyword} />
                               </span>
                             ) : (
-                              <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1 rounded">
+                              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                                 Chung
                               </span>
                             )}
 
-                            <span className="font-mono text-xs font-bold text-slate-800 truncate max-w-[200px]">
+                            <span className="font-mono text-sm font-black text-slate-800 truncate max-w-[220px]">
                               <HighlightText text={m.message} highlight={searchKeyword} />
                             </span>
                           </div>
 
                           {!isRead && (
-                            <span className="h-2 w-2 rounded-full bg-rose-500 shrink-0" title="Chưa đọc" />
+                            <span className="h-2.5 w-2.5 rounded-full bg-rose-600 ring-2 ring-rose-200 shrink-0" title="Chưa đọc" />
                           )}
                         </div>
 
-                        <p className={`text-[11px] leading-relaxed line-clamp-2 ${cat === "duplicate" ? "text-purple-900 font-semibold" : cat === "sold" ? "text-amber-900 font-semibold" : cat === "error" ? "text-rose-700" : "text-slate-600"}`}>
+                        <p className={`text-xs leading-relaxed line-clamp-2 ${cat === "duplicate" ? "text-purple-900 font-semibold" : cat === "sold" ? "text-amber-900 font-semibold" : cat === "error" ? "text-rose-700 font-medium" : "text-slate-600"}`}>
                           <HighlightText text={m.detail} highlight={searchKeyword} />
                         </p>
 
-                        <div className="flex items-center justify-between mt-1 text-[10px] text-slate-400">
+                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100/60 text-[11px] text-slate-400">
                           <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
+                            <Clock className="h-3.5 w-3.5" />
                             {fmtFullTime(m.createdAt)}
                           </span>
+
+                          {/* TÁCH RIÊNG NÚT MỞ KHO ĐỂ KHÔNG BỊ CHUYỂN TRANG NHẦM KHI LƯỚT XEM */}
                           {m.warehouse && (
-                            <span className="text-emerald-700 font-semibold flex items-center gap-0.5 hover:underline">
-                              Mở kho <ChevronRight className="h-3 w-3" />
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkItemRead(m.id);
+                                onOpenWarehouse(m.warehouse!);
+                                setIsOpen(false);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-bold transition active:scale-95 cursor-pointer"
+                            >
+                              <span>Mở kho {pad(m.warehouse)}</span>
+                              <ChevronRight className="h-3 w-3" />
+                            </button>
                           )}
                         </div>
                       </div>

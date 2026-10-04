@@ -1,17 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { 
   Boxes, 
-  MapPin, 
   PackageSearch, 
   RefreshCw, 
   CheckCircle2, 
   AlertCircle,
   Warehouse,
-  History,
   Menu,
-  Sparkles,
   ShoppingBag,
   ArrowRightLeft,
   RotateCcw,
@@ -20,14 +17,20 @@ import {
 import SearchBar from "@/components/SearchBar";
 import WarehouseDetailModal from "@/components/WarehouseDetailModal";
 import WarehouseGrid from "@/components/WarehouseGrid";
-import ZaloSimulator from "@/components/ZaloSimulator";
-import ZaloLiveFeed from "@/components/ZaloLiveFeed";
 import PasteImportModal from "@/components/PasteImportModal";
 import NotificationBell from "@/components/NotificationBell";
 import RightMenuDrawer from "@/components/RightMenuDrawer";
 import { ClipboardPaste } from "lucide-react";
-import { getSupabase } from "@/lib/supabase";
 import type { Item, ItemsResponse, ZaloMessage, ItemHistory } from "@/types";
+import { 
+  saveLocalItems, 
+  getLocalItems, 
+  saveLocalMessages, 
+  getLocalMessages, 
+  saveLocalHistory, 
+  getLocalHistory,
+  enqueueMutation
+} from "@/pwa/db";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const fmt = (iso: string) => {
@@ -79,14 +82,28 @@ export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [defaultPasteWarehouse, setDefaultPasteWarehouse] = useState(1);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [isSearchTransferring, setIsSearchTransferring] = useState(false);
   const [searchTargetWarehouse, setSearchTargetWarehouse] = useState(1);
+  const fetchingRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const fetchData = () => {
-    fetch("/api/items", { cache: "no-store" })
-      .then((r) => r.json() as Promise<ItemsResponse>)
-      .then((data) => {
+  const fetchData = useCallback(() => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    fetch("/api/items", { cache: "no-store", signal: controller.signal })
+      .then((r) => {
+        if (r.status === 401) {
+          window.location.assign("/login");
+          throw new Error("Chưa đăng nhập");
+        }
+        if (!r.ok) throw new Error("Không thể đồng bộ dữ liệu kho");
+        return r.json() as Promise<ItemsResponse>;
+      })
+      .then(async (data) => {
         setItems(data.items || []);
         setMessages(data.messages || []);
         setHistory(data.history || []);
@@ -96,83 +113,51 @@ export default function Home() {
         if (data.totalWarehouses && data.totalWarehouses >= 30) {
           setTotalWarehouses(data.totalWarehouses);
         }
+        // Lưu trữ bản sao dữ liệu an toàn vào IndexedDB theo chuẩn PWA 2026
+        saveLocalItems(data.items || []).catch(() => undefined);
+        saveLocalMessages(data.messages || []).catch(() => undefined);
+        saveLocalHistory(data.history || []).catch(() => undefined);
+        setError(null);
         setLoading(false);
       })
-      .catch(() => {
-        setError("Không thể đồng bộ dữ liệu kho");
+      .catch(async (caught) => {
+        if (caught instanceof DOMException && caught.name === "AbortError") return;
+        // Ngoại tuyến: Đọc từ IndexedDB cục bộ của máy
+        try {
+          const [cachedItems, cachedMsgs, cachedHist] = await Promise.all([
+            getLocalItems(),
+            getLocalMessages(),
+            getLocalHistory(),
+          ]);
+          if (cachedItems && cachedItems.length > 0) {
+            setItems(cachedItems);
+            setMessages(cachedMsgs || []);
+            setHistory(cachedHist || []);
+            setError(null);
+          } else {
+            setError("Không thể kết nối máy chủ");
+          }
+        } catch {
+          setError("Không thể đồng bộ dữ liệu kho");
+        }
         setLoading(false);
-      });
-  };
+      })
+      .finally(() => { fetchingRef.current = false; });
+  }, []);
 
   useEffect(() => {
     fetchData();
-    // Tự động kiểm tra trạng thái bot mỗi 15 giây
-    const botInterval = setInterval(() => {
-      fetch("/api/items", { cache: "no-store" })
-        .then((r) => r.json() as Promise<ItemsResponse>)
-        .then((data) => {
-          if (data.botStatus) setBotStatus(data.botStatus);
-        })
-        .catch(() => {});
-    }, 15000);
-
-    return () => clearInterval(botInterval);
-  }, []);
-
-  // Lắng nghe Realtime của Supabase: có mã mới là giao diện tự nhảy số
-  useEffect(() => {
-    const sb = getSupabase();
-    if (!sb) return;
-
-    const channel = sb
-      .channel("kho-30-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "warehouse_items" }, () => {
-        fetchData();
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "warehouse_history" }, () => {
-        fetchData();
-      })
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "zalo_messages" },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            const row = payload.new as Record<string, unknown>;
-            const rawMsg = String(row.message ?? "").trim();
-            const rowId = String(row.id ?? "");
-            const groupId = String(row.group_id ?? "");
-            if (rowId === "bot_heartbeat" || rawMsg.toUpperCase() === "PING" || groupId === "SYSTEM") {
-              return;
-            }
-            const msg: ZaloMessage = {
-              id: rowId,
-              groupId: groupId,
-              warehouse: (row.warehouse as number | null) ?? null,
-              message: rawMsg,
-              status: (row.status as "ok" | "error") ?? "ok",
-              detail: String(row.detail ?? ""),
-              createdAt: String(row.created_at),
-              read: Boolean(row.read),
-            };
-            setMessages((prev) =>
-              prev.some((m) => m.id === msg.id) ? prev : [msg, ...prev].slice(0, 100)
-            );
-          } else if (payload.eventType === "UPDATE") {
-            const row = payload.new as Record<string, unknown>;
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === String(row.id) ? { ...m, read: Boolean(row.read) } : m
-              )
-            );
-          }
-        }
-      )
-      .subscribe();
-
+    const interval = window.setInterval(fetchData, 10000);
+    const refreshVisible = () => { if (document.visibilityState === "visible") fetchData(); };
+    window.addEventListener("focus", fetchData);
+    document.addEventListener("visibilitychange", refreshVisible);
     return () => {
-      sb.removeChannel(channel);
+      window.clearInterval(interval);
+      window.removeEventListener("focus", fetchData);
+      document.removeEventListener("visibilitychange", refreshVisible);
+      abortRef.current?.abort();
     };
-  }, []);
+  }, [fetchData]);
 
   const matchingItems = useMemo(() => {
     const code = query.trim().toUpperCase();
@@ -196,56 +181,80 @@ export default function Home() {
   }, [matchingItems, selectedSku, query]);
 
   async function removeSku(sku: string) {
-    const res = await fetch("/api/items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "remove", sku, note: "Xuất kho từ modal chi tiết" }),
-    });
-    if (res.ok) {
-      setItems((list) => list.filter((i) => i.sku !== sku));
-      fetchData();
+    setItems((list) => list.filter((i) => i.sku !== sku));
+    try {
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove", sku, note: "Xuất kho từ modal chi tiết" }),
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        await enqueueMutation("remove", { sku, note: "Xuất kho từ modal chi tiết" });
+      }
+    } catch {
+      await enqueueMutation("remove", { sku, note: "Xuất kho từ modal chi tiết" });
     }
   }
 
   async function markSoldSku(sku: string, note: string = "Đã bán") {
-    const res = await fetch("/api/items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "mark_sold", sku, note }),
-    });
-    if (res.ok) {
-      fetchData();
-    } else {
-      const data = await res.json();
-      alert(data.error || "Không thể đánh dấu đã bán");
+    setItems((list) =>
+      list.map((it) => (it.sku === sku ? { ...it, status: "sold", soldAt: new Date().toISOString() } : it))
+    );
+    try {
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "mark_sold", sku, note }),
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        await enqueueMutation("sold", { sku, note });
+      }
+    } catch {
+      await enqueueMutation("sold", { sku, note });
     }
   }
 
   async function restockSku(sku: string, warehouse?: number, note: string = "Khách trả / Nhập lại kho") {
-    const res = await fetch("/api/items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "restock", sku, warehouse, note }),
-    });
-    if (res.ok) {
-      fetchData();
-    } else {
-      const data = await res.json();
-      alert(data.error || "Không thể nhập lại kho");
+    setItems((list) =>
+      list.map((it) => (it.sku === sku ? { ...it, status: "active", warehouse: warehouse || it.warehouse } : it))
+    );
+    try {
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restock", sku, warehouse, note }),
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        await enqueueMutation("restock", { sku, warehouse, note });
+      }
+    } catch {
+      await enqueueMutation("restock", { sku, warehouse, note });
     }
   }
 
   async function transferSku(sku: string, toWarehouse: number) {
-    const res = await fetch("/api/items", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "transfer", sku, toWarehouse }),
-    });
-    const data = await res.json();
-    if (res.ok && data.ok) {
-      fetchData();
-    } else {
-      alert(data.error || "Không thể chuyển kho");
+    setItems((list) =>
+      list.map((it) => (it.sku === sku ? { ...it, warehouse: toWarehouse } : it))
+    );
+    try {
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "transfer", sku, toWarehouse }),
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        await enqueueMutation("transfer", { sku, toWarehouse });
+      }
+    } catch {
+      await enqueueMutation("transfer", { sku, toWarehouse });
     }
   }
 
@@ -289,7 +298,7 @@ export default function Home() {
   }
 
   async function onWebhook(payload: { groupId: string; message: string }) {
-    const res = await fetch("/api/webhook/zalo", {
+    const res = await fetch("/api/simulator/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -315,7 +324,7 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col antialiased selection:bg-emerald-100 selection:text-emerald-900">
       
       {/* TOPBAR / HEADER THEO CHUẨN DESIGN SYSTEM SÁNG & MOBILE PWA (Hỗ trợ tai thỏ / notch) */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs pt-9 sm:pt-0">
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs pt-[calc(env(safe-area-inset-top)+1.75rem)] sm:pt-0">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2 sm:px-6 sm:py-3.5">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs shrink-0">
@@ -394,16 +403,16 @@ export default function Home() {
             <button
               onClick={fetchData}
               title="Làm mới dữ liệu"
-              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer"
+              className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer"
             >
-              <RefreshCw className="h-3.5 w-3.5" />
+              <RefreshCw className="h-4 w-4" />
             </button>
 
             {/* NÚT MENU BÊN PHẢI (RIGHT DRAWER) */}
             <button
               type="button"
               onClick={() => setIsMenuOpen(true)}
-              className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-slate-900 bg-slate-900 text-white hover:bg-slate-800 transition active:scale-95 shadow-2xs cursor-pointer"
+              className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-slate-900 bg-slate-900 text-white hover:bg-slate-800 transition active:scale-95 shadow-2xs cursor-pointer"
               title="Mở menu quản lý & tiện ích bên phải"
             >
               <Menu className="h-4 w-4 text-white" />
@@ -683,7 +692,10 @@ export default function Home() {
       </main>
 
       {/* FOOTER */}
-      <footer className="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
+      <footer
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        className="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500"
+      >
         Xưởng Lũa Nhựt · Hệ Thống Quản Lý Kho Độc Bản · Nền Tảng PWA Tối Ưu Mobile
       </footer>
 
@@ -735,4 +747,3 @@ export default function Home() {
     </div>
   );
 }
-

@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Zalo } from "zca-js";
 import { hasSku, parseWarehouseFromName, resolveWarehouse } from "./index.js";
+import { sendSignedWebhook } from "./webhook-client.js";
 
 const BOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -101,13 +102,9 @@ async function main() {
 
           // Gửi về Webhook để lưu vào Supabase
           try {
-            const res = await fetch(WEBHOOK_URL, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
+            const res = await sendSignedWebhook(WEBHOOK_URL, {
                 groupId: `KHO_${String(wh).padStart(2, "0")}`,
                 message: text.trim(),
-              }),
             });
             const data = await res.json();
             if (data.ok) {
@@ -181,13 +178,9 @@ export async function syncRecentGroupHistory(api, limit = 50) {
           if (text && hasSku(text)) {
             parsed++;
             try {
-              const res = await fetch(WEBHOOK_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
+              const res = await sendSignedWebhook(WEBHOOK_URL, {
                   groupId: `KHO_${String(wh).padStart(2, "0")}`,
                   message: text.trim(),
-                }),
               });
               const data = await res.json();
               if (data.ok) imported++;

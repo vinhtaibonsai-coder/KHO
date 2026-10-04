@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   X, 
   PlusCircle, 
@@ -18,7 +19,8 @@ import {
   FlaskConical,
   Radio,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  LogOut
 } from "lucide-react";
 import type { Item, ItemHistory, ZaloMessage } from "@/types";
 import ZaloLiveFeed from "@/components/ZaloLiveFeed";
@@ -58,7 +60,33 @@ export default function RightMenuDrawer({
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
   const [devTab, setDevTab] = useState<"live" | "sim" | null>(null);
 
-  if (!isOpen) return null;
+  // Khóa cứng cuộn trang nền ngoài chuẩn Mobile PWA (iOS Safari & Android Chrome)
+  useEffect(() => {
+    if (!isOpen) return;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalBodyPosition = document.body.style.position;
+    const originalBodyTop = document.body.style.top;
+    const originalBodyWidth = document.body.style.width;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      document.body.style.position = originalBodyPosition;
+      document.body.style.top = originalBodyTop;
+      document.body.style.width = originalBodyWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [isOpen]);
+
+  if (!isOpen || typeof document === "undefined") return null;
 
   // Thống kê nhanh theo dòng sản phẩm
   const prefixStats = (() => {
@@ -137,15 +165,23 @@ export default function RightMenuDrawer({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.assign("/login");
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 touch-none overscroll-none">
       <div className="absolute inset-0" onClick={onClose} />
 
       <div className="fixed inset-y-0 right-0 max-w-full flex">
-        <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200">
+        <div 
+          className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
           
           {/* HEADER MENU BÊN PHẢI - Thêm pt-safe / pt-12 trên mobile để không bị tai thỏ & camera che */}
-          <div className="pt-10 sm:pt-4 px-4 sm:px-5 pb-3 sm:pb-4 border-b border-slate-200 bg-white/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-10">
+          <div className="pt-10 sm:pt-4 px-4 sm:px-5 pb-3 sm:pb-4 border-b border-slate-200 bg-white/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-10 shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="h-9 w-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
                 <Settings className="h-5 w-5 text-emerald-400" />
@@ -169,7 +205,20 @@ export default function RightMenuDrawer({
           </div>
 
           {/* NỘI DUNG CUỘN */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 pb-12">
+          <div 
+            className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 pb-12 overscroll-contain touch-pan-y"
+            style={{ WebkitOverflowScrolling: "touch" }}
+            onTouchMove={(e) => e.stopPropagation()}
+          >
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+              Đăng xuất
+            </button>
 
             {/* THÔNG BÁO THÀNH CÔNG */}
             {addSuccess && (
@@ -414,11 +463,12 @@ export default function RightMenuDrawer({
           </div>
 
           {/* FOOTER DRAWER */}
-          <div className="p-4 border-t border-slate-200 bg-slate-50 text-center text-[11px] text-slate-400">
+          <div className="p-4 border-t border-slate-200 bg-slate-50 text-center text-[11px] text-slate-400 shrink-0">
             Xưởng Lũa Nhựt · Phiên Bản Vận Hành 2.5
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

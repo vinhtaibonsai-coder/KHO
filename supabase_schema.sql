@@ -6,30 +6,41 @@
 create table if not exists public.warehouse_items (
   sku         text primary key,
   name        text not null default 'Hàng độc bản',
-  warehouse   integer not null check (warehouse between 1 and 30),
+  warehouse   integer not null check (warehouse between 1 and 100),
   qty         integer not null default 1,
-  updated_at  timestamptz not null default now()
+  updated_at  timestamptz not null default now(),
+  status      text not null default 'active' check (status in ('active', 'sold')),
+  sold_at     timestamptz,
+  sold_note   text
 );
 
 create table if not exists public.zalo_messages (
   id          text primary key,
   group_id    text not null,
-  warehouse   integer check (warehouse between 1 and 30),
+  warehouse   integer check (warehouse between 1 and 100),
   message     text not null,
   status      text not null default 'ok' check (status in ('ok', 'error')),
   detail      text not null default '',
-  created_at  timestamptz not null default now()
+  created_at  timestamptz not null default now(),
+  read        boolean not null default false
 );
 
 create table if not exists public.warehouse_history (
   id              text primary key,
   sku             text not null,
-  action          text not null check (action in ('in', 'out', 'transfer')),
-  from_warehouse  integer check (from_warehouse between 1 and 30),
-  to_warehouse    integer check (to_warehouse between 1 and 30),
+  action          text not null check (action in ('in', 'out', 'transfer', 'sold', 'restock')),
+  from_warehouse  integer check (from_warehouse between 1 and 100),
+  to_warehouse    integer check (to_warehouse between 1 and 100),
   note            text not null default '',
   created_at      timestamptz not null default now()
 );
+
+create table if not exists public.warehouse_settings (
+  id text primary key,
+  total_warehouses integer not null default 30 check (total_warehouses between 1 and 100)
+);
+insert into public.warehouse_settings (id, total_warehouses) values ('main', 30)
+on conflict (id) do nothing;
 
 create index if not exists warehouse_items_warehouse_idx on public.warehouse_items (warehouse);
 create index if not exists zalo_messages_created_at_idx on public.zalo_messages (created_at desc);
@@ -56,48 +67,25 @@ after insert on public.zalo_messages
 for each row execute function public.trim_zalo_messages();
 
 -- ============================================================
--- BẬT REALTIME (Websocket) cho cả 3 bảng
--- ============================================================
-alter publication supabase_realtime add table public.warehouse_items;
-alter publication supabase_realtime add table public.zalo_messages;
-alter publication supabase_realtime add table public.warehouse_history;
-
--- Gửi cả dữ liệu cũ (UPDATE/DELETE) để client cập nhật chính xác
-alter table public.warehouse_items replica identity full;
-alter table public.zalo_messages replica identity full;
-alter table public.warehouse_history replica identity full;
-
--- ============================================================
 -- (TUỲ CHỌN) Row Level Security: cho phép đọc/ghi ẩn danh
 -- Bỏ các block này nếu bạn chỉ dùng Service Role Key phía server.
 -- ============================================================
 alter table public.warehouse_items enable row level security;
 alter table public.zalo_messages enable row level security;
 alter table public.warehouse_history enable row level security;
+alter table public.warehouse_settings enable row level security;
 
 drop policy if exists "public read warehouse_items" on public.warehouse_items;
-create policy "public read warehouse_items"
-  on public.warehouse_items for select using (true);
 
 drop policy if exists "public write warehouse_items" on public.warehouse_items;
-create policy "public write warehouse_items"
-  on public.warehouse_items for all using (true) with check (true);
 
 drop policy if exists "public read zalo_messages" on public.zalo_messages;
-create policy "public read zalo_messages"
-  on public.zalo_messages for select using (true);
 
 drop policy if exists "public write zalo_messages" on public.zalo_messages;
-create policy "public write zalo_messages"
-  on public.zalo_messages for all using (true) with check (true);
 
 drop policy if exists "public read warehouse_history" on public.warehouse_history;
-create policy "public read warehouse_history"
-  on public.warehouse_history for select using (true);
 
 drop policy if exists "public write warehouse_history" on public.warehouse_history;
-create policy "public write warehouse_history"
-  on public.warehouse_history for all using (true) with check (true);
 
 -- ============================================================
 -- SEED (tuỳ chọn): một vài mã mẫu để kiểm tra giao diện

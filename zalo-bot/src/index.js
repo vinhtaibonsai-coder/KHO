@@ -6,6 +6,7 @@ import pngjs from "pngjs";
 import jsQR from "jsqr";
 import qrcodeTerminal from "qrcode-terminal";
 import { syncRecentGroupHistory } from "./sync-history.js";
+import { sendSignedWebhook } from "./webhook-client.js";
 
 const { PNG } = pngjs;
 
@@ -85,11 +86,7 @@ function saveMapping(mapping) {
 export async function forward(groupId, message, url = WEBHOOK_URL, attempts = 3) {
   for (let i = 1; i <= attempts; i++) {
     try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ groupId, message }),
-      });
+      const res = await sendSignedWebhook(url, { groupId, message });
       const data = await res.json().catch(() => ({}));
       if (res.ok) return data;
       console.error(`[webhook] HTTP ${res.status} cho "${message}":`, data.error ?? data.detail ?? "");
@@ -369,7 +366,7 @@ function selftest() {
   assert(parseWarehouseFromName("KHO 05") === 5, "KHO 05 -> 5");
   assert(parseWarehouseFromName("Kho 5") === 5, "Kho 5 -> 5");
   assert(parseWarehouseFromName("Kho-12 nhom A") === 12, "Kho-12 -> 12");
-  assert(parseWarehouseFromName("Kho 99") === null, "kho 99 -> null");
+  assert(parseWarehouseFromName("Kho 105") === null, "kho 105 -> null");
 
   const mapping = { groups: { "gid-1": 7 } };
   assert(resolveWarehouse(mapping, "gid-1", "Kho 9") === 7, "map theo Group ID được ưu tiên");
@@ -413,11 +410,7 @@ async function main() {
   // 3. Heartbeat định kỳ 20 giây gửi tín hiệu ping để web hiển thị bot đang chạy
   const sendHeartbeat = async () => {
     try {
-      await fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "heartbeat" }),
-      });
+      await sendSignedWebhook(WEBHOOK_URL, { action: "heartbeat" });
     } catch {}
   };
   // Gửi ngay 1 lần đầu

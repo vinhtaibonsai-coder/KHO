@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import type { Item, ZaloMessage, ItemHistory } from "@/types";
-import { getSupabase, supabaseEnabled } from "@/lib/supabase";
+import { getSupabase, supabaseEnabled } from "@/lib/supabase-server";
 
 export const DEFAULT_TOTAL_WAREHOUSES = 30;
 export const TOTAL_WAREHOUSES = 30; // legacy fallback
@@ -888,5 +888,4 @@ export async function getBotStatus(): Promise<{ online: boolean; lastPing: strin
 
   return { online, lastPing: lastPingIso };
 }
-
 

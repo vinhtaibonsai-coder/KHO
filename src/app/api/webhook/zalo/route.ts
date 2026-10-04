@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { addQty, pushMessage, removeItem, upsertItem, findItem, transferItem, ensureWarehouseExists, recordBotPing } from "@/lib/store";
 import { validateSku, extractValidSkusFromText } from "@/lib/sku-rules";
 import type { ZaloMessage } from "@/types";
+import { verifyWebhookSignature } from "@/lib/webhook-signature";
 
 export const dynamic = "force-dynamic";
 
@@ -77,7 +78,16 @@ function parseMessage(text: string): { action: "in" | "out" | "assign"; sku: str
 }
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => null);
+  const rawBody = await req.text();
+  if (!verifyWebhookSignature(
+    rawBody,
+    req.headers.get("x-zalo-timestamp"),
+    req.headers.get("x-zalo-signature"),
+    process.env.ZALO_WEBHOOK_SECRET
+  )) {
+    return NextResponse.json({ ok: false, error: "Webhook không hợp lệ" }, { status: 401 });
+  }
+  const body = (() => { try { return JSON.parse(rawBody); } catch { return null; } })();
 
   // Nhận tín hiệu heartbeat giữ trạng thái bot online
   if (body?.action === "heartbeat" || body?.message === "__PING__") {

@@ -1,4 +1,23 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hệ thống kho nội bộ
+
+Ứng dụng Next.js 16 quản lý vị trí hàng, nhận dữ liệu từ Zalo bot và lưu trên Supabase. Giao diện/API nghiệp vụ được bảo vệ bằng PIN; webhook dùng secret riêng.
+
+## Cấu hình
+
+Yêu cầu Node.js 20.9+. Sao chép `.env.example` thành `.env.local`, rồi tạo giá trị:
+
+```powershell
+npm run auth:hash-pin -- 123456
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Đặt kết quả đầu vào `APP_PIN_HASH`. Chạy lệnh random hai lần cho `SESSION_SECRET` và `ZALO_WEBHOOK_SECRET`. Đặt cùng webhook secret trong `zalo-bot/.env`. Không commit các file env. `SUPABASE_SERVICE_ROLE_KEY` chỉ nằm phía server, không dùng tiền tố `NEXT_PUBLIC_`.
+
+## Supabase
+
+Với hệ thống hiện hữu, chạy thủ công `supabase_migration_security_v2.sql` trong Supabase SQL Editor. Browser không còn truy cập Supabase trực tiếp; Next.js dùng service role và giao diện polling `/api/items` mỗi 10 giây.
+
+## Chạy và kiểm tra
 
 ## Getting Started
 

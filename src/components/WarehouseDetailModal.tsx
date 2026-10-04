@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { 
   ArrowDownUp, 
   ArrowRightLeft, 
@@ -58,6 +59,31 @@ export default function WarehouseDetailModal({
   const [transferringSku, setTransferringSku] = useState<string | null>(null);
   const [targetWarehouse, setTargetWarehouse] = useState<number>(warehouse === 1 ? 2 : 1);
   const [transferSubmitting, setTransferSubmitting] = useState(false);
+
+  // Khóa cứng cuộn trang nền ngoài chuẩn Mobile PWA (iOS Safari & Android Chrome)
+  useEffect(() => {
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalBodyPosition = document.body.style.position;
+    const originalBodyTop = document.body.style.top;
+    const originalBodyWidth = document.body.style.width;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = "100%";
+
+    return () => {
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
+      document.body.style.position = originalBodyPosition;
+      document.body.style.top = originalBodyTop;
+      document.body.style.width = originalBodyWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, []);
 
   // Danh sách item đang CÒN TRONG KHO (chưa bán)
   const activeList = useMemo(() => {
@@ -153,17 +179,19 @@ export default function WarehouseDetailModal({
     }
   };
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-2 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex flex-col justify-end sm:justify-center items-center bg-slate-900/60 p-0 sm:p-4 backdrop-blur-xs animate-in fade-in duration-200 touch-none overscroll-none"
       onClick={onClose}
     >
       <div
-        className="max-h-[94vh] sm:max-h-[90vh] w-full max-w-2xl flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden"
+        className="max-h-[88vh] sm:max-h-[90vh] h-[88vh] sm:h-auto w-full max-w-2xl flex flex-col rounded-t-3xl sm:rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden overscroll-contain"
         onClick={(e) => e.stopPropagation()}
       >
         {/* HEADER MODAL - Tinh gọn, rõ ràng */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-4 sm:px-6 py-3.5">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/90 px-4 sm:px-6 py-3.5 shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-slate-900 text-white font-extrabold text-base shadow-xs shrink-0">
               {pad(warehouse)}
@@ -200,7 +228,7 @@ export default function WarehouseDetailModal({
               type="button"
               onClick={onClose}
               aria-label="Đóng"
-              className="rounded-xl border border-slate-200 p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition cursor-pointer"
+              className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition active:scale-95 cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
@@ -290,8 +318,12 @@ export default function WarehouseDetailModal({
           </div>
         )}
 
-        {/* NỘI DUNG CHÍNH */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 bg-slate-50/40">
+        {/* NỘI DUNG CHÍNH - Cuộn độc lập mượt mà, chặn toàn bộ touch lan ra bên ngoài */}
+        <div 
+          className="flex-1 overflow-y-auto p-4 sm:p-5 pb-16 sm:pb-6 bg-slate-50/40 overscroll-contain touch-pan-y"
+          style={{ WebkitOverflowScrolling: "touch" }}
+          onTouchMove={(e) => e.stopPropagation()}
+        >
           
           {/* TRƯỜNG HỢP 1: ĐANG XEM CHI TIẾT 1 SẢN PHẨM CỤ THỂ KHI BẤM VÀO */}
           {selectedItem ? (
@@ -640,25 +672,25 @@ export default function WarehouseDetailModal({
                             <span className="font-mono text-base font-black text-slate-900 hover:text-emerald-700 tracking-wide block truncate">
                               {it.sku}
                             </span>
-                            <span className="text-[10px] text-slate-400 block truncate">
+                            <span className="text-xs text-slate-500 font-medium block truncate">
                               {time} · {date}
                             </span>
                           </div>
                         </div>
 
-                        {/* NÚT THAO TÁC RÕ RÀNG, TINH GỌN */}
+                        {/* NÚT THAO TÁC RÕ RÀNG, KHOẢNG CÁCH AN TOÀN TRÁNH BẤM NHẦM */}
                         <div 
-                          className="flex items-center gap-1 shrink-0"
+                          className="flex items-center gap-1.5 shrink-0"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {/* NÚT ĐÁNH DẤU ĐÃ BÁN */}
                           <button
                             type="button"
                             onClick={() => handleMarkSoldItem(it.sku)}
-                            className="flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
+                            className="flex items-center gap-1 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 transition active:scale-95 cursor-pointer"
                             title="Đánh dấu đã bán"
                           >
-                            <ShoppingBag className="h-3 w-3 text-amber-600" />
+                            <ShoppingBag className="h-3.5 w-3.5 text-amber-600" />
                             <span>Bán</span>
                           </button>
 
@@ -673,25 +705,28 @@ export default function WarehouseDetailModal({
                                 setTargetWarehouse(warehouse === 1 ? 2 : 1);
                               }
                             }}
-                            className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-bold transition cursor-pointer ${
+                            className={`flex items-center gap-1 rounded-xl border px-2.5 py-1.5 text-xs font-bold transition active:scale-95 cursor-pointer ${
                               isTransferringThis
-                                ? "border-indigo-400 bg-indigo-50 text-indigo-800"
+                                ? "border-indigo-400 bg-indigo-50 text-indigo-800 ring-2 ring-indigo-200"
                                 : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
                             }`}
                             title="Chuyển sang kho khác"
                           >
-                            <ArrowRightLeft className="h-3 w-3 text-indigo-600" />
+                            <ArrowRightLeft className="h-3.5 w-3.5 text-indigo-600" />
                             <span>{isTransferringThis ? "Huỷ" : "Chuyển"}</span>
                           </button>
 
-                          {/* NÚT XUẤT KHO */}
+                          {/* ĐƯỜNG PHÂN CÁCH NGĂN NÚT XUẤT/XÓA KHỎI CÁC NÚT THƯỜNG DÙNG */}
+                          <div className="h-4 w-px bg-slate-200 mx-0.5" />
+
+                          {/* NÚT XUẤT KHO (ĐẶT TÁCH BIỆT RÕ RÀNG) */}
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(it.sku)}
-                            className="flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 p-1 text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+                            className="flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-100 transition active:scale-95 cursor-pointer"
                             title="Xuất mã này ra khỏi kho"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
@@ -748,17 +783,22 @@ export default function WarehouseDetailModal({
         </div>
 
         {/* FOOTER */}
-        <div className="border-t border-slate-200 bg-white px-4 sm:px-6 py-3 flex justify-between items-center text-xs text-slate-500">
-          <span>* Dữ liệu các mã đã bán luôn được lưu vết vĩnh viễn trong hệ thống.</span>
+        <div 
+          className="border-t border-slate-200 bg-white px-4 sm:px-6 py-3 flex justify-between items-center text-xs text-slate-500 shrink-0"
+          style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
+        >
+          <span className="hidden sm:inline">* Dữ liệu các mã đã bán luôn được lưu vết vĩnh viễn trong hệ thống.</span>
+          <span className="sm:hidden font-medium text-slate-400">Kho {pad(warehouse)} · Xưởng Lũa Nhựt</span>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl bg-slate-900 px-4 py-2 font-bold text-white hover:bg-slate-800 transition cursor-pointer"
+            className="rounded-xl bg-slate-900 px-5 py-2.5 font-bold text-white hover:bg-slate-800 transition active:scale-95 cursor-pointer ml-auto sm:ml-0"
           >
             Đóng
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

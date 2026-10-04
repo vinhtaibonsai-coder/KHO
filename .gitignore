@@ -46,3 +46,9 @@ next-env.d.ts
 zalo-bot/node_modules/
 zalo-bot/.zalo-session.json
 zalo-bot/qr.png
+data/.bot-ping.json
+*.log
+
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
