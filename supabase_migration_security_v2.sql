@@ -21,9 +21,12 @@ alter table public.warehouse_history add constraint warehouse_history_to_warehou
 
 create table if not exists public.warehouse_settings (
   id text primary key,
-  total_warehouses integer not null default 30 check (total_warehouses between 1 and 100)
+  total_warehouses integer not null default 30 check (total_warehouses between 1 and 100),
+  system_pin_hash text
 );
-insert into public.warehouse_settings (id, total_warehouses) values ('default', 30)
+alter table public.warehouse_settings add column if not exists system_pin_hash text;
+insert into public.warehouse_settings (id, total_warehouses, system_pin_hash) 
+values ('default', 30, 'scrypt:f807eb24b1ec9dccef5c82f75a2f4290:901daa989670d51d418bfc6c36aabce280343df43dff43926a9b3bf326fe24526ccc12d1b2b2177dbaa02e7a682b161a251a125fc3f42405ef4dbd68954c76c4')
 on conflict (id) do nothing;
 
 alter table public.warehouse_items enable row level security;

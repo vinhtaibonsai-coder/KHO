@@ -18,13 +18,18 @@ export async function hashPin(pin: string): Promise<string> {
   return `scrypt:${salt}:${hash.toString("hex")}`;
 }
 
+// Mã hash mặc định của mã PIN 1809
+const DEFAULT_1809_PIN_HASH =
+  "scrypt:f807eb24b1ec9dccef5c82f75a2f4290:901daa989670d51d418bfc6c36aabce280343df43dff43926a9b3bf326fe24526ccc12d1b2b2177dbaa02e7a682b161a251a125fc3f42405ef4dbd68954c76c4";
+
 /**
  * Đọc mã PIN hash hiện tại:
  * 1. Ưu tiên đọc từ Supabase (bảng warehouse_settings -> system_pin_hash)
  * 2. Đọc từ file local data/system_settings.json
  * 3. Fallback đọc từ biến môi trường APP_PIN_HASH
+ * 4. Fallback mặc định là mã PIN 1809 (không bao giờ báo lỗi hệ thống chưa cấu hình)
  */
-export async function getActivePinHash(): Promise<string | undefined> {
+export async function getActivePinHash(): Promise<string> {
   // 1. Thử lấy từ Supabase
   if (supabaseEnabled) {
     try {
@@ -58,7 +63,13 @@ export async function getActivePinHash(): Promise<string | undefined> {
   }
 
   // 3. Fallback từ biến môi trường
-  return process.env.APP_PIN_HASH?.trim();
+  const envHash = process.env.APP_PIN_HASH?.trim();
+  if (envHash) {
+    return envHash;
+  }
+
+  // 4. Luôn fallback về mã PIN 1809 mặc định
+  return DEFAULT_1809_PIN_HASH;
 }
 
 /**
