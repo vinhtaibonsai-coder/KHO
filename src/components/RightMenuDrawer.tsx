@@ -23,6 +23,7 @@ import {
   LogOut,
   KeyRound
 } from "lucide-react";
+import { APP_VERSION, APP_BUILD_TIME } from "@/lib/version";
 import type { Item, ItemHistory, ZaloMessage } from "@/types";
 import ZaloLiveFeed from "@/components/ZaloLiveFeed";
 import ZaloSimulator from "@/components/ZaloSimulator";
@@ -502,8 +503,16 @@ export default function RightMenuDrawer({
           </div>
 
           {/* FOOTER DRAWER */}
-          <div className="p-4 border-t border-slate-200 bg-slate-50 text-center text-[11px] text-slate-400 shrink-0">
-            Xưởng Lũa Nhựt · Phiên Bản Vận Hành 2.5
+          <div className="p-3.5 border-t border-slate-200 bg-slate-50 text-center flex flex-col items-center gap-0.5 shrink-0">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <span>Xưởng Lũa Nhựt</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-mono font-black border border-emerald-200">
+                v{APP_VERSION}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium">
+              Bản cập nhật: {APP_BUILD_TIME}
+            </p>
           </div>
         </div>
       </div>

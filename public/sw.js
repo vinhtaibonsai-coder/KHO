@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-const CACHE_VERSION = "v2.5.0";
+const CACHE_VERSION = "v2.5.2";
 const STATIC_CACHE = `lua-nhut-static-${CACHE_VERSION}`;
 const IMAGE_CACHE = `lua-nhut-images-${CACHE_VERSION}`;
 const OFFLINE_FALLBACK = "/offline.html";

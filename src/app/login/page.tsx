@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, Delete, KeyRound, AlertCircle, Sparkles } from "lucide-react";
+import { APP_VERSION } from "@/lib/version";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -245,11 +246,14 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Footer Info */}
-      <footer className="relative z-10 text-center pb-1">
+      {/* Footer Info & Version */}
+      <footer className="relative z-10 text-center pb-1 flex flex-col items-center gap-1">
         <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">
           Dành riêng cho nhân viên thủ kho & quản lý Xưởng Lũa Nhựt
         </p>
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-200/60 text-slate-600 border border-slate-300/60">
+          Phiên bản v{APP_VERSION}
+        </span>
       </footer>
     </main>
   );
