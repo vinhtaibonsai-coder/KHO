@@ -73,10 +73,14 @@ export default function LoginPage() {
         throw new Error(data.error || "Mã PIN không chính xác");
       }
 
-      // Đăng nhập thành công! Rung xúc giác báo thành công & chuyển trang
+      // Đăng nhập thành công! Rung xúc giác báo thành công & chuyển trang mượt mà
       triggerHaptic([30, 50, 40]);
-      router.replace("/");
-      router.refresh();
+      // Dùng window.location.assign để đảm bảo cookie mới được load đầy đủ trên Mobile WebKit/Safari
+      if (typeof window !== "undefined") {
+        window.location.assign("/");
+      } else {
+        router.replace("/");
+      }
     } catch (err) {
       triggerHaptic([50, 40, 50]);
       setError(err instanceof Error ? err.message : "Mã PIN không đúng");
@@ -112,43 +116,43 @@ export default function LoginPage() {
   ];
 
   return (
-    <main className="relative min-h-[100dvh] w-full flex flex-col justify-between items-center bg-gradient-to-b from-slate-50 via-emerald-50/30 to-slate-100 text-slate-800 select-none overflow-hidden px-4 py-6 sm:py-10">
+    <main className="relative min-h-[100dvh] w-full flex flex-col justify-between items-center bg-gradient-to-b from-slate-50 via-emerald-50/30 to-slate-100 text-slate-800 select-none overflow-y-auto px-4 pt-3 pb-4 sm:py-8" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))", paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
       {/* Decorative Light Background Accents */}
       <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-400/15 rounded-full blur-[90px] pointer-events-none" />
       <div className="absolute -bottom-32 left-1/2 -translate-x-1/2 w-96 h-96 bg-teal-400/10 rounded-full blur-[90px] pointer-events-none" />
 
       {/* Top Header / Branding - Theme Sáng */}
-      <header className="relative z-10 flex flex-col items-center text-center mt-2 sm:mt-6">
-        <div className="relative mb-3 flex items-center justify-center">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-500 p-[2px] shadow-xl shadow-emerald-500/20">
-            <div className="w-full h-full rounded-[22px] bg-white flex items-center justify-center shadow-inner">
-              <ShieldCheck className="w-8 h-8 sm:w-10 sm:h-10 text-emerald-600" />
+      <header className="relative z-10 flex flex-col items-center text-center mt-1 sm:mt-4">
+        <div className="relative mb-2 sm:mb-3 flex items-center justify-center">
+          <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 p-[2px] shadow-lg shadow-emerald-500/20">
+            <div className="w-full h-full rounded-[14px] bg-white flex items-center justify-center shadow-inner">
+              <ShieldCheck className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-600" />
             </div>
           </div>
-          <span className="absolute -bottom-1 -right-1 flex h-5 w-5">
+          <span className="absolute -bottom-1 -right-1 flex h-4.5 w-4.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-600 items-center justify-center text-[10px] font-bold text-white shadow-sm">✓</span>
+            <span className="relative inline-flex rounded-full h-4.5 w-4.5 bg-emerald-600 items-center justify-center text-[9px] font-bold text-white shadow-sm">✓</span>
           </span>
         </div>
 
-        <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 flex items-center gap-1.5">
+        <h1 className="text-lg sm:text-xl font-black tracking-tight text-slate-900 flex items-center gap-1.5">
           Xưởng Lũa Nhựt
         </h1>
-        <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 max-w-[280px]">
+        <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5 max-w-[260px]">
           Quản lý định vị sản phẩm & kho hàng thời gian thực
         </p>
       </header>
 
       {/* Center PIN Display & Status */}
-      <div className="relative z-10 w-full max-w-xs flex flex-col items-center my-auto">
-        <div className="flex items-center gap-1.5 mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+      <div className="relative z-10 w-full max-w-xs flex flex-col items-center my-auto py-2 sm:py-3">
+        <div className="flex items-center gap-1.5 mb-2 sm:mb-3 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500">
           <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
           <span>Nhập mã PIN truy cập</span>
         </div>
 
         {/* PIN Indicators (4 Dots / Digits) - Light Glass Style */}
         <div
-          className={`flex items-center justify-center gap-4 py-3.5 px-7 rounded-2xl bg-white/90 border border-slate-200/90 shadow-lg shadow-slate-200/50 backdrop-blur-xl transition-all duration-200 ${
+          className={`flex items-center justify-center gap-3.5 py-2.5 px-6 rounded-2xl bg-white/95 border border-slate-200/90 shadow-md shadow-slate-200/50 backdrop-blur-xl transition-all duration-200 ${
             shake ? "-translate-x-2 animate-pulse border-rose-400 shadow-rose-200/50" : ""
           }`}
         >
@@ -158,7 +162,7 @@ export default function LoginPage() {
             return (
               <div
                 key={index}
-                className={`relative w-4 h-4 sm:w-5 sm:h-5 rounded-full transition-all duration-250 flex items-center justify-center ${
+                className={`relative w-4 h-4 rounded-full transition-all duration-200 flex items-center justify-center ${
                   isFilled
                     ? "bg-emerald-600 shadow-md shadow-emerald-500/40 scale-110"
                     : isCurrent
@@ -175,28 +179,28 @@ export default function LoginPage() {
         </div>
 
         {/* Notification / Error message */}
-        <div className="min-h-[30px] mt-3.5 flex items-center justify-center text-center">
+        <div className="min-h-[26px] mt-2 flex items-center justify-center text-center">
           {loading ? (
             <p className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-emerald-700 animate-pulse">
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
               Đang xác thực thông tin...
             </p>
           ) : error ? (
-            <p className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3.5 py-1 rounded-full shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-0.5 rounded-full shadow-sm">
               <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-600" />
               {error}
             </p>
           ) : (
-            <p className="text-[11px] sm:text-xs text-slate-400 font-medium">
+            <p className="text-[11px] text-slate-400 font-medium">
               Chạm 4 số mã bảo mật được cấp
             </p>
           )}
         </div>
       </div>
 
-      {/* Modern Custom On-Screen Keypad - Giao Diện Sáng Tinh Tế */}
-      <div className="relative z-10 w-full max-w-[290px] sm:max-w-[320px] mb-2 sm:mb-6">
-        <div className="grid grid-cols-3 gap-3 sm:gap-4 place-items-center">
+      {/* Modern Custom On-Screen Keypad - Giao Diện Sáng Tinh Tế & Vừa Vặn Mobile */}
+      <div className="relative z-10 w-full max-w-[280px] sm:max-w-[310px] mb-1 sm:mb-4">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5 place-items-center">
           {keypadNumbers.map((row) =>
             row.map((num) => (
               <button
@@ -204,7 +208,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => handleKeyPress(num)}
                 disabled={loading}
-                className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-emerald-400 text-xl sm:text-2xl font-extrabold text-slate-800 hover:text-emerald-700 flex flex-col items-center justify-center active:scale-95 active:bg-emerald-50 transition-all duration-150 shadow-md shadow-slate-200/60 active:shadow-inner cursor-pointer"
+                className="w-15 h-15 sm:w-18 sm:h-18 rounded-full bg-white hover:bg-slate-50 border border-slate-200/90 active:border-emerald-500 text-2xl font-bold text-slate-800 hover:text-emerald-700 flex flex-col items-center justify-center active:scale-90 active:bg-emerald-50 transition-all duration-100 shadow-sm shadow-slate-200 active:shadow-inner cursor-pointer touch-manipulation"
               >
                 <span>{num}</span>
               </button>
@@ -216,7 +220,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleClear}
             disabled={loading || pin.length === 0}
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-100 hover:bg-slate-200/80 text-[11px] font-bold text-slate-600 hover:text-slate-800 flex items-center justify-center active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+            className="w-15 h-15 sm:w-18 sm:h-18 rounded-full bg-slate-100 hover:bg-slate-200/80 active:bg-slate-200 text-[10px] font-bold text-slate-600 hover:text-slate-800 flex items-center justify-center active:scale-90 transition-all duration-100 disabled:opacity-25 disabled:pointer-events-none cursor-pointer touch-manipulation"
           >
             XÓA HẾT
           </button>
@@ -225,7 +229,7 @@ export default function LoginPage() {
             type="button"
             onClick={() => handleKeyPress("0")}
             disabled={loading}
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-emerald-400 text-xl sm:text-2xl font-extrabold text-slate-800 hover:text-emerald-700 flex items-center justify-center active:scale-95 active:bg-emerald-50 transition-all duration-150 shadow-md shadow-slate-200/60 active:shadow-inner cursor-pointer"
+            className="w-15 h-15 sm:w-18 sm:h-18 rounded-full bg-white hover:bg-slate-50 border border-slate-200/90 active:border-emerald-500 text-2xl font-bold text-slate-800 hover:text-emerald-700 flex items-center justify-center active:scale-90 active:bg-emerald-50 transition-all duration-100 shadow-sm shadow-slate-200 active:shadow-inner cursor-pointer touch-manipulation"
           >
             0
           </button>
@@ -234,7 +238,7 @@ export default function LoginPage() {
             type="button"
             onClick={handleDelete}
             disabled={loading || pin.length === 0}
-            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 flex items-center justify-center active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+            className="w-15 h-15 sm:w-18 sm:h-18 rounded-full bg-slate-100 hover:bg-rose-50 active:bg-rose-100 text-slate-600 hover:text-rose-600 flex items-center justify-center active:scale-90 transition-all duration-100 disabled:opacity-25 disabled:pointer-events-none cursor-pointer touch-manipulation"
           >
             <Delete className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
@@ -242,8 +246,8 @@ export default function LoginPage() {
       </div>
 
       {/* Footer Info */}
-      <footer className="relative z-10 text-center pb-2">
-        <p className="text-[11px] text-slate-400 font-medium">
+      <footer className="relative z-10 text-center pb-1">
+        <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">
           Dành riêng cho nhân viên thủ kho & quản lý Xưởng Lũa Nhựt
         </p>
       </footer>

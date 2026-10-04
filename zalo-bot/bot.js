@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const config = require("./config");
 
 // Cấu hình URL Webhook
@@ -46,13 +47,19 @@ function isWarehouseMessage(text) {
  */
 async function forwardToWebhook(groupId, messageText) {
   try {
+    const rawBody = JSON.stringify({ groupId, message: messageText });
+    const timestamp = String(Date.now());
+    const secret = process.env.ZALO_WEBHOOK_SECRET;
+    if (!secret) throw new Error("Thiếu ZALO_WEBHOOK_SECRET");
+    const signature = crypto.createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
     const response = await fetch(WEBHOOK_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        groupId: groupId,
-        message: messageText,
-      }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-zalo-timestamp": timestamp,
+        "x-zalo-signature": signature,
+      },
+      body: rawBody,
     });
     const result = await response.json();
     if (result.ok) {

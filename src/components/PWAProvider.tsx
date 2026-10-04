@@ -3,13 +3,18 @@
 import { useEffect, useState } from "react";
 import { registerServiceWorker } from "@/pwa/registerServiceWorker";
 import { processSyncQueue } from "@/pwa/syncManager";
-import { Sparkles, WifiOff, RefreshCw, X, Download } from "lucide-react";
+import { Sparkles, WifiOff, X, Download } from "lucide-react";
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
 
 export default function PWAProvider() {
   const [updateReloadFn, setUpdateReloadFn] = useState<(() => void) | null>(null);
   const [isOffline, setIsOffline] = useState(false);
   const [showIosInstall, setShowIosInstall] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
     // 1. Đăng ký Service Worker với cơ chế cập nhật an toàn (không reload đột ngột)
@@ -28,24 +33,24 @@ export default function PWAProvider() {
       setIsOffline(true);
     };
 
-    setIsOffline(!navigator.onLine);
+    const initialNetworkTimer = window.setTimeout(() => setIsOffline(!navigator.onLine), 0);
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
     // 3. Xử lý Install Prompt trên Android/Desktop
     const handleBeforeInstall = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
 
     // 4. Phát hiện xem có phải iOS Safari chưa cài Standalone không
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as any).standalone === true;
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
     const isIos =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+      /iPad|iPhone|iPod/.test(navigator.userAgent);
 
     // Không hiện nếu đã cài standalone hoặc đã xem gần đây
     const hasSeenIosPrompt = localStorage.getItem("lua_nhut_ios_install_seen");
@@ -54,13 +59,17 @@ export default function PWAProvider() {
       const timer = setTimeout(() => {
         setShowIosInstall(true);
       }, 10000);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        clearTimeout(initialNetworkTimer);
+      };
     }
 
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      clearTimeout(initialNetworkTimer);
     };
   }, []);
 

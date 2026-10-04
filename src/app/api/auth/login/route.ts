@@ -14,10 +14,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Mã PIN không đúng" }, { status: 401 });
   }
   const response = NextResponse.json({ ok: true });
+  const isHttps =
+    request.headers.get("x-forwarded-proto") === "https" ||
+    request.url.startsWith("https:");
+
   response.cookies.set(SESSION_COOKIE, await createSessionToken(secret), {
     httpOnly: true,
-    sameSite: "strict",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    secure: isHttps,
     path: "/",
     maxAge: SESSION_MAX_AGE,
   });

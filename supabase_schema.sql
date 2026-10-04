@@ -39,7 +39,7 @@ create table if not exists public.warehouse_settings (
   id text primary key,
   total_warehouses integer not null default 30 check (total_warehouses between 1 and 100)
 );
-insert into public.warehouse_settings (id, total_warehouses) values ('main', 30)
+insert into public.warehouse_settings (id, total_warehouses) values ('default', 30)
 on conflict (id) do nothing;
 
 create index if not exists warehouse_items_warehouse_idx on public.warehouse_items (warehouse);
