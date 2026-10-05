@@ -4,12 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { 
   Search, 
   LayoutGrid, 
-  ClipboardPaste, 
+  Layers,
   Bell, 
   Menu
 } from "lucide-react";
 
-export type BottomTabType = "search" | "warehouse" | "paste" | "zalo" | "menu";
+export type BottomTabType = "search" | "warehouse" | "size" | "paste" | "zalo" | "menu";
 
 export default function BottomTabBar({
   activeTab = "search",
@@ -54,6 +54,7 @@ export default function BottomTabBar({
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
   const tabs = [
     {
       id: "warehouse" as BottomTabType,
@@ -61,9 +62,9 @@ export default function BottomTabBar({
       icon: LayoutGrid,
     },
     {
-      id: "paste" as BottomTabType,
-      label: "Dán Chat",
-      icon: ClipboardPaste,
+      id: "size" as BottomTabType,
+      label: "Theo Size",
+      icon: Layers,
     },
     {
       id: "search" as BottomTabType,

@@ -24,6 +24,13 @@ function groupKeyOf(sku: string): { key: string; sized: boolean } {
   return { key: "KHAC", sized: false };
 }
 
+function parseSkuNum(sku: string): number {
+  const m = sku.match(/\.(\d+)/);
+  if (m) return parseInt(m[1], 10);
+  const m2 = sku.match(/(\d+)/);
+  return m2 ? parseInt(m2[1], 10) : 0;
+}
+
 export default function SizeInventoryManager({
   items,
   totalWarehouses = 30,
@@ -49,7 +56,13 @@ export default function SizeInventoryManager({
     const result: SizeGroup[] = [];
     for (const [key, list] of map) {
       const isSize = /^\d+$/.test(key);
-      const sorted = list.slice().sort((a, b) => a.sku.localeCompare(b.sku, "vi", { numeric: true }));
+      // Sắp xếp mã bên trong theo số thứ tự lớn tới nhỏ (giảm dần)
+      const sorted = list.slice().sort((a, b) => {
+        const numA = parseSkuNum(a.sku);
+        const numB = parseSkuNum(b.sku);
+        if (numA !== numB) return numB - numA;
+        return b.sku.localeCompare(a.sku, "vi", { numeric: true });
+      });
       result.push({
         key,
         label: isSize ? key : key === "KHAC" ? "Khác" : key,

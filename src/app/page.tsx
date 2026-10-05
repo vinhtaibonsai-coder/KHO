@@ -350,14 +350,24 @@ export default function Home() {
 
   // Xử lý chuyển tab điều hướng dưới đáy (GitHub iOS Bottom Bar)
   const handleTabSelect = (tab: BottomTabType) => {
+    if (tab === "paste") {
+      setDefaultPasteWarehouse(1);
+      setIsPasteOpen(true);
+      return;
+    }
+    if (tab === "zalo") {
+      setIsNotificationOpen(true);
+      return;
+    }
+    if (tab === "menu") {
+      setIsMenuOpen(true);
+      return;
+    }
+
     setActiveTab(tab);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
     if (tab === "search") {
-      const searchEl = document.getElementById("search-section");
-      if (searchEl) {
-        searchEl.scrollIntoView({ behavior: "smooth", block: "center" });
-      } else {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
       // Focus ngay lập tức và bôi đen toàn bộ chữ hiện có để gõ đè nhanh
       const triggerFocus = () => {
         const input = searchInputRef.current || (document.getElementById("main-search-input") as HTMLInputElement | null);
@@ -369,18 +379,6 @@ export default function Home() {
       triggerFocus();
       setTimeout(triggerFocus, 100);
       setTimeout(triggerFocus, 300);
-    } else if (tab === "warehouse") {
-      const whEl = document.getElementById("warehouse-section");
-      if (whEl) {
-        whEl.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    } else if (tab === "paste") {
-      setDefaultPasteWarehouse(1);
-      setIsPasteOpen(true);
-    } else if (tab === "zalo") {
-      setIsNotificationOpen(true);
-    } else if (tab === "menu") {
-      setIsMenuOpen(true);
     }
   };
 
@@ -524,295 +522,301 @@ export default function Home() {
           </div>
         )}
 
-        {/* SECTION 1: THANH TÌM KIẾM TRA CỨU ĐỈNH CAO (ƯU TIÊN HÀNG ĐẦU) */}
-        <section id="search-section" className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <PackageSearch className="h-5 w-5 text-emerald-600" />
-              <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                Tra Cứu Vị Trí Sản Phẩm Trong Kho
-              </h2>
-            </div>
-            <span className="text-xs text-slate-400 hidden xs:inline">1 Mã = Duy nhất 1 Vị trí</span>
-          </div>
-
-          <SearchBar 
-            value={query} 
-            onChange={setQuery} 
-            inputRef={searchInputRef}
-            autoFocus={true}
-          />
-
-          {/* MÀN HÌNH CHỜ TRA CỨU PHONG CÁCH GITHUB IOS (KHI CHƯA NHẬP MÃ) */}
-          {!query.trim() && (
-            <div className="py-8 sm:py-12 flex flex-col items-center justify-center text-center space-y-3 px-4">
-              <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-1 border border-slate-200/80 shadow-inner">
-                <PackageSearch className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400 stroke-[1.5]" />
+        {/* TAB 1: TRA CỨU VỊ TRÍ SẢN PHẨM TRONG KHO */}
+        {activeTab === "search" && (
+          <section id="search-section" className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs space-y-4 animate-in fade-in duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <PackageSearch className="h-5 w-5 text-emerald-600" />
+                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                  Tra Cứu Vị Trí Sản Phẩm Trong Kho
+                </h2>
               </div>
-              <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                Tìm vị trí hàng trong kho.
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-sm leading-relaxed">
-                Nhập mã SKU trên tem sản phẩm (ví dụ: <span className="font-mono font-bold text-slate-700">E120.124</span>, <span className="font-mono font-bold text-slate-700">K100</span>, <span className="font-mono font-bold text-slate-700">PT395</span>...) để định vị chính xác ô kho đang chứa hàng.
-              </p>
+              <span className="text-xs text-slate-400 hidden xs:inline">1 Mã = Duy nhất 1 Vị trí</span>
             </div>
-          )}
 
-          {/* BANNER THÔNG BÁO KẾT QUẢ TÌM KIẾM */}
-          {query.trim() && (
-            matchingItems.length > 0 && activeFoundItem ? (
-              <div className="space-y-3">
-                {/* THANH DANH SÁCH TẤT CẢ CÁC MÃ TÌM THẤY (KHI TÌM ĐƯỢC NHIỀU MÃ) */}
-                {matchingItems.length > 1 && (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        Tìm thấy <strong className="font-mono text-sm text-emerald-800">{matchingItems.length}</strong> sản phẩm khớp với &quot;{query.trim().toUpperCase()}&quot;:
-                      </span>
-                      <span className="text-[11px] text-slate-500 font-medium">Nhấn vào mã để thao tác nhanh</span>
-                    </div>
+            <SearchBar 
+              value={query} 
+              onChange={setQuery} 
+              inputRef={searchInputRef}
+              autoFocus={true}
+            />
 
-                    <div className="flex flex-wrap gap-1.5">
-                      {matchingItems.map((it) => {
-                        const isCurrent = activeFoundItem.sku === it.sku;
-                        return (
-                          <button
-                            key={it.sku}
-                            type="button"
-                            onClick={() => {
-                              setSelectedSku(it.sku);
-                              setIsSearchTransferring(false);
-                            }}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition cursor-pointer shadow-2xs ${
-                              isCurrent
-                                ? "bg-emerald-600 text-white ring-2 ring-emerald-400 scale-102"
-                                : "bg-white text-slate-800 border border-emerald-300/80 hover:bg-emerald-100/70"
-                            }`}
-                          >
-                            <span>{it.sku}</span>
-                            <span
-                              className={`text-[10px] px-1.5 py-0.2 rounded-md ${
+            {/* MÀN HÌNH CHỜ TRA CỨU PHONG CÁCH GITHUB IOS (KHI CHƯA NHẬP MÃ) */}
+            {!query.trim() && (
+              <div className="py-12 sm:py-16 flex flex-col items-center justify-center text-center space-y-3 px-4">
+                <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-1 border border-slate-200/80 shadow-inner">
+                  <PackageSearch className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400 stroke-[1.5]" />
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                  Tìm vị trí hàng trong kho.
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 max-w-sm leading-relaxed">
+                  Nhập mã SKU trên tem sản phẩm (ví dụ: <span className="font-mono font-bold text-slate-700">E120.124</span>, <span className="font-mono font-bold text-slate-700">K100</span>, <span className="font-mono font-bold text-slate-700">PT395</span>...) để định vị chính xác ô kho đang chứa hàng.
+                </p>
+              </div>
+            )}
+
+            {/* BANNER THÔNG BÁO KẾT QUẢ TÌM KIẾM */}
+            {query.trim() && (
+              matchingItems.length > 0 && activeFoundItem ? (
+                <div className="space-y-3">
+                  {/* THANH DANH SÁCH TẤT CẢ CÁC MÃ TÌM THẤY (KHI TÌM ĐƯỢC NHIỀU MÃ) */}
+                  {matchingItems.length > 1 && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          Tìm thấy <strong className="font-mono text-sm text-emerald-800">{matchingItems.length}</strong> sản phẩm khớp với &quot;{query.trim().toUpperCase()}&quot;:
+                        </span>
+                        <span className="text-[11px] text-slate-500 font-medium">Nhấn vào mã để thao tác nhanh</span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1.5">
+                        {matchingItems.map((it) => {
+                          const isCurrent = activeFoundItem.sku === it.sku;
+                          return (
+                            <button
+                              key={it.sku}
+                              type="button"
+                              onClick={() => {
+                                setSelectedSku(it.sku);
+                                setIsSearchTransferring(false);
+                              }}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition cursor-pointer shadow-2xs ${
                                 isCurrent
-                                  ? "bg-emerald-800 text-emerald-100"
-                                  : it.status === "sold"
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-emerald-100 text-emerald-800"
+                                  ? "bg-emerald-600 text-white ring-2 ring-emerald-400 scale-102"
+                                  : "bg-white text-slate-800 border border-emerald-300/80 hover:bg-emerald-100/70"
                               }`}
                             >
-                              {it.status === "sold" ? "Đã bán" : `Kho ${pad(it.warehouse)}`}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* THẺ CHI TIẾT CỦA MÃ ĐANG CHỌN (ĐẦY ĐỦ CÁC NÚT ĐÃ BÁN, CHUYỂN KHO, MỞ KHO) */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 rounded-2xl border-2 border-emerald-500 bg-emerald-50/90 p-4 sm:p-5 shadow-sm">
-                  {/* THÔNG TIN VỊ TRÍ TÌM THẤY */}
-                  <div className="flex items-start sm:items-center gap-3 min-w-0">
-                    <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs shrink-0 mt-0.5 sm:mt-0">
-                      <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2">
-                        <span className="text-[11px] sm:text-xs font-bold text-emerald-800 uppercase tracking-wide">
-                          ĐÃ TÌM THẤY:
-                        </span>
-                        <span className="font-mono text-xl sm:text-2xl font-black text-slate-900 tracking-wider">
-                          {activeFoundItem.sku}
-                        </span>
-                        <span className="text-[11px] text-slate-400 font-medium">
-                          (Nhập lúc {fmt(activeFoundItem.updatedAt)})
-                        </span>
-                      </div>
-
-                      <div className="text-xs sm:text-sm text-slate-700 font-medium mt-1">
-                        {activeFoundItem.status === "sold" ? (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="inline-flex items-center gap-1 font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 text-[11px]">
-                              ĐÃ BÁN (Ẩn khỏi kho)
-                            </span>
-                            <span className="text-[11px] text-slate-500">
-                              Kho lưu trước đó: <strong>Kho {pad(activeFoundItem.warehouse)}</strong>
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-slate-600">Đang nằm cố định tại:</span>
-                            <span className="inline-flex items-center gap-1 font-black text-emerald-800 bg-emerald-200/80 px-2.5 py-0.5 rounded-lg border border-emerald-400 text-sm">
-                              KHO {pad(activeFoundItem.warehouse)}
-                            </span>
-                          </div>
-                        )}
+                              <span>{it.sku}</span>
+                              <span
+                                className={`text-[10px] px-1.5 py-0.2 rounded-md ${
+                                  isCurrent
+                                    ? "bg-emerald-800 text-emerald-100"
+                                    : it.status === "sold"
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-emerald-100 text-emerald-800"
+                                }`}
+                              >
+                                {it.status === "sold" ? "Đã bán" : `Kho ${pad(it.warehouse)}`}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* CỤM NÚT THAO TÁC CÙNG HÀNG, ĐỀU NHAU, KHÔNG LỆCH */}
-                  <div className="flex items-center gap-1.5 sm:gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-emerald-200/60 shrink-0 flex-wrap">
-                    {activeFoundItem.status === "sold" ? (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          const confirmRestock = window.confirm(`Khách trả hàng hoặc muốn nhập lại mã [${activeFoundItem.sku}] vào Kho ${pad(activeFoundItem.warehouse)}?`);
-                          if (!confirmRestock) return;
-                          await restockSku(activeFoundItem.sku, activeFoundItem.warehouse);
-                        }}
-                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-50 transition active:scale-95 cursor-pointer"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
-                        <span>Nhập lại</span>
-                      </button>
-                    ) : (
-                      <>
-                        {/* NÚT ĐÁNH DẤU ĐÃ BÁN */}
+                  {/* THẺ CHI TIẾT CỦA MÃ ĐANG CHỌN (ĐẦY ĐỦ CÁC NÚT ĐÃ BÁN, CHUYỂN KHO, MỞ KHO) */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 rounded-2xl border-2 border-emerald-500 bg-emerald-50/90 p-4 sm:p-5 shadow-sm">
+                    {/* THÔNG TIN VỊ TRÍ TÌM THẤY */}
+                    <div className="flex items-start sm:items-center gap-3 min-w-0">
+                      <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-xs shrink-0 mt-0.5 sm:mt-0">
+                        <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-1.5 sm:gap-2">
+                          <span className="text-[11px] sm:text-xs font-bold text-emerald-800 uppercase tracking-wide">
+                            ĐÃ TÌM THẤY:
+                          </span>
+                          <span className="font-mono text-xl sm:text-2xl font-black text-slate-900 tracking-wider">
+                            {activeFoundItem.sku}
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-medium">
+                            (Nhập lúc {fmt(activeFoundItem.updatedAt)})
+                          </span>
+                        </div>
+
+                        <div className="text-xs sm:text-sm text-slate-700 font-medium mt-1">
+                          {activeFoundItem.status === "sold" ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="inline-flex items-center gap-1 font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-300 text-[11px]">
+                                ĐÃ BÁN (Ẩn khỏi kho)
+                              </span>
+                              <span className="text-[11px] text-slate-500">
+                                Kho lưu trước đó: <strong>Kho {pad(activeFoundItem.warehouse)}</strong>
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-slate-600">Đang nằm cố định tại:</span>
+                              <span className="inline-flex items-center gap-1 font-black text-emerald-800 bg-emerald-200/80 px-2.5 py-0.5 rounded-lg border border-emerald-400 text-sm">
+                                KHO {pad(activeFoundItem.warehouse)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CỤM NÚT THAO TÁC CÙNG HÀNG, ĐỀU NHAU, KHÔNG LỆCH */}
+                    <div className="flex items-center gap-1.5 sm:gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-emerald-200/60 shrink-0 flex-wrap">
+                      {activeFoundItem.status === "sold" ? (
                         <button
                           type="button"
                           onClick={async () => {
-                            const confirmSold = window.confirm(
-                              `XÁC NHẬN BÁN:\nBạn có chắc chắn muốn đánh dấu mã [${activeFoundItem.sku}] là ĐÃ BÁN?\n(Sản phẩm sẽ ẩn khỏi kho nhưng dữ liệu và lịch sử vẫn được lưu vĩnh viễn)`
-                            );
-                            if (!confirmSold) return;
-                            await markSoldSku(activeFoundItem.sku, "Đã bán từ tra cứu nhanh");
+                            const confirmRestock = window.confirm(`Khách trả hàng hoặc muốn nhập lại mã [${activeFoundItem.sku}] vào Kho ${pad(activeFoundItem.warehouse)}?`);
+                            if (!confirmRestock) return;
+                            await restockSku(activeFoundItem.sku, activeFoundItem.warehouse);
                           }}
-                          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border border-amber-300 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer"
-                          title="Đánh dấu đã bán"
+                          className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-50 transition active:scale-95 cursor-pointer"
                         >
-                          <ShoppingBag className="h-3.5 w-3.5" />
-                          <span>Đã bán</span>
+                          <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Nhập lại</span>
                         </button>
+                      ) : (
+                        <>
+                          {/* NÚT ĐÁNH DẤU ĐÃ BÁN */}
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const confirmSold = window.confirm(
+                                `XÁC NHẬN BÁN:\nBạn có chắc chắn muốn đánh dấu mã [${activeFoundItem.sku}] là ĐÃ BÁN?\n(Sản phẩm sẽ ẩn khỏi kho nhưng dữ liệu và lịch sử vẫn được lưu vĩnh viễn)`
+                              );
+                              if (!confirmSold) return;
+                              await markSoldSku(activeFoundItem.sku, "Đã bán từ tra cứu nhanh");
+                            }}
+                            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border border-amber-300 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer"
+                            title="Đánh dấu đã bán"
+                          >
+                            <ShoppingBag className="h-3.5 w-3.5" />
+                            <span>Đã bán</span>
+                          </button>
 
-                        {/* NÚT CHUYỂN KHO */}
+                          {/* NÚT CHUYỂN KHO */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsSearchTransferring(!isSearchTransferring);
+                              setSearchTargetWarehouse(activeFoundItem.warehouse === 1 ? 2 : 1);
+                            }}
+                            className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border px-3 py-2 text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer ${
+                              isSearchTransferring
+                                ? "border-indigo-500 bg-indigo-600 text-white"
+                                : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
+                            }`}
+                            title="Chuyển mã này sang ô kho khác"
+                          >
+                            <ArrowRightLeft className="h-3.5 w-3.5" />
+                            <span>{isSearchTransferring ? "Đóng" : "Chuyển kho"}</span>
+                          </button>
+                        </>
+                      )}
+
+                      {/* NÚT MỞ KHO */}
+                      <button
+                        type="button"
+                        onClick={() => setOpenWarehouse(activeFoundItem.warehouse)}
+                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-2xs hover:bg-slate-800 transition active:scale-95 cursor-pointer"
+                      >
+                        <Warehouse className="h-3.5 w-3.5 text-emerald-400" />
+                        <span>Mở Kho {pad(activeFoundItem.warehouse)}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* KHUNG CHỌN KHO ĐÍCH KHI BẤM CHUYỂN KHO TRỰC TIẾP TỪ TRA CỨU */}
+                  {isSearchTransferring && activeFoundItem.status !== "sold" && (
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 p-3 flex flex-wrap items-center justify-between gap-2 animate-in fade-in duration-150">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-indigo-950">
+                        <span>Chuyển mã [{activeFoundItem.sku}] từ Kho {pad(activeFoundItem.warehouse)} sang:</span>
+                        <select
+                          value={searchTargetWarehouse}
+                          onChange={(e) => setSearchTargetWarehouse(Number(e.target.value))}
+                          className="rounded-lg border border-indigo-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          {Array.from({ length: totalWarehouses }, (_, i) => i + 1)
+                            .filter((wh) => wh !== activeFoundItem.warehouse)
+                            .map((wh) => (
+                              <option key={wh} value={wh}>
+                                Kho {pad(wh)}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => {
-                            setIsSearchTransferring(!isSearchTransferring);
-                            setSearchTargetWarehouse(activeFoundItem.warehouse === 1 ? 2 : 1);
-                          }}
-                          className={`flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border px-3 py-2 text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer ${
-                            isSearchTransferring
-                              ? "border-indigo-500 bg-indigo-600 text-white"
-                              : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
-                          }`}
-                          title="Chuyển mã này sang ô kho khác"
+                          onClick={() => setIsSearchTransferring(false)}
+                          className="px-2.5 py-1 text-xs font-medium text-slate-500 hover:text-slate-700 cursor-pointer"
                         >
-                          <ArrowRightLeft className="h-3.5 w-3.5" />
-                          <span>{isSearchTransferring ? "Đóng" : "Chuyển kho"}</span>
+                          Huỷ
                         </button>
-                      </>
-                    )}
-
-                    {/* NÚT MỞ KHO */}
-                    <button
-                      type="button"
-                      onClick={() => setOpenWarehouse(activeFoundItem.warehouse)}
-                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-2xs hover:bg-slate-800 transition active:scale-95 cursor-pointer"
-                    >
-                      <Warehouse className="h-3.5 w-3.5 text-emerald-400" />
-                      <span>Mở Kho {pad(activeFoundItem.warehouse)}</span>
-                    </button>
-                  </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await transferSku(activeFoundItem.sku, searchTargetWarehouse);
+                            setIsSearchTransferring(false);
+                          }}
+                          className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white shadow-2xs hover:bg-indigo-700 transition cursor-pointer"
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                          <span>Xác nhận chuyển sang Kho {pad(searchTargetWarehouse)}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-center text-sm font-semibold text-rose-700">
+                  KHÔNG TÌM THẤY MÃ SẢN PHẨM &quot;<span className="font-mono">{query.trim().toUpperCase()}</span>&quot; TRONG HỆ THỐNG {totalWarehouses} KHO
+                </div>
+              )
+            )}
+          </section>
+        )}
 
-                {/* KHUNG CHỌN KHO ĐÍCH KHI BẤM CHUYỂN KHO TRỰC TIẾP TỪ TRA CỨU */}
-                {isSearchTransferring && activeFoundItem.status !== "sold" && (
-                  <div className="rounded-xl border border-indigo-200 bg-indigo-50/80 p-3 flex flex-wrap items-center justify-between gap-2 animate-in fade-in duration-150">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-indigo-950">
-                      <span>Chuyển mã [{activeFoundItem.sku}] từ Kho {pad(activeFoundItem.warehouse)} sang:</span>
-                      <select
-                        value={searchTargetWarehouse}
-                        onChange={(e) => setSearchTargetWarehouse(Number(e.target.value))}
-                        className="rounded-lg border border-indigo-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        {Array.from({ length: totalWarehouses }, (_, i) => i + 1)
-                          .filter((wh) => wh !== activeFoundItem.warehouse)
-                          .map((wh) => (
-                            <option key={wh} value={wh}>
-                              Kho {pad(wh)}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsSearchTransferring(false)}
-                        className="px-2.5 py-1 text-xs font-medium text-slate-500 hover:text-slate-700 cursor-pointer"
-                      >
-                        Huỷ
-                      </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await transferSku(activeFoundItem.sku, searchTargetWarehouse);
-                          setIsSearchTransferring(false);
-                        }}
-                        className="flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-bold text-white shadow-2xs hover:bg-indigo-700 transition cursor-pointer"
-                      >
-                        <Check className="h-3.5 w-3.5" />
-                        <span>Xác nhận chuyển sang Kho {pad(searchTargetWarehouse)}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
+        {/* TAB 2: SƠ ĐỒ LƯỚI CÁC Ô KHO TRỰC QUAN */}
+        {activeTab === "warehouse" && (
+          <section id="warehouse-section" className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Warehouse className="h-5 w-5 text-slate-700" />
+                <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                  Sơ Đồ {totalWarehouses} Ô Kho Vận Hành
+                </h2>
+                <span className="text-xs text-slate-400">(Nhấp vào ô kho để xem danh sách mã bên trong)</span>
               </div>
-            ) : (
-              <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-center text-sm font-semibold text-rose-700">
-                KHÔNG TÌM THẤY MÃ SẢN PHẨM &quot;<span className="font-mono">{query.trim().toUpperCase()}</span>&quot; TRONG HỆ THỐNG {totalWarehouses} KHO
-              </div>
-            )
-          )}
-        </section>
 
-        {/* SECTION 2: SƠ ĐỒ LƯỚI CÁC Ô KHO TRỰC QUAN */}
-        <section id="warehouse-section" className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Warehouse className="h-5 w-5 text-slate-700" />
-              <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                Sơ Đồ {totalWarehouses} Ô Kho Vận Hành
-              </h2>
-              <span className="text-xs text-slate-400">(Nhấp vào ô kho để xem danh sách mã bên trong)</span>
+              <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-md bg-slate-100 border border-slate-300"></span> Trống
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-md bg-emerald-50 border border-emerald-300"></span> Có hàng
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-md bg-emerald-500 ring-2 ring-emerald-300"></span> Đang chọn
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-md bg-slate-100 border border-slate-300"></span> Trống
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-md bg-emerald-50 border border-emerald-300"></span> Có hàng
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-3 w-3 rounded-md bg-emerald-500 ring-2 ring-emerald-300"></span> Đang chọn
-              </span>
-            </div>
-          </div>
+            <WarehouseGrid
+              items={items}
+              highlight={activeFoundItem ? activeFoundItem.warehouse : null}
+              highlightWarehouses={matchingItems.map((m) => m.warehouse)}
+              query={query}
+              totalWarehouses={totalWarehouses}
+              onSelect={setOpenWarehouse}
+            />
+          </section>
+        )}
 
-          <WarehouseGrid
-            items={items}
-            highlight={activeFoundItem ? activeFoundItem.warehouse : null}
-            highlightWarehouses={matchingItems.map((m) => m.warehouse)}
-            query={query}
-            totalWarehouses={totalWarehouses}
-            onSelect={setOpenWarehouse}
-          />
-        </section>
-
-        {/* SECTION 3: QUẢN LÝ KHO THEO SIZE (THỐNG KÊ & BUNG DANH SÁCH MÃ) */}
-        <section
-          id="size-section"
-          className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs"
-        >
-          <SizeInventoryManager
-            items={items}
-            totalWarehouses={totalWarehouses}
-            onOpenWarehouse={setOpenWarehouse}
-          />
-        </section>
+        {/* TAB 3: QUẢN LÝ KHO THEO SIZE (THỐNG KÊ & BUNG DANH SÁCH MÃ) */}
+        {activeTab === "size" && (
+          <section
+            id="size-section"
+            className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs animate-in fade-in duration-200"
+          >
+            <SizeInventoryManager
+              items={items}
+              totalWarehouses={totalWarehouses}
+              onOpenWarehouse={setOpenWarehouse}
+            />
+          </section>
+        )}
 
       </main>
 
