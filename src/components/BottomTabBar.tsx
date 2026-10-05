@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { 
   Search, 
   LayoutGrid, 
@@ -19,6 +20,40 @@ export default function BottomTabBar({
   unreadCount?: number;
   onTabSelect: (tab: BottomTabType) => void;
 }) {
+  const [isVisible, setIsVisible] = useState(true);
+  const lastScrollY = useRef(0);
+  const scrollThreshold = 10; // Ngưỡng cuộn tối thiểu để tránh rung giật nhấp nháy
+
+  useEffect(() => {
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY || window.pageYOffset || 0;
+          const diff = currentScrollY - lastScrollY.current;
+
+          // Nếu đang ở gần đầu trang (< 60px) thì luôn hiện
+          if (currentScrollY < 60) {
+            setIsVisible(true);
+          } else if (diff > scrollThreshold) {
+            // Vuốt xuống -> Ẩn thanh menu như Facebook / Safari iOS
+            setIsVisible(false);
+          } else if (diff < -scrollThreshold) {
+            // Vuốt lên -> Hiện thanh menu trở lại ngay
+            setIsVisible(true);
+          }
+
+          lastScrollY.current = currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
   const tabs = [
     {
       id: "warehouse" as BottomTabType,
@@ -51,12 +86,16 @@ export default function BottomTabBar({
 
   return (
     <div 
-      className="fixed bottom-3 sm:bottom-4 left-0 right-0 z-40 flex justify-center pointer-events-none px-4"
+      className={`fixed bottom-3 sm:bottom-4 left-0 right-0 z-40 flex justify-center pointer-events-none px-4 transition-all duration-300 ease-in-out ${
+        isVisible 
+          ? "translate-y-0 opacity-100" 
+          : "translate-y-24 opacity-0 pointer-events-none"
+      }`}
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
     >
       {/* Floating Island Capsule theo phong cách GitHub iOS */}
       <nav 
-        className="pointer-events-auto flex items-center gap-1 sm:gap-2 px-2 py-1.5 rounded-full bg-white/90 backdrop-blur-xl border border-slate-200/90 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-950/5 max-w-md w-full justify-between select-none animate-in slide-in-from-bottom-3 duration-300"
+        className="pointer-events-auto flex items-center gap-1 sm:gap-2 px-2 py-1.5 rounded-full bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-950/5 max-w-md w-full justify-between select-none"
         aria-label="Thanh điều hướng chính"
       >
         {tabs.map((tab) => {

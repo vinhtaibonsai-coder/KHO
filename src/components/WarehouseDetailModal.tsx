@@ -13,7 +13,10 @@ import {
   Check, 
   ShoppingBag, 
   RotateCcw,
-  ChevronLeft
+  ChevronLeft,
+  ArrowDownWideNarrow,
+  ArrowUpNarrowWide,
+  SlidersHorizontal
 } from "lucide-react";
 import type { Item, ItemHistory } from "@/types";
 
@@ -50,7 +53,8 @@ export default function WarehouseDetailModal({
   onOpenPaste?: (warehouse: number) => void;
 }) {
   const [activeTab, setActiveTab] = useState<"items" | "sold" | "history">("items");
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [selectedSizePrefix, setSelectedSizePrefix] = useState<string>("all");
+  const [sortOrder, setSortOrder] = useState<"num_desc" | "num_asc" | "newest" | "oldest">("num_desc");
   
   // Sản phẩm đang được chọn xem chi tiết & lịch sử chuyển/xuất
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
@@ -59,6 +63,26 @@ export default function WarehouseDetailModal({
   const [transferringSku, setTransferringSku] = useState<string | null>(null);
   const [targetWarehouse, setTargetWarehouse] = useState<number>(warehouse === 1 ? 2 : 1);
   const [transferSubmitting, setTransferSubmitting] = useState(false);
+
+  // Hàm bóc tách tiền tố size và số thứ tự trong mã SKU (ví dụ: E120.124 -> prefix: "E", num: 120.124; K100 -> prefix: "K", num: 100)
+  const parseSku = (sku: string) => {
+    const clean = sku.trim().toUpperCase();
+    const match = clean.match(/^([A-Z]+)\s*(\d+(?:\.\d+)?)/);
+    if (match) {
+      return {
+        prefix: match[1],
+        num: parseFloat(match[2]),
+        rawNum: match[2]
+      };
+    }
+    // Trường hợp mã số thuần
+    const numOnly = clean.match(/(\d+(?:\.\d+)?)/);
+    return {
+      prefix: "Khác",
+      num: numOnly ? parseFloat(numOnly[1]) : -1,
+      rawNum: numOnly ? numOnly[1] : ""
+    };
+  };
 
   // Khóa cứng cuộn trang nền ngoài chuẩn Mobile PWA (iOS Safari & Android Chrome)
   useEffect(() => {
@@ -85,15 +109,51 @@ export default function WarehouseDetailModal({
     };
   }, []);
 
-  // Danh sách item đang CÒN TRONG KHO (chưa bán)
+  // Danh sách item thô của kho này
+  const rawWarehouseActive = useMemo(() => {
+    return items.filter((i) => i.warehouse === warehouse && i.status !== "sold");
+  }, [items, warehouse]);
+
+  // Thống kê các nhóm size có trong kho này
+  const availableSizes = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const it of rawWarehouseActive) {
+      const { prefix } = parseSku(it.sku);
+      counts[prefix] = (counts[prefix] || 0) + 1;
+    }
+    return counts;
+  }, [rawWarehouseActive]);
+
+  // Danh sách item đang CÒN TRONG KHO (Đã lọc theo Size & Sắp xếp từ Lớn đến Nhỏ)
   const activeList = useMemo(() => {
-    const raw = items.filter((i) => i.warehouse === warehouse && i.status !== "sold");
-    return raw.sort((a, b) => {
+    let list = rawWarehouseActive;
+    if (selectedSizePrefix !== "all") {
+      list = list.filter((i) => parseSku(i.sku).prefix === selectedSizePrefix);
+    }
+    return list.slice().sort((a, b) => {
+      if (sortOrder === "num_desc") {
+        // Sắp xếp số thứ tự từ LỚN ĐẾN NHỎ (theo yêu cầu kiểm kho)
+        const parsedA = parseSku(a.sku);
+        const parsedB = parseSku(b.sku);
+        if (parsedA.prefix !== parsedB.prefix && selectedSizePrefix === "all") {
+          return parsedA.prefix.localeCompare(parsedB.prefix);
+        }
+        return parsedB.num - parsedA.num;
+      }
+      if (sortOrder === "num_asc") {
+        // Sắp xếp số thứ tự từ NHỎ ĐẾN LỚN
+        const parsedA = parseSku(a.sku);
+        const parsedB = parseSku(b.sku);
+        if (parsedA.prefix !== parsedB.prefix && selectedSizePrefix === "all") {
+          return parsedA.prefix.localeCompare(parsedB.prefix);
+        }
+        return parsedA.num - parsedB.num;
+      }
       const timeA = new Date(a.updatedAt).getTime();
       const timeB = new Date(b.updatedAt).getTime();
       return sortOrder === "newest" ? timeB - timeA : timeA - timeB;
     });
-  }, [items, warehouse, sortOrder]);
+  }, [rawWarehouseActive, selectedSizePrefix, sortOrder]);
 
   // Danh sách item ĐÃ BÁN của ô kho này (để tra cứu hoặc khách trả hàng nhập lại)
   const soldList = useMemo(() => {
@@ -288,17 +348,90 @@ export default function WarehouseDetailModal({
           </div>
 
           {activeTab === "items" && !selectedItem && (
-            <button
-              type="button"
-              onClick={() => setSortOrder(sortOrder === "newest" ? "oldest" : "newest")}
-              className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 hover:border-emerald-500 hover:text-emerald-700 transition cursor-pointer shadow-2xs shrink-0"
-              title="Đổi thứ tự sắp xếp theo thời gian"
-            >
-              <ArrowDownUp className="h-3 w-3 text-emerald-600" />
-              <span className="hidden sm:inline">{sortOrder === "newest" ? "Mới nhất" : "Cũ nhất"}</span>
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Nút chuyển đổi kiểu sắp xếp */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (sortOrder === "num_desc") setSortOrder("num_asc");
+                  else if (sortOrder === "num_asc") setSortOrder("newest");
+                  else if (sortOrder === "newest") setSortOrder("num_desc");
+                  else setSortOrder("num_desc");
+                }}
+                className={`flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-bold transition cursor-pointer shadow-2xs ${
+                  sortOrder.startsWith("num") 
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-300" 
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
+                title="Bấm để đổi cách sắp xếp"
+              >
+                {sortOrder === "num_desc" ? (
+                  <>
+                    <ArrowDownWideNarrow className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Số: Lớn → Nhỏ</span>
+                  </>
+                ) : sortOrder === "num_asc" ? (
+                  <>
+                    <ArrowUpNarrowWide className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>Số: Nhỏ → Lớn</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownUp className="h-3.5 w-3.5 text-slate-500" />
+                    <span>Mới nhập nhất</span>
+                  </>
+                )}
+              </button>
+            </div>
           )}
         </div>
+
+        {/* THANH LỌC NHANH THEO SIZE SẢN PHẨM TRONG KHO (GIÚP KIỂM KHO DỄ DÀNG) */}
+        {activeTab === "items" && !selectedItem && rawWarehouseActive.length > 0 && (
+          <div className="flex items-center gap-1.5 px-4 sm:px-6 py-2 bg-slate-50/80 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0">
+            <span className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1 shrink-0 mr-1">
+              <SlidersHorizontal className="h-3 w-3 text-slate-400" />
+              Lọc Size:
+            </span>
+
+            {/* Nút Tất cả */}
+            <button
+              type="button"
+              onClick={() => setSelectedSizePrefix("all")}
+              className={`rounded-full px-2.5 py-0.5 text-xs font-mono font-bold transition cursor-pointer shrink-0 border ${
+                selectedSizePrefix === "all"
+                  ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              Tất cả ({rawWarehouseActive.length})
+            </button>
+
+            {/* Các nhóm size thực tế có trong kho này */}
+            {Object.entries(availableSizes).map(([prefix, count]) => {
+              const isSelected = selectedSizePrefix === prefix;
+              return (
+                <button
+                  key={prefix}
+                  type="button"
+                  onClick={() => setSelectedSizePrefix(prefix)}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-mono font-bold transition cursor-pointer shrink-0 border flex items-center gap-1 ${
+                    isSelected
+                      ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs"
+                      : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50"
+                  }`}
+                >
+                  <span>Size {prefix}</span>
+                  <span className={`text-[10px] px-1 py-0.2 rounded-full ${
+                    isSelected ? "bg-emerald-800 text-emerald-100" : "bg-slate-100 text-slate-500 font-normal"
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* BANNER THÔNG BÁO KẾT QUẢ THAO TÁC */}
         {actionNotice && (
@@ -646,12 +779,19 @@ export default function WarehouseDetailModal({
             ) : (
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs text-slate-500 font-medium px-1">
-                  <span>💡 Nhấp vào mã để xem lịch sử đầy đủ hoặc bấm nút thao tác nhanh:</span>
+                  <span>
+                    Đang hiển thị: <strong className="text-slate-800 font-bold">{activeList.length}</strong> sản phẩm 
+                    {selectedSizePrefix !== "all" && <span> (Size {selectedSizePrefix})</span>}
+                  </span>
+                  <span className="text-[11px] text-emerald-700 font-bold">
+                    {sortOrder === "num_desc" ? "Số giảm dần ↓" : sortOrder === "num_asc" ? "Số tăng dần ↑" : "Theo thời gian"}
+                  </span>
                 </div>
 
                 {activeList.map((it, idx) => {
                   const { time, date } = fmtDate(it.updatedAt);
                   const isTransferringThis = transferringSku === it.sku;
+                  const parsed = parseSku(it.sku);
 
                   return (
                     <div
@@ -669,9 +809,16 @@ export default function WarehouseDetailModal({
                             #{pad(idx + 1)}
                           </span>
                           <div className="min-w-0">
-                            <span className="font-mono text-base font-black text-slate-900 hover:text-emerald-700 tracking-wide block truncate">
-                              {it.sku}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-base font-black text-slate-900 hover:text-emerald-700 tracking-wide truncate">
+                                {it.sku}
+                              </span>
+                              {parsed.prefix !== "Khác" && (
+                                <span className="font-mono text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-1.5 py-0.2 rounded-md">
+                                  Size {parsed.prefix}
+                                </span>
+                              )}
+                            </div>
                             <span className="text-xs text-slate-500 font-medium block truncate">
                               {time} · {date}
                             </span>
