@@ -16,9 +16,13 @@ const QUICK_FILTERS = [
 export default function SearchBar({
   value,
   onChange,
+  inputRef,
+  autoFocus = false,
 }: {
   value: string;
   onChange: (v: string) => void;
+  inputRef?: React.Ref<HTMLInputElement>;
+  autoFocus?: boolean;
 }) {
   return (
     <div className="w-full space-y-2.5">
@@ -28,6 +32,8 @@ export default function SearchBar({
           <Search className="h-4 w-4 text-slate-400" />
         </div>
         <input
+          ref={inputRef}
+          autoFocus={autoFocus}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value.toUpperCase())}

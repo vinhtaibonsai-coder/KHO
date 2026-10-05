@@ -21,6 +21,7 @@ import WarehouseGrid from "@/components/WarehouseGrid";
 import PasteImportModal from "@/components/PasteImportModal";
 import NotificationBell from "@/components/NotificationBell";
 import RightMenuDrawer from "@/components/RightMenuDrawer";
+import BottomTabBar, { type BottomTabType } from "@/components/BottomTabBar";
 import { ClipboardPaste } from "lucide-react";
 import { APP_VERSION } from "@/lib/version";
 import type { Item, ItemsResponse, ZaloMessage, ItemHistory } from "@/types";
@@ -83,11 +84,14 @@ export default function Home() {
   const [openWarehouse, setOpenWarehouse] = useState<number | null>(null);
   const [isPasteOpen, setIsPasteOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<BottomTabType>("search");
   const [defaultPasteWarehouse, setDefaultPasteWarehouse] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [, setLoading] = useState(true);
   const [isSearchTransferring, setIsSearchTransferring] = useState(false);
   const [searchTargetWarehouse, setSearchTargetWarehouse] = useState(1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const fetchingRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -326,6 +330,39 @@ export default function Home() {
     return set.size;
   }, [activeItems]);
 
+  // Đếm tin nhắn Zalo chưa đọc
+  const unreadMessageCount = useMemo(() => {
+    return messages.filter((m) => !m.read && m.id !== "bot_heartbeat" && (m.message || "").trim().toUpperCase() !== "PING").length;
+  }, [messages]);
+
+  // Xử lý chuyển tab điều hướng dưới đáy (GitHub iOS Bottom Bar)
+  const handleTabSelect = (tab: BottomTabType) => {
+    setActiveTab(tab);
+    if (tab === "search") {
+      const searchEl = document.getElementById("search-section");
+      if (searchEl) {
+        searchEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 350);
+    } else if (tab === "warehouse") {
+      const whEl = document.getElementById("warehouse-section");
+      if (whEl) {
+        whEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    } else if (tab === "paste") {
+      setDefaultPasteWarehouse(1);
+      setIsPasteOpen(true);
+    } else if (tab === "zalo") {
+      setIsNotificationOpen(true);
+    } else if (tab === "menu") {
+      setIsMenuOpen(true);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col antialiased selection:bg-emerald-100 selection:text-emerald-900">
       
@@ -440,6 +477,8 @@ export default function Home() {
               onOpenWarehouse={setOpenWarehouse}
               onMarkAllRead={markAllReadHandler}
               onMarkRead={markReadHandler}
+              externalIsOpen={isNotificationOpen}
+              onOpenChange={setIsNotificationOpen}
             />
 
             {/* LÀM MỚI DỮ LIỆU */}
@@ -464,8 +503,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* NỘI DUNG CHÍNH */}
-      <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 py-6 sm:px-6">
+      {/* NỘI DUNG CHÍNH (Thêm pb-28 để chừa khoảng trống cho Bottom Tab Bar nổi) */}
+      <main className="mx-auto w-full max-w-7xl flex-1 space-y-6 px-4 pt-4 sm:pt-6 pb-28 sm:pb-32 sm:px-6">
         
         {error && (
           <div className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
@@ -474,19 +513,24 @@ export default function Home() {
           </div>
         )}
 
-        {/* SECTION 1: THANH TÌM KIẾM TRA CỨU ĐỈNH CAO */}
-        <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+        {/* SECTION 1: THANH TÌM KIẾM TRA CỨU ĐỈNH CAO (ƯU TIÊN HÀNG ĐẦU) */}
+        <section id="search-section" className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <PackageSearch className="h-5 w-5 text-emerald-600" />
               <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                Tra Cứu Nhanh Vị Trí Sản Phẩm
+                Tra Cứu Vị Trí Sản Phẩm Trong Kho
               </h2>
             </div>
-            <span className="text-xs text-slate-400">1 Mã = Duy nhất 1 Vị trí</span>
+            <span className="text-xs text-slate-400 hidden xs:inline">1 Mã = Duy nhất 1 Vị trí</span>
           </div>
 
-          <SearchBar value={query} onChange={setQuery} />
+          <SearchBar 
+            value={query} 
+            onChange={setQuery} 
+            inputRef={searchInputRef}
+            autoFocus={true}
+          />
 
           {/* BANNER THÔNG BÁO KẾT QUẢ TÌM KIẾM */}
           {query.trim() && (
@@ -699,7 +743,7 @@ export default function Home() {
         </section>
 
         {/* SECTION 2: SƠ ĐỒ LƯỚI CÁC Ô KHO TRỰC QUAN */}
-        <section className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
+        <section id="warehouse-section" className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
             <div className="flex items-center gap-2">
               <Warehouse className="h-5 w-5 text-slate-700" />
@@ -791,6 +835,13 @@ export default function Home() {
           setQuery(prefix);
           window.scrollTo({ top: 0, behavior: "smooth" });
         }}
+      />
+
+      {/* THANH ĐIỀU HƯỚNG NỔI PHONG CÁCH GITHUB IOS (FLOATING BOTTOM TAB BAR) */}
+      <BottomTabBar
+        activeTab={activeTab}
+        unreadCount={unreadMessageCount}
+        onTabSelect={handleTabSelect}
       />
     </div>
   );

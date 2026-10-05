@@ -178,13 +178,23 @@ export default function NotificationBell({
   onOpenWarehouse,
   onMarkAllRead,
   onMarkRead,
+  externalIsOpen,
+  onOpenChange,
 }: {
   messages: ZaloMessage[];
   onOpenWarehouse: (warehouse: number) => void;
   onMarkAllRead?: () => void;
   onMarkRead?: (id: string) => void;
+  externalIsOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  const setIsOpen = (val: boolean | ((prev: boolean) => boolean)) => {
+    const nextVal = typeof val === "function" ? val(isOpen) : val;
+    if (onOpenChange) onOpenChange(nextVal);
+    else setInternalIsOpen(nextVal);
+  };
   const [readTab, setReadTab] = useState<"all" | "unread" | "read">("all");
   const [categoryTab, setCategoryTab] = useState<NotificationCategory>("all");
   const [searchKeyword, setSearchKeyword] = useState<string>("");
