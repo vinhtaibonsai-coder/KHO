@@ -552,6 +552,21 @@ export default function Home() {
             autoFocus={true}
           />
 
+          {/* MÀN HÌNH CHỜ TRA CỨU PHONG CÁCH GITHUB IOS (KHI CHƯA NHẬP MÃ) */}
+          {!query.trim() && (
+            <div className="py-8 sm:py-12 flex flex-col items-center justify-center text-center space-y-3 px-4">
+              <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-1 border border-slate-200/80 shadow-inner">
+                <PackageSearch className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400 stroke-[1.5]" />
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                Tìm vị trí hàng trong kho.
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-sm leading-relaxed">
+                Nhập mã SKU trên tem sản phẩm (ví dụ: <span className="font-mono font-bold text-slate-700">E120.124</span>, <span className="font-mono font-bold text-slate-700">K100</span>, <span className="font-mono font-bold text-slate-700">PT395</span>...) để định vị chính xác ô kho đang chứa hàng.
+              </p>
+            </div>
+          )}
+
           {/* BANNER THÔNG BÁO KẾT QUẢ TÌM KIẾM */}
           {query.trim() && (
             matchingItems.length > 0 && activeFoundItem ? (

@@ -21,12 +21,6 @@ export default function BottomTabBar({
 }) {
   const tabs = [
     {
-      id: "search" as BottomTabType,
-      label: "Tra Cứu",
-      icon: Search,
-      primaryFocus: true,
-    },
-    {
       id: "warehouse" as BottomTabType,
       label: "Ô Kho",
       icon: LayoutGrid,
@@ -35,6 +29,12 @@ export default function BottomTabBar({
       id: "paste" as BottomTabType,
       label: "Dán Chat",
       icon: ClipboardPaste,
+    },
+    {
+      id: "search" as BottomTabType,
+      label: "Tra Cứu",
+      icon: Search,
+      isCenter: true,
     },
     {
       id: "zalo" as BottomTabType,
@@ -62,6 +62,32 @@ export default function BottomTabBar({
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
+          const isCenter = "isCenter" in tab && tab.isCenter;
+
+          if (isCenter) {
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onTabSelect(tab.id)}
+                className="relative -top-2 flex flex-col items-center justify-center cursor-pointer group active:scale-95 transition-all"
+                title="Tra cứu nhanh sản phẩm"
+              >
+                <div className={`h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 border-2 ${
+                  isActive
+                    ? "bg-emerald-600 text-white border-white ring-4 ring-emerald-500/25 scale-105"
+                    : "bg-slate-900 text-white border-white hover:bg-emerald-600 shadow-slate-900/30"
+                }`}>
+                  <Search className="h-5 w-5 stroke-[2.5]" />
+                </div>
+                <span className={`text-[10px] sm:text-[11px] mt-0.5 tracking-tight font-black ${
+                  isActive ? "text-emerald-700" : "text-slate-800"
+                }`}>
+                  {tab.label}
+                </span>
+              </button>
+            );
+          }
 
           return (
             <button
