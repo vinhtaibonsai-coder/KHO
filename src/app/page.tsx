@@ -13,16 +13,17 @@ import {
   ArrowRightLeft,
   RotateCcw,
   Check,
-  Database
+  Database,
+  Bot
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import WarehouseDetailModal from "@/components/WarehouseDetailModal";
 import WarehouseGrid from "@/components/WarehouseGrid";
+import SizeInventoryManager from "@/components/SizeInventoryManager";
 import PasteImportModal from "@/components/PasteImportModal";
 import NotificationBell from "@/components/NotificationBell";
 import RightMenuDrawer from "@/components/RightMenuDrawer";
 import BottomTabBar, { type BottomTabType } from "@/components/BottomTabBar";
-import { ClipboardPaste } from "lucide-react";
 import { APP_VERSION } from "@/lib/version";
 import type { Item, ItemsResponse, ZaloMessage, ItemHistory } from "@/types";
 import { 
@@ -419,56 +420,47 @@ export default function Home() {
               <span><strong className="text-emerald-700 font-bold">{occupiedWarehouses}</strong>/{totalWarehouses} kho</span>
             </div>
 
-            {/* NÚT DÁN ĐOẠN CHAT ZALO */}
-            <button
-              type="button"
-              onClick={() => {
-                setDefaultPasteWarehouse(1);
-                setIsPasteOpen(true);
-              }}
-              className="flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
-              title="Dán đoạn chat Zalo để bóc tách mã nạp vào kho"
-            >
-              <ClipboardPaste className="h-3.5 w-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">Dán Chat</span>
-              <span className="sm:hidden">Dán</span>
-            </button>
-
-            {/* HIỂN THỊ TRẠNG THÁI SUPABASE CLOUD */}
+            {/* ICON TRẠNG THÁI SUPABASE CLOUD (TRÒN, CHỈ BIỂU TƯỢNG) */}
             <div
-              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl text-xs font-bold border transition ${
+              role="status"
+              aria-label={dbStatus?.connected ? "Supabase đã kết nối" : "Supabase mất kết nối"}
+              className={`relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border transition shadow-2xs ${
                 dbStatus?.connected
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-600"
                   : dbStatus
-                  ? "bg-rose-50 text-rose-700 border-rose-200"
-                  : "bg-slate-100 text-slate-500 border-slate-200"
+                  ? "bg-rose-50 border-rose-200 text-rose-600"
+                  : "bg-slate-100 border-slate-200 text-slate-400"
               }`}
               title={
                 dbStatus?.connected
                   ? `Supabase Cloud: ĐÃ KẾT NỐI THÀNH CÔNG\nĐộ trễ: ${dbStatus.latencyMs ?? 0}ms\nTổng sản phẩm trong DB: ${dbStatus.itemCount ?? activeItems.length}`
+                  : dbStatus
+                  ? "Supabase Cloud: MẤT KẾT NỐI"
                   : "Đang kiểm tra kết nối Supabase Cloud..."
               }
             >
-              <Database className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+              <Database className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
               <span
-                className={`h-2 w-2 rounded-full ${
-                  dbStatus?.connected ? "bg-emerald-500 animate-pulse" : "bg-rose-400"
+                className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${
+                  dbStatus?.connected
+                    ? "bg-emerald-500 animate-pulse"
+                    : dbStatus
+                    ? "bg-rose-500"
+                    : "bg-slate-300"
                 }`}
               />
-              <span className="hidden lg:inline font-mono">
-                {dbStatus?.connected ? "Supabase Online" : "Supabase Mất Kết Nối"}
-              </span>
-              <span className="lg:hidden font-mono">
-                {dbStatus?.connected ? "Supabase" : "Mất DB"}
-              </span>
             </div>
 
-            {/* HIỂN THỊ TRẠNG THÁI BOT ZALO TRÊN MÁY TÍNH */}
+            {/* ICON TRẠNG THÁI BOT ZALO TRÊN MÁY TÍNH (TRÒN, CHỈ BIỂU TƯỢNG) */}
             <div
-              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl text-xs font-bold border transition ${
+              role="status"
+              aria-label={botStatus?.online ? "Bot Zalo đang chạy" : "Bot Zalo đang tắt"}
+              className={`relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border transition shadow-2xs ${
                 botStatus?.online
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
-                  : "bg-slate-100 text-slate-500 border-slate-200"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                  : botStatus
+                  ? "bg-amber-50 border-amber-200 text-amber-600"
+                  : "bg-slate-100 border-slate-200 text-slate-400"
               }`}
               title={
                 botStatus?.online
@@ -478,17 +470,16 @@ export default function Home() {
                   : "Bot Zalo trên máy tính: ĐANG TẮT\n(Khi bật bot lên, máy sẽ tự động đồng bộ lại các tin nhắn cũ)"
               }
             >
+              <Bot className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
               <span
-                className={`h-2 w-2 rounded-full ${
-                  botStatus?.online ? "bg-emerald-500 animate-pulse" : "bg-slate-400"
+                className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${
+                  botStatus?.online
+                    ? "bg-emerald-500 animate-pulse"
+                    : botStatus
+                    ? "bg-amber-500"
+                    : "bg-slate-300"
                 }`}
               />
-              <span className="hidden md:inline font-mono">
-                {botStatus?.online ? "Bot Zalo Online" : "Bot Zalo Offline"}
-              </span>
-              <span className="md:hidden font-mono">
-                {botStatus?.online ? "Bot Bật" : "Bot Tắt"}
-              </span>
             </div>
 
             {/* CHUÔNG THÔNG BÁO NHẬT KÝ ZALO (PHÂN CHIA ĐÃ ĐỌC / CHƯA ĐỌC) */}
@@ -808,6 +799,18 @@ export default function Home() {
             query={query}
             totalWarehouses={totalWarehouses}
             onSelect={setOpenWarehouse}
+          />
+        </section>
+
+        {/* SECTION 3: QUẢN LÝ KHO THEO SIZE (THỐNG KÊ & BUNG DANH SÁCH MÃ) */}
+        <section
+          id="size-section"
+          className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs"
+        >
+          <SizeInventoryManager
+            items={items}
+            totalWarehouses={totalWarehouses}
+            onOpenWarehouse={setOpenWarehouse}
           />
         </section>
 

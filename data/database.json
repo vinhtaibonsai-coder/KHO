@@ -65,7 +65,8 @@
       "message": "XK E80.345",
       "status": "ok",
       "detail": "Đã xuất mã [E80.345] khỏi kho",
-      "createdAt": "2026-10-01T00:44:55.209Z"
+      "createdAt": "2026-10-01T00:44:55.209Z",
+      "read": true
     },
     {
       "id": "1790815293043-gx8o7f",
@@ -74,7 +75,8 @@
       "message": "+E120.124",
       "status": "ok",
       "detail": "Đã nhập [E120.124] (+1) vào Kho 5",
-      "createdAt": "2026-10-01T00:41:33.044Z"
+      "createdAt": "2026-10-01T00:41:33.044Z",
+      "read": true
     },
     {
       "id": "1790815163731-b927no",
@@ -83,7 +85,8 @@
       "message": "+E120.125",
       "status": "ok",
       "detail": "Đã nhập [E120.125] (+1) vào Kho 16",
-      "createdAt": "2026-10-01T00:39:23.731Z"
+      "createdAt": "2026-10-01T00:39:23.731Z",
+      "read": true
     },
     {
       "id": "1790815157904-cuwl4z",
@@ -92,7 +95,8 @@
       "message": "+E120.125",
       "status": "ok",
       "detail": "Đã nhập [E120.125] (+1) vào Kho 14",
-      "createdAt": "2026-10-01T00:39:17.904Z"
+      "createdAt": "2026-10-01T00:39:17.904Z",
+      "read": true
     },
     {
       "id": "1790815144742-uyyjpt",
@@ -101,7 +105,8 @@
       "message": "+E120.125",
       "status": "ok",
       "detail": "Đã nhập [E120.125] (+1) vào Kho 12",
-      "createdAt": "2026-10-01T00:39:04.742Z"
+      "createdAt": "2026-10-01T00:39:04.742Z",
+      "read": true
     },
     {
       "id": "1790815137217-zkc2ag",
@@ -110,7 +115,8 @@
       "message": "+E120.124",
       "status": "ok",
       "detail": "Đã nhập [E120.124] (+1) vào Kho 5",
-      "createdAt": "2026-10-01T00:38:57.217Z"
+      "createdAt": "2026-10-01T00:38:57.217Z",
+      "read": true
     }
   ],
   "history": [],
