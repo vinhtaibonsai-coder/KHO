@@ -1,5 +1,6 @@
 "use client";
 
+import React, { forwardRef } from "react";
 import { Search, X } from "lucide-react";
 
 const QUICK_FILTERS = [
@@ -13,17 +14,26 @@ const QUICK_FILTERS = [
   { label: "BC", value: "BC" },
 ];
 
-export default function SearchBar({
-  value,
-  onChange,
-  inputRef,
-  autoFocus = false,
-}: {
+export interface SearchBarProps {
   value: string;
   onChange: (v: string) => void;
   inputRef?: React.Ref<HTMLInputElement>;
   autoFocus?: boolean;
-}) {
+}
+
+const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBar(
+  { value, onChange, inputRef, autoFocus = false },
+  ref
+) {
+  // Kết hợp ref từ cả forwardRef lẫn prop inputRef nếu có
+  const combinedRef = (node: HTMLInputElement | null) => {
+    if (typeof ref === "function") ref(node);
+    else if (ref) (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
+
+    if (typeof inputRef === "function") inputRef(node);
+    else if (inputRef) (inputRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
+  };
+
   return (
     <div className="w-full space-y-2.5">
       {/* GitHub Mobile Style Search Input Bar */}
@@ -32,14 +42,15 @@ export default function SearchBar({
           <Search className="h-4 w-4 text-slate-400" />
         </div>
         <input
-          ref={inputRef}
+          id="main-search-input"
+          ref={combinedRef}
           autoFocus={autoFocus}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value.toUpperCase())}
           placeholder="Tìm mã sản phẩm (E120.124, K100, PT395...)"
           aria-label="Tìm mã sản phẩm"
-          className="w-full rounded-full border border-slate-200/90 bg-slate-100/80 hover:bg-slate-100 py-2.5 pr-10 pl-9 font-mono text-sm sm:text-base font-bold tracking-wide text-slate-900 uppercase transition placeholder:font-sans placeholder:text-xs sm:placeholder:text-sm placeholder:font-normal placeholder:text-slate-400 focus:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-200 shadow-inner"
+          className="w-full rounded-full border border-slate-200/90 bg-slate-100/80 hover:bg-slate-100 py-3 pr-10 pl-9 font-mono text-sm sm:text-base font-bold tracking-wide text-slate-900 uppercase transition placeholder:font-sans placeholder:text-xs sm:placeholder:text-sm placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/15 shadow-inner"
         />
         {value && (
           <button
@@ -77,4 +88,6 @@ export default function SearchBar({
       </div>
     </div>
   );
-}
+});
+
+export default SearchBar;

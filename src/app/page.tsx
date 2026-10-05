@@ -169,6 +169,18 @@ export default function Home() {
     };
   }, [fetchData]);
 
+  // Tự động trỏ con trỏ vào ô tra cứu khi vừa vào trang
+  useEffect(() => {
+    const focusTimer = setTimeout(() => {
+      const el = searchInputRef.current || document.getElementById("main-search-input") as HTMLInputElement;
+      if (el) {
+        el.focus({ preventScroll: true });
+        el.select();
+      }
+    }, 200);
+    return () => clearTimeout(focusTimer);
+  }, []);
+
   const matchingItems = useMemo(() => {
     const code = query.trim().toUpperCase();
     if (!code) return [];
@@ -341,13 +353,21 @@ export default function Home() {
     if (tab === "search") {
       const searchEl = document.getElementById("search-section");
       if (searchEl) {
-        searchEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        searchEl.scrollIntoView({ behavior: "smooth", block: "center" });
       } else {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 350);
+      // Focus ngay lập tức và bôi đen toàn bộ chữ hiện có để gõ đè nhanh
+      const triggerFocus = () => {
+        const input = searchInputRef.current || (document.getElementById("main-search-input") as HTMLInputElement | null);
+        if (input) {
+          input.focus();
+          input.select();
+        }
+      };
+      triggerFocus();
+      setTimeout(triggerFocus, 100);
+      setTimeout(triggerFocus, 300);
     } else if (tab === "warehouse") {
       const whEl = document.getElementById("warehouse-section");
       if (whEl) {
