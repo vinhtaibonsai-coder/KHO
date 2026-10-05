@@ -12,7 +12,8 @@ import {
   ShoppingBag,
   ArrowRightLeft,
   RotateCcw,
-  Check
+  Check,
+  Database
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import WarehouseDetailModal from "@/components/WarehouseDetailModal";
@@ -77,6 +78,7 @@ export default function Home() {
   const [history, setHistory] = useState<ItemHistory[]>([]);
   const [totalWarehouses, setTotalWarehouses] = useState<number>(30);
   const [botStatus, setBotStatus] = useState<{ online: boolean; lastPing: string | null } | undefined>(undefined);
+  const [dbStatus, setDbStatus] = useState<{ connected: boolean; type: "supabase" | "local"; latencyMs?: number; itemCount?: number } | undefined>(undefined);
   const [query, setQuery] = useState("");
   const [openWarehouse, setOpenWarehouse] = useState<number | null>(null);
   const [isPasteOpen, setIsPasteOpen] = useState(false);
@@ -110,6 +112,9 @@ export default function Home() {
         setHistory(data.history || []);
         if (data.botStatus) {
           setBotStatus(data.botStatus);
+        }
+        if (data.dbStatus) {
+          setDbStatus(data.dbStatus);
         }
         if (data.totalWarehouses && data.totalWarehouses >= 30) {
           setTotalWarehouses(data.totalWarehouses);
@@ -325,7 +330,10 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col antialiased selection:bg-emerald-100 selection:text-emerald-900">
       
       {/* TOPBAR / HEADER THEO CHUẨN DESIGN SYSTEM SÁNG & MOBILE PWA (Hỗ trợ tai thỏ / notch) */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs pt-[calc(env(safe-area-inset-top)+1.75rem)] sm:pt-0">
+      <header 
+        className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs"
+        style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
+      >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2 sm:px-6 sm:py-3.5">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs shrink-0">
@@ -369,9 +377,38 @@ export default function Home() {
               <span className="sm:hidden">Dán</span>
             </button>
 
+            {/* HIỂN THỊ TRẠNG THÁI SUPABASE CLOUD */}
+            <div
+              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl text-xs font-bold border transition ${
+                dbStatus?.connected
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
+                  : dbStatus
+                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                  : "bg-slate-100 text-slate-500 border-slate-200"
+              }`}
+              title={
+                dbStatus?.connected
+                  ? `Supabase Cloud: ĐÃ KẾT NỐI THÀNH CÔNG\nĐộ trễ: ${dbStatus.latencyMs ?? 0}ms\nTổng sản phẩm trong DB: ${dbStatus.itemCount ?? activeItems.length}`
+                  : "Đang kiểm tra kết nối Supabase Cloud..."
+              }
+            >
+              <Database className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  dbStatus?.connected ? "bg-emerald-500 animate-pulse" : "bg-rose-400"
+                }`}
+              />
+              <span className="hidden lg:inline font-mono">
+                {dbStatus?.connected ? "Supabase Online" : "Supabase Mất Kết Nối"}
+              </span>
+              <span className="lg:hidden font-mono">
+                {dbStatus?.connected ? "Supabase" : "Mất DB"}
+              </span>
+            </div>
+
             {/* HIỂN THỊ TRẠNG THÁI BOT ZALO TRÊN MÁY TÍNH */}
             <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border transition ${
+              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl text-xs font-bold border transition ${
                 botStatus?.online
                   ? "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
                   : "bg-slate-100 text-slate-500 border-slate-200"
@@ -745,10 +782,15 @@ export default function Home() {
         history={history}
         messages={messages}
         botStatus={botStatus}
+        dbStatus={dbStatus}
         onAddWarehouse={addWarehouseHandler}
         onOpenPaste={() => setIsPasteOpen(true)}
         onOpenWarehouse={setOpenWarehouse}
         onSendWebhook={onWebhook}
+        onFilterSkuType={(prefix) => {
+          setQuery(prefix);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }}
       />
     </div>
   );

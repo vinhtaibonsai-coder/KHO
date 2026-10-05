@@ -40,9 +40,18 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-html, body {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+/* Đảm bảo toàn bộ form inputs/select/textarea trên iOS không bị tự động zoom phóng to màn hình */
+input, select, textarea {
+  font-size: 16px !important;
+}
+
+@media (min-width: 640px) {
+  input, select, textarea {
+    font-size: inherit !important;
+  }
+}
+
+html {
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }

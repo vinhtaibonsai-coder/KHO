@@ -368,7 +368,8 @@ export default function NotificationBell({
 
           {/* KHUNG THÔNG BÁO NỔI */}
           <div 
-            className="relative z-10 w-full max-w-lg mt-12 sm:mt-14 rounded-2xl border border-slate-200/90 bg-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[80vh] animate-in zoom-in-95 duration-150 overscroll-contain"
+            className="relative z-10 w-full max-w-lg rounded-2xl border border-slate-200/90 bg-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[80vh] animate-in zoom-in-95 duration-150 overscroll-contain"
+            style={{ marginTop: "max(3rem, calc(env(safe-area-inset-top) + 1rem))" }}
             onClick={(e) => e.stopPropagation()}
           >
             

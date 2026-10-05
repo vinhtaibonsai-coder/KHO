@@ -247,13 +247,19 @@ export default function LoginPage() {
       </div>
 
       {/* Footer Info & Version */}
-      <footer className="relative z-10 text-center pb-1 flex flex-col items-center gap-1">
+      <footer className="relative z-10 text-center pb-1 flex flex-col items-center gap-1.5">
         <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium">
           Dành riêng cho nhân viên thủ kho & quản lý Xưởng Lũa Nhựt
         </p>
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-200/60 text-slate-600 border border-slate-300/60">
-          Phiên bản v{APP_VERSION}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-200/60 text-slate-600 border border-slate-300/60">
+            Phiên bản v{APP_VERSION}
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Supabase Cloud Connected
+          </span>
+        </div>
       </footer>
     </main>
   );

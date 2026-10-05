@@ -889,3 +889,32 @@ export async function getBotStatus(): Promise<{ online: boolean; lastPing: strin
   return { online, lastPing: lastPingIso };
 }
 
+export async function getDatabaseStatus(): Promise<{
+  connected: boolean;
+  type: "supabase" | "local";
+  latencyMs?: number;
+  itemCount?: number;
+}> {
+  if (supabaseEnabled) {
+    const start = Date.now();
+    try {
+      const sb = getSupabase();
+      if (!sb) return { connected: false, type: "supabase" };
+      const { count, error } = await sb
+        .from("warehouse_items")
+        .select("count", { count: "exact", head: true });
+      if (error) {
+        return { connected: false, type: "supabase" };
+      }
+      return {
+        connected: true,
+        type: "supabase",
+        latencyMs: Date.now() - start,
+        itemCount: count ?? undefined,
+      };
+    } catch {
+      return { connected: false, type: "supabase" };
+    }
+  }
+  return { connected: true, type: "local" };
+}

@@ -8,6 +8,7 @@ import {
   getMessages,
   getWarehouseCount,
   getBotStatus,
+  getDatabaseStatus,
   markAllMessagesRead,
   markItemSold,
   markMessageRead,
@@ -22,12 +23,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [items, messages, history, totalWarehouses, botStatus] = await Promise.all([
+    const [items, messages, history, totalWarehouses, botStatus, dbStatus] = await Promise.all([
       getItems(),
       getMessages(),
       getHistory(),
       getWarehouseCount(),
       getBotStatus(),
+      getDatabaseStatus(),
     ]);
     return NextResponse.json({
       items,
@@ -35,6 +37,7 @@ export async function GET() {
       history,
       totalWarehouses,
       botStatus,
+      dbStatus,
     });
   } catch (err) {
     console.error("API GET /api/items lỗi:", err);

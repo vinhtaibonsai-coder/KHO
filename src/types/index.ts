@@ -43,5 +43,11 @@ export interface ItemsResponse {
     online: boolean;
     lastPing: string | null;
   };
+  dbStatus?: {
+    connected: boolean;
+    type: "supabase" | "local";
+    latencyMs?: number;
+    itemCount?: number;
+  };
 }
 

@@ -56,7 +56,7 @@ export async function verifySessionToken(
   if (!payload || !signature || extra) return false;
   try {
     const actual = base64UrlToBytes(signature);
-    const expected = await hmac(secret, payload);
+    const expected = await hmac(activeSecret, payload);
     if (actual.length !== expected.length) return false;
     let difference = 0;
     for (let i = 0; i < expected.length; i++) difference |= actual[i] ^ expected[i];

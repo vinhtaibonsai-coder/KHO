@@ -20,8 +20,13 @@ import {
   Radio,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   LogOut,
-  KeyRound
+  KeyRound,
+  Database,
+  Wifi,
+  WifiOff,
+  ClipboardPaste
 } from "lucide-react";
 import { APP_VERSION, APP_BUILD_TIME } from "@/lib/version";
 import type { Item, ItemHistory, ZaloMessage } from "@/types";
@@ -38,6 +43,7 @@ export default function RightMenuDrawer({
   history,
   messages,
   botStatus,
+  dbStatus,
   onAddWarehouse,
   onOpenPaste,
   onOpenWarehouse,
@@ -51,6 +57,7 @@ export default function RightMenuDrawer({
   history: ItemHistory[];
   messages: ZaloMessage[];
   botStatus?: { online: boolean; lastPing: string | null };
+  dbStatus?: { connected: boolean; type: "supabase" | "local"; latencyMs?: number; itemCount?: number };
   onAddWarehouse: () => Promise<void>;
   onOpenPaste: () => void;
   onOpenWarehouse?: (warehouse: number) => void;
@@ -218,8 +225,11 @@ export default function RightMenuDrawer({
           onClick={(e) => e.stopPropagation()}
         >
           
-          {/* HEADER MENU BÊN PHẢI - Thêm pt-safe / pt-12 trên mobile để không bị tai thỏ & camera che */}
-          <div className="pt-10 sm:pt-4 px-4 sm:px-5 pb-3 sm:pb-4 border-b border-slate-200 bg-white/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-10 shrink-0">
+          {/* HEADER MENU BÊN PHẢI - Thêm safe area padding để không bị tai thỏ & camera che */}
+          <div 
+            className="px-4 sm:px-5 pb-3 sm:pb-4 border-b border-slate-200 bg-white/95 backdrop-blur-md flex items-center justify-between sticky top-0 z-10 shrink-0"
+            style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
+          >
             <div className="flex items-center gap-2.5">
               <div className="h-9 w-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
                 <Settings className="h-5 w-5 text-emerald-400" />
@@ -242,268 +252,368 @@ export default function RightMenuDrawer({
             </button>
           </div>
 
-          {/* NỘI DUNG CUỘN */}
+          {/* NỘI DUNG CUỘN - GitHub iOS Grouped Style */}
           <div 
             className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 pb-12 overscroll-contain touch-pan-y"
             style={{ WebkitOverflowScrolling: "touch" }}
             onTouchMove={(e) => e.stopPropagation()}
           >
 
-            <div>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
-              >
-                <LogOut className="h-4 w-4" />
-                Đăng xuất
-              </button>
-            </div>
-
             {/* THÔNG BÁO THÀNH CÔNG */}
             {addSuccess && (
-              <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
                 <span>{addSuccess}</span>
               </div>
             )}
 
-            {/* 1. QUẢN LÝ Ô KHO & TẠO THÊM KHO */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <Warehouse className="h-4 w-4 text-emerald-600" />
-                  Hệ Thống Ô Kho Hiện Tại
+            {/* NHÓM 1: CÔNG VIỆC & QUẢN TRỊ KHO (GIỐNG GITHUB "MY WORK") */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                  Quản Trị Kho & Tác Vụ
                 </span>
-                <span className="font-mono text-xs font-extrabold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                  {totalWarehouses} Ô KHO
+                <span className="text-[11px] font-mono font-bold text-slate-400">
+                  {totalWarehouses} kho · {items.length} mã
                 </span>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Bạn có thể mở rộng thêm kho mới bất kỳ lúc nào. Kho mới được thêm sẽ tự động xuất hiện trên sơ đồ và cho phép nạp/chuyển mã hàng.
-                </p>
-
+              <div className="rounded-2xl bg-white border border-slate-200/90 divide-y divide-slate-100 shadow-xs overflow-hidden">
+                {/* Mục 1: Thêm ô kho */}
                 <button
                   type="button"
                   disabled={addingWh}
                   onClick={handleCreateWarehouse}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2.5 text-xs font-bold hover:bg-slate-800 transition active:scale-98 shadow-xs cursor-pointer disabled:opacity-50"
+                  className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition cursor-pointer text-left disabled:opacity-60"
                 >
-                  <PlusCircle className="h-4 w-4 text-emerald-400" />
-                  <span>{addingWh ? "Đang tạo kho mới..." : `+ Tạo Thêm Kho ${pad(totalWarehouses + 1)}`}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <Warehouse className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 block">
+                        Hệ Thống Ô Kho
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        Hiện có {totalWarehouses} kho · Nhấn để thêm Kho {pad(totalWarehouses + 1)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="font-mono text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                      {addingWh ? "Đang tạo..." : `+ Kho ${pad(totalWarehouses + 1)}`}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-300" />
+                  </div>
                 </button>
-              </div>
-            </div>
 
-            {/* 2. TÍNH NĂNG XUẤT BÁO CÁO EXCEL / CSV */}
-            <div className="space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-                Xuất Báo Cáo Kho Hàng
-              </span>
+                {/* Mục 2: Dán đoạn chat Zalo */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenPaste();
+                  }}
+                  className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition cursor-pointer text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <ClipboardPaste className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 block">
+                        Dán Đoạn Chat Zalo
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        Tự nhận diện và cập nhật mã hàng loạt
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">
+                      Mở ngay
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-300" />
+                  </div>
+                </button>
 
-              <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-500 font-medium">Tổng số sản phẩm đang có:</span>
-                  <span className="font-bold font-mono text-slate-900">{items.length} mã</span>
-                </div>
-
+                {/* Mục 3: Xuất file Excel / CSV */}
                 <button
                   type="button"
                   disabled={exporting || items.length === 0}
                   onClick={handleExportCSV}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 px-4 py-2.5 text-xs font-bold hover:bg-emerald-100 transition active:scale-98 shadow-2xs cursor-pointer disabled:opacity-50"
+                  className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition cursor-pointer text-left disabled:opacity-50"
                 >
-                  <Download className="h-4 w-4 text-emerald-600" />
-                  <span>{exporting ? "Đang xuất file..." : "Tải Bảng Excel/CSV Toàn Bộ Kho"}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 3. THỐNG KÊ NHANH THEO DÒNG SẢN PHẨM */}
-            <div className="space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <Layers className="h-4 w-4 text-emerald-600" />
-                Phân Loại Dòng Hàng Đang Có
-              </span>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {Object.entries(prefixStats).map(([prefix, count]) => (
-                  <div
-                    key={prefix}
-                    className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/80 flex items-center justify-between"
-                  >
-                    <span className="font-bold text-slate-700">Dòng {prefix}:</span>
-                    <span className="font-mono font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
-                      {count}
-                    </span>
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <FileSpreadsheet className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 block">
+                        Xuất File Báo Cáo
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        Tải bảng Excel / CSV {items.length} mã sản phẩm
+                      </span>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[11px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-lg border border-teal-200">
+                      {exporting ? "Đang tải..." : "Tải Excel"}
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-300" />
+                  </div>
+                </button>
 
-            {/* 4. TIỆN ÍCH DÁN CHAT NHANH */}
-            <div className="space-y-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-emerald-600" />
-                Công Cụ Hỗ Trợ
-              </span>
-
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenPaste();
-                }}
-                className="w-full flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 transition cursor-pointer text-left text-xs font-bold text-slate-800"
-              >
-                <span>Mở hộp thoại Dán Chat Zalo</span>
-                <span className="text-emerald-700 font-semibold text-[11px]">Mở ngay →</span>
-              </button>
-            </div>
-
-            {/* 5. KHU VỰC TÍNH NĂNG ĐANG PHÁT TRIỂN & THỬ NGHIỆM */}
-            <div className="space-y-3 pt-2 border-t border-slate-200">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
-                  <FlaskConical className="h-4 w-4 text-amber-600" />
-                  Tính Năng Đang Phát Triển
-                </span>
-                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
-                  Thử nghiệm (Lab)
-                </span>
-              </div>
-
-              {/* TÙY CHỌN 1: BẢNG TIN LIVE FEED NHẬT KÝ ZALO */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+                {/* Mục 4: Đổi mã PIN hệ thống */}
                 <button
                   type="button"
-                  onClick={() => setDevTab(devTab === "live" ? null : "live")}
-                  className="w-full flex items-center justify-between p-3 text-left transition hover:bg-slate-100 cursor-pointer"
+                  onClick={() => setShowChangePinModal(true)}
+                  className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition cursor-pointer text-left"
                 >
-                  <div className="flex items-center gap-2">
-                    <Radio className="h-4 w-4 text-emerald-600" />
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <KeyRound className="h-4 w-4" />
+                    </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-800 block">Nhật Ký Tin Nhắn Zalo Live</span>
-                      <span className="text-[10px] text-slate-400">Xem luồng tin bot quét theo thời gian thực</span>
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 block">
+                        Mã PIN Bảo Mật
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        Đổi 4 số PIN đăng nhập vào kho
+                      </span>
                     </div>
                   </div>
-                  {devTab === "live" ? (
-                    <ChevronUp className="h-4 w-4 text-slate-400" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-slate-400" />
-                  )}
-                </button>
-
-                {devTab === "live" && (
-                  <div className="p-3 border-t border-slate-200 bg-white animate-in fade-in">
-                    <ZaloLiveFeed
-                      messages={messages}
-                      totalWarehouses={totalWarehouses}
-                      onOpenWarehouse={(wh) => {
-                        onClose();
-                        if (onOpenWarehouse) onOpenWarehouse(wh);
-                      }}
-                    />
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-[11px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-lg border border-violet-200">
+                      Thay đổi
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-slate-300" />
                   </div>
-                )}
+                </button>
+              </div>
+            </div>
+
+            {/* NHÓM 2: DÒNG SẢN PHẨM (FAVORITES / CATEGORIES) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                  Dòng Sản Phẩm Hiện Có
+                </span>
+                <span className="text-[11px] font-medium text-slate-400">
+                  Chạm để lọc nhanh
+                </span>
               </div>
 
-              {/* TÙY CHỌN 2: MÔ PHỎNG TEST TIN NHẮN (ZALO SIMULATOR) */}
-              {onSendWebhook && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 overflow-hidden">
+              <div className="rounded-2xl bg-white border border-slate-200/90 divide-y divide-slate-100 shadow-xs overflow-hidden">
+                <div className="p-3 grid grid-cols-4 gap-2">
+                  {Object.entries(prefixStats).map(([prefix, count]) => (
+                    <button
+                      key={prefix}
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        if (onFilterSkuType) onFilterSkuType(prefix === "Khác" ? "" : prefix);
+                      }}
+                      className="p-2.5 rounded-xl border border-slate-200/80 bg-slate-50 hover:bg-slate-100 flex flex-col items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
+                    >
+                      <span className="text-xs font-black text-slate-800 font-mono">
+                        {prefix}
+                      </span>
+                      <span className="font-mono text-xs font-extrabold text-emerald-600 mt-0.5">
+                        {count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* NHÓM 3: KHU VỰC THỬ NGHIỆM & CÔNG CỤ (SHORTCUTS / LAB) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                  Công Cụ Thử Nghiệm (Lab)
+                </span>
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                  Beta
+                </span>
+              </div>
+
+              <div className="rounded-2xl bg-white border border-slate-200/90 divide-y divide-slate-100 shadow-xs overflow-hidden">
+                {/* Live Feed */}
+                <div>
                   <button
                     type="button"
-                    onClick={() => setDevTab(devTab === "sim" ? null : "sim")}
-                    className="w-full flex items-center justify-between p-3 text-left transition hover:bg-slate-100 cursor-pointer"
+                    onClick={() => setDevTab(devTab === "live" ? null : "live")}
+                    className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition cursor-pointer text-left"
                   >
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-indigo-600" />
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <Radio className="h-4 w-4" />
+                      </div>
                       <div>
-                        <span className="text-xs font-bold text-slate-800 block">Mô Phỏng Tin Nhắn Zalo</span>
-                        <span className="text-[10px] text-slate-400">Giả lập gửi tin từ các nhóm kho để test</span>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 block">
+                          Nhật Ký Zalo Live Feed
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          Theo dõi tin nhắn quét theo thời gian thực
+                        </span>
                       </div>
                     </div>
-                    {devTab === "sim" ? (
+                    {devTab === "live" ? (
                       <ChevronUp className="h-4 w-4 text-slate-400" />
                     ) : (
                       <ChevronDown className="h-4 w-4 text-slate-400" />
                     )}
                   </button>
 
-                  {devTab === "sim" && (
-                    <div className="p-3 border-t border-slate-200 bg-white animate-in fade-in">
-                      <ZaloSimulator
+                  {devTab === "live" && (
+                    <div className="p-3 border-t border-slate-100 bg-slate-50/50 animate-in fade-in">
+                      <ZaloLiveFeed
                         messages={messages}
-                        onSend={onSendWebhook}
-                        items={items}
                         totalWarehouses={totalWarehouses}
+                        onOpenWarehouse={(wh) => {
+                          onClose();
+                          if (onOpenWarehouse) onOpenWarehouse(wh);
+                        }}
                       />
                     </div>
                   )}
                 </div>
-              )}
-            </div>
 
-            {/* 6. TRẠNG THÁI HỆ THỐNG */}
-            <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/60 text-xs text-slate-500 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-700 font-bold">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  <span>Trạng thái kết nối</span>
-                </div>
-                {botStatus ? (
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      botStatus.online
-                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                        : "bg-amber-100 text-amber-800 border border-amber-300"
-                    }`}
-                  >
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        botStatus.online ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
-                      }`}
-                    />
-                    {botStatus.online ? "Bot Đang Chạy" : "Bot Đang Tắt"}
-                  </span>
-                ) : null}
-              </div>
+                {/* Simulator */}
+                {onSendWebhook && (
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setDevTab(devTab === "sim" ? null : "sim")}
+                      className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition cursor-pointer text-left"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                          <Sparkles className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="text-xs sm:text-sm font-bold text-slate-900 block">
+                            Mô Phỏng Tin Nhắn Zalo
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-medium">
+                            Giả lập gửi tin từ các nhóm kho để test
+                          </span>
+                        </div>
+                      </div>
+                      {devTab === "sim" ? (
+                        <ChevronUp className="h-4 w-4 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-slate-400" />
+                      )}
+                    </button>
 
-              <div className="text-[11px] leading-relaxed space-y-1">
-                <div className="flex items-start gap-1.5">
-                  <span className={botStatus?.online ? "text-emerald-600 font-bold" : "text-amber-600 font-bold"}>•</span>
-                  <span>
-                    <strong>Zalo Bot trên máy:</strong>{" "}
-                    {botStatus?.online ? (
-                      <span className="text-emerald-700 font-semibold">Đang hoạt động trực tiếp (nghe tin nhắn & tự đồng bộ).</span>
-                    ) : (
-                      <span className="text-amber-700">Chưa bật hoặc đang tắt máy. Khi bật lại sẽ tự quét nạp tin nhắn cũ.</span>
+                    {devTab === "sim" && (
+                      <div className="p-3 border-t border-slate-100 bg-slate-50/50 animate-in fade-in">
+                        <ZaloSimulator
+                          messages={messages}
+                          onSend={onSendWebhook}
+                          items={items}
+                          totalWarehouses={totalWarehouses}
+                        />
+                      </div>
                     )}
-                  </span>
-                </div>
-                {botStatus?.lastPing && (
-                  <div className="text-[10px] text-slate-400 pl-3">
-                    Lần phát tín hiệu cuối: {new Date(botStatus.lastPing).toLocaleTimeString("vi-VN")} - {new Date(botStatus.lastPing).toLocaleDateString("vi-VN")}
                   </div>
                 )}
-                <div className="flex items-start gap-1.5">
-                  <span className="text-emerald-600 font-bold">•</span>
-                  <span><strong>Hệ thống cơ sở dữ liệu:</strong> Hoạt động ổn định trên Supabase Cloud.</span>
+              </div>
+            </div>
+
+            {/* NHÓM 4: TRẠNG THÁI HỆ THỐNG (SYSTEM STATUS CARD) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                  Trạng Thái & Kết Nối
+                </span>
+                <span className="text-[11px] font-bold text-emerald-700">
+                  {dbStatus?.connected ? "Trực tuyến" : "Ngoại tuyến"}
+                </span>
+              </div>
+
+              <div className="rounded-2xl bg-white border border-slate-200/90 divide-y divide-slate-100 shadow-xs overflow-hidden text-xs">
+                {/* Supabase Status */}
+                <div className="p-3.5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-8 w-8 rounded-xl text-white flex items-center justify-center shrink-0 shadow-2xs ${
+                      dbStatus?.connected ? "bg-emerald-600" : "bg-rose-500"
+                    }`}>
+                      <Database className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-900 block">
+                        Cơ Sở Dữ Liệu Supabase
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {dbStatus?.connected 
+                          ? `Đã kết nối (${dbStatus.latencyMs ?? 0}ms)` 
+                          : "Mất kết nối Supabase Cloud"}
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${
+                    dbStatus?.connected 
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200" 
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                  }`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${dbStatus?.connected ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+                    {dbStatus?.connected ? `${dbStatus.itemCount ?? items.length} mã` : "Offline"}
+                  </span>
                 </div>
-                <div className="flex items-start gap-1.5">
-                  <span className="text-emerald-600 font-bold">•</span>
-                  <span><strong>Chế độ PWA:</strong> Đã kích hoạt trên trình duyệt & điện thoại.</span>
+
+                {/* Zalo Bot Status */}
+                <div className="p-3.5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`h-8 w-8 rounded-xl text-white flex items-center justify-center shrink-0 shadow-2xs ${
+                      botStatus?.online ? "bg-emerald-600" : "bg-amber-500"
+                    }`}>
+                      <Radio className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-900 block">
+                        Bot Quét Tin Nhắn
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {botStatus?.online ? "Đang chạy trên máy tính" : "Chưa bật bot trên máy"}
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${
+                    botStatus?.online 
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200" 
+                      : "bg-amber-50 text-amber-800 border border-amber-200"
+                  }`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${botStatus?.online ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                    {botStatus?.online ? "Online" : "Tắt"}
+                  </span>
                 </div>
               </div>
+            </div>
+
+            {/* NHÓM 5: NÚT ĐĂNG XUẤT */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full flex items-center justify-center gap-2 rounded-2xl border border-rose-200 bg-rose-50/80 p-3.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer shadow-xs active:scale-98"
+              >
+                <LogOut className="h-4 w-4" />
+                Đăng Xuất Khỏi Hệ Thống
+              </button>
             </div>
 
           </div>
 
           {/* FOOTER DRAWER */}
-          <div className="p-3.5 border-t border-slate-200 bg-slate-50 text-center flex flex-col items-center gap-0.5 shrink-0">
+          <div 
+            className="p-3.5 border-t border-slate-200 bg-slate-50 text-center flex flex-col items-center gap-0.5 shrink-0"
+            style={{ paddingBottom: "max(0.875rem, env(safe-area-inset-bottom))" }}
+          >
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
               <span>Xưởng Lũa Nhựt</span>
               <span className="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-mono font-black border border-emerald-200">
