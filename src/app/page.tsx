@@ -19,7 +19,7 @@ import {
 import SearchBar from "@/components/SearchBar";
 import WarehouseDetailModal from "@/components/WarehouseDetailModal";
 import WarehouseGrid from "@/components/WarehouseGrid";
-import WarehouseMapCanvas from "@/components/WarehouseMapCanvas";
+import WarehouseMapCanvas, { getWarehouseBuildingInfo } from "@/components/WarehouseMapCanvas";
 import SizeInventoryManager from "@/components/SizeInventoryManager";
 import PasteImportModal from "@/components/PasteImportModal";
 import NotificationBell from "@/components/NotificationBell";
@@ -607,6 +607,7 @@ export default function Home() {
                       <div className="flex flex-wrap gap-1.5">
                         {matchingItems.map((it) => {
                           const isCurrent = activeFoundItem.sku === it.sku;
+                          const bInfo = getWarehouseBuildingInfo(it.warehouse, totalWarehouses);
                           return (
                             <button
                               key={it.sku}
@@ -631,7 +632,7 @@ export default function Home() {
                                     : "bg-emerald-100 text-emerald-800"
                                 }`}
                               >
-                                {it.status === "sold" ? "Đã bán" : `Kho ${pad(it.warehouse)}`}
+                                {it.status === "sold" ? "Đã bán" : `Kho ${pad(it.warehouse)} (${bInfo.buildingName})`}
                               </span>
                             </button>
                           );
@@ -667,7 +668,7 @@ export default function Home() {
                                 ĐÃ BÁN (Ẩn khỏi kho)
                               </span>
                               <span className="text-[11px] text-slate-500">
-                                Kho lưu trước đó: <strong>Kho {pad(activeFoundItem.warehouse)}</strong>
+                                Kho lưu trước đó: <strong>Kho {pad(activeFoundItem.warehouse)}</strong> ({getWarehouseBuildingInfo(activeFoundItem.warehouse, totalWarehouses).buildingName})
                               </span>
                             </div>
                           ) : (
@@ -675,6 +676,9 @@ export default function Home() {
                               <span className="text-slate-600">Đang nằm cố định tại:</span>
                               <span className="inline-flex items-center gap-1 font-black text-emerald-800 bg-emerald-200/80 px-2.5 py-0.5 rounded-lg border border-emerald-400 text-sm">
                                 KHO {pad(activeFoundItem.warehouse)}
+                              </span>
+                              <span className="inline-flex items-center gap-1 font-extrabold text-indigo-800 bg-indigo-100 px-2.5 py-0.5 rounded-lg border border-indigo-300 text-xs shadow-2xs">
+                                🏢 {getWarehouseBuildingInfo(activeFoundItem.warehouse, totalWarehouses).buildingName}
                               </span>
                             </div>
                           )}

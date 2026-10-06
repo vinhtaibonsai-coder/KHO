@@ -59,6 +59,45 @@ const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min)
 const snap = (v: number, snapGrid: boolean, size = GRID_SIZE) =>
   snapGrid ? Math.round(v / size) * size : v;
 
+export function getWarehouseBuildingInfo(
+  warehouseId: number,
+  totalWarehouses = 30
+): { buildingName: string; buildingId?: string } {
+  if (typeof window === "undefined") {
+    // SSR fallback to default 4 buildings
+    if (warehouseId <= 7) return { buildingName: "TÒA TRÁI (DỌC)", buildingId: "building-left" };
+    if (warehouseId <= 15) return { buildingName: "TÒA GIỮA TRÊN (NGANG)", buildingId: "building-center-top" };
+    if (warehouseId <= 23) return { buildingName: "TÒA GIỮA DƯỚI (NGANG)", buildingId: "building-center-bottom" };
+    if (warehouseId <= 30) return { buildingName: "TÒA PHẢI (DỌC)", buildingId: "building-right" };
+    return { buildingName: "Ngoài tòa" };
+  }
+
+  try {
+    const stored =
+      localStorage.getItem(STORAGE_KEY) ||
+      localStorage.getItem("xuong_lua_nhut_warehouse_map_layout_v1");
+    if (stored) {
+      const parsed = JSON.parse(stored) as MapLayout;
+      if (parsed && Array.isArray(parsed.nodes) && Array.isArray(parsed.buildings)) {
+        const node = parsed.nodes.find((n) => n.id === warehouseId);
+        if (node && node.buildingId) {
+          const b = parsed.buildings.find((item) => item.id === node.buildingId);
+          if (b) return { buildingName: b.name, buildingId: b.id };
+        }
+      }
+    }
+  } catch {
+    // fallback
+  }
+
+  // Default fallback
+  if (warehouseId <= 7) return { buildingName: "TÒA TRÁI (DỌC)", buildingId: "building-left" };
+  if (warehouseId <= 15) return { buildingName: "TÒA GIỮA TRÊN (NGANG)", buildingId: "building-center-top" };
+  if (warehouseId <= 23) return { buildingName: "TÒA GIỮA DƯỚI (NGANG)", buildingId: "building-center-bottom" };
+  if (warehouseId <= 30) return { buildingName: "TÒA PHẢI (DỌC)", buildingId: "building-right" };
+  return { buildingName: "Ngoài tòa" };
+}
+
 // 4 tòa nhà theo đúng ảnh phác thảo của người dùng:
 // - Tòa Trái: hình chữ nhật đứng (kho 1..7)
 // - Tòa Giữa Trên: hình chữ nhật ngang (kho 8..15)
@@ -1025,6 +1064,13 @@ export default function WarehouseMapCanvas({
               const pos = dragBuilding && dragBuilding.id === b.id ? dragBuilding : b;
               const isBuildingSelected = edit && selectedBuilding === b.id;
 
+              // Kiểm tra xem tòa nhà này có chứa kho đang được tìm thấy không
+              const buildingWarehouses = visibleNodes.filter((n) => n.buildingId === b.id);
+              const matchedInBuilding = buildingWarehouses.filter(
+                (n) => highlight === n.id || highlightWarehouses.includes(n.id)
+              );
+              const hasHighlightWarehouse = matchedInBuilding.length > 0;
+
               return (
                 <div
                   key={b.id}
@@ -1039,9 +1085,11 @@ export default function WarehouseMapCanvas({
                       setSelectedIds([]);
                     }
                   }}
-                  className={`absolute rounded-2xl border-2 transition-colors ${
+                  className={`absolute rounded-2xl border-2 transition-all ${
                     isBuildingSelected
                       ? "border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-400"
+                      : hasHighlightWarehouse && !edit
+                      ? "border-emerald-500 bg-emerald-50/70 ring-4 ring-emerald-400/40 shadow-lg"
                       : b.color || "border-slate-300 bg-white/50"
                   }`}
                   style={{
@@ -1049,15 +1097,26 @@ export default function WarehouseMapCanvas({
                     top: pos.y,
                     width: b.width,
                     height: b.height,
-                    zIndex: 2,
+                    zIndex: hasHighlightWarehouse ? 3 : 2,
                     touchAction: edit ? "none" : "auto",
                     cursor: edit ? "grab" : "default",
                   }}
                 >
                   <div className="flex items-center justify-between p-2">
-                    <span className="rounded-md bg-slate-800 px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-xs">
-                      {b.name}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className={`rounded-md px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-xs ${
+                          hasHighlightWarehouse && !edit ? "bg-emerald-700 animate-pulse" : "bg-slate-800"
+                        }`}
+                      >
+                        🏢 {b.name}
+                      </span>
+                      {hasHighlightWarehouse && !edit && (
+                        <span className="rounded bg-emerald-200 px-1.5 py-0.5 text-[10px] font-black text-emerald-900 border border-emerald-400">
+                          🎯 Có {matchedInBuilding.length} kho khớp tìm kiếm
+                        </span>
+                      )}
+                    </div>
                     {edit && (
                       <span className="text-[10px] font-bold text-slate-500 bg-white/80 rounded px-1.5 py-0.5">
                         {b.width}×{b.height}px
