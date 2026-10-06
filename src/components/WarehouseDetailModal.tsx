@@ -39,6 +39,7 @@ export default function WarehouseDetailModal({
   onRemove,
   onTransfer,
   onBulkTransfer,
+  onBulkMarkSold,
   onMarkSold,
   onRestock,
   onOpenPaste,
@@ -51,6 +52,7 @@ export default function WarehouseDetailModal({
   onRemove: (sku: string) => void;
   onTransfer: (sku: string, toWarehouse: number) => Promise<boolean | void>;
   onBulkTransfer?: (skus: string[], toWarehouse: number) => Promise<void> | void;
+  onBulkMarkSold?: (skus: string[], note?: string) => Promise<void> | void;
   onMarkSold?: (sku: string, note?: string) => Promise<void>;
   onRestock?: (sku: string, warehouse?: number, note?: string) => Promise<void>;
   onOpenPaste?: (warehouse: number) => void;
@@ -63,6 +65,7 @@ export default function WarehouseDetailModal({
   const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
   const [bulkTarget, setBulkTarget] = useState<number>(warehouse === 1 ? 2 : 1);
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkSoldSubmitting, setBulkSoldSubmitting] = useState(false);
   
   // Sản phẩm đang được chọn xem chi tiết & lịch sử chuyển/xuất
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
@@ -259,6 +262,31 @@ export default function WarehouseDetailModal({
           setSelectedSkus(new Set());
         } finally {
           setBulkSubmitting(false);
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+        }
+      },
+    });
+  };
+
+  const handleBulkMarkSold = () => {
+    const skus = Array.from(selectedSkus);
+    if (!skus.length || !onBulkMarkSold) return;
+    setConfirmConfig({
+      isOpen: true,
+      variant: "sold",
+      title: "Xác Nhận Đã Bán Hàng Loạt",
+      message: `Bạn có chắc chắn muốn đánh dấu ${skus.length} mã đã chọn là ĐÃ BÁN?`,
+      subMessage: `Các mã: ${skus.slice(0, 8).join(", ")}${skus.length > 8 ? ` và ${skus.length - 8} mã khác` : ""}. Sản phẩm sẽ ẩn khỏi kho để tránh bán trùng, lịch sử vẫn được lưu vĩnh viễn.`,
+      confirmLabel: `Xác nhận đã bán ${skus.length} mã`,
+      cancelLabel: "Hủy bỏ",
+      onConfirm: async () => {
+        setBulkSoldSubmitting(true);
+        try {
+          await onBulkMarkSold(skus, "Đã bán cho khách (hàng loạt)");
+          showNotice(`🎉 Đã đánh dấu BÁN THÀNH CÔNG ${skus.length} mã! (Đã lưu lịch sử & thông báo)`, "success");
+          setSelectedSkus(new Set());
+        } finally {
+          setBulkSoldSubmitting(false);
           setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
         }
       },
@@ -1064,7 +1092,7 @@ export default function WarehouseDetailModal({
         </div>
 
         {/* THANH CÔNG CỤ NỔI PHÍA DƯỚI (FLOATING ACTION BAR) ĐIỀU CHUYỂN HÀNG LOẠT */}
-        {activeTab === "items" && !selectedItem && onBulkTransfer && selectedSkus.size > 0 && (
+        {activeTab === "items" && !selectedItem && (onBulkTransfer || onBulkMarkSold) && selectedSkus.size > 0 && (
           <div className="shrink-0 border-t-2 border-emerald-300 bg-emerald-50/95 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 animate-in fade-in slide-in-from-bottom duration-200">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-950">
               <span className="rounded-lg bg-emerald-600 px-2 py-0.5 text-[11px] font-extrabold text-white">
@@ -1076,32 +1104,48 @@ export default function WarehouseDetailModal({
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-950">
-                <span className="hidden sm:inline">Kho đích:</span>
-                <select
-                  value={bulkTarget}
-                  onChange={(e) => setBulkTarget(Number(e.target.value))}
-                  className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  {Array.from({ length: totalWarehouses }, (_, i) => i + 1)
-                    .filter((wh) => wh !== warehouse)
-                    .map((wh) => (
-                      <option key={wh} value={wh}>
-                        Kho {pad(wh)}
-                      </option>
-                    ))}
-                </select>
-              </div>
+              {onBulkTransfer && (
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-950">
+                  <span className="hidden sm:inline">Kho đích:</span>
+                  <select
+                    value={bulkTarget}
+                    onChange={(e) => setBulkTarget(Number(e.target.value))}
+                    className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {Array.from({ length: totalWarehouses }, (_, i) => i + 1)
+                      .filter((wh) => wh !== warehouse)
+                      .map((wh) => (
+                        <option key={wh} value={wh}>
+                          Kho {pad(wh)}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
 
-              <button
-                type="button"
-                disabled={bulkSubmitting}
-                onClick={handleBulkTransfer}
-                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition active:scale-95 disabled:opacity-50 cursor-pointer"
-              >
-                <ArrowRightLeft className="h-3.5 w-3.5" />
-                <span>{bulkSubmitting ? "Đang chuyển..." : `Xác nhận chuyển ${selectedSkus.size} mã`}</span>
-              </button>
+              {onBulkMarkSold && (
+                <button
+                  type="button"
+                  disabled={bulkSoldSubmitting}
+                  onClick={handleBulkMarkSold}
+                  className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  <ShoppingBag className="h-3.5 w-3.5 text-amber-600" />
+                  <span>{bulkSoldSubmitting ? "Đang xử lý..." : `Đã bán (${selectedSkus.size} mã)`}</span>
+                </button>
+              )}
+
+              {onBulkTransfer && (
+                <button
+                  type="button"
+                  disabled={bulkSubmitting}
+                  onClick={handleBulkTransfer}
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  <ArrowRightLeft className="h-3.5 w-3.5" />
+                  <span>{bulkSubmitting ? "Đang chuyển..." : `Xác nhận chuyển ${selectedSkus.size} mã`}</span>
+                </button>
+              )}
 
               <button
                 type="button"

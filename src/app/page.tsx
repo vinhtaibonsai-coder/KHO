@@ -309,6 +309,12 @@ export default function Home() {
     }
   }
 
+  async function bulkMarkSoldSkus(skus: string[], note?: string) {
+    for (const sku of skus) {
+      await markSoldSku(sku, note || "Đã bán");
+    }
+  }
+
   async function addWarehouseHandler() {
     const res = await fetch("/api/items", {
       method: "POST",
@@ -939,6 +945,7 @@ export default function Home() {
           onRemove={removeSku}
           onTransfer={transferSku}
           onBulkTransfer={bulkTransferSkus}
+          onBulkMarkSold={bulkMarkSoldSkus}
           onMarkSold={markSoldSku}
           onRestock={restockSku}
           onOpenPaste={(wh) => {
