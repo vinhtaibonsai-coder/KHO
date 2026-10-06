@@ -38,6 +38,7 @@ export default function WarehouseDetailModal({
   onClose,
   onRemove,
   onTransfer,
+  onBulkTransfer,
   onMarkSold,
   onRestock,
   onOpenPaste,
@@ -49,6 +50,7 @@ export default function WarehouseDetailModal({
   onClose: () => void;
   onRemove: (sku: string) => void;
   onTransfer: (sku: string, toWarehouse: number) => Promise<boolean | void>;
+  onBulkTransfer?: (skus: string[], toWarehouse: number) => Promise<void> | void;
   onMarkSold?: (sku: string, note?: string) => Promise<void>;
   onRestock?: (sku: string, warehouse?: number, note?: string) => Promise<void>;
   onOpenPaste?: (warehouse: number) => void;
@@ -56,6 +58,11 @@ export default function WarehouseDetailModal({
   const [activeTab, setActiveTab] = useState<"items" | "sold" | "history">("items");
   const [selectedSizePrefix, setSelectedSizePrefix] = useState<string>("all");
   const [sortOrder, setSortOrder] = useState<"num_desc" | "num_asc" | "newest" | "oldest">("num_desc");
+
+  // CHỌN NHIỀU MÃ (BULK SELECT) ĐỂ ĐIỀU CHUYỂN HÀNG LOẠT
+  const [selectedSkus, setSelectedSkus] = useState<Set<string>>(new Set());
+  const [bulkTarget, setBulkTarget] = useState<number>(warehouse === 1 ? 2 : 1);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
   
   // Sản phẩm đang được chọn xem chi tiết & lịch sử chuyển/xuất
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
@@ -219,6 +226,43 @@ export default function WarehouseDetailModal({
   const showNotice = (message: string, type: "success" | "info" = "success") => {
     setActionNotice({ message, type });
     setTimeout(() => setActionNotice(null), 3500);
+  };
+
+  const toggleSkuSelected = (sku: string) => {
+    setSelectedSkus((prev) => {
+      const next = new Set(prev);
+      if (next.has(sku)) next.delete(sku);
+      else next.add(sku);
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => setSelectedSkus(new Set(activeList.map((i) => i.sku)));
+  const clearSelection = () => setSelectedSkus(new Set());
+
+  const handleBulkTransfer = () => {
+    const skus = Array.from(selectedSkus);
+    if (!skus.length || !onBulkTransfer) return;
+    setConfirmConfig({
+      isOpen: true,
+      variant: "warning",
+      title: "Xác Nhận Chuyển Hàng Loạt",
+      message: `Bạn có chắc chắn muốn chuyển ${skus.length} mã đã chọn sang Kho ${pad(bulkTarget)} không?`,
+      subMessage: `Các mã: ${skus.slice(0, 8).join(", ")}${skus.length > 8 ? ` và ${skus.length - 8} mã khác` : ""}. Toàn bộ lịch sử chuyển kho sẽ được lưu riêng cho từng mã.`,
+      confirmLabel: `Xác nhận chuyển ${skus.length} mã`,
+      cancelLabel: "Hủy bỏ",
+      onConfirm: async () => {
+        setBulkSubmitting(true);
+        try {
+          await onBulkTransfer(skus, bulkTarget);
+          showNotice(`Đã chuyển ${skus.length} mã sang Kho ${pad(bulkTarget)} thành công!`, "success");
+          setSelectedSkus(new Set());
+        } finally {
+          setBulkSubmitting(false);
+          setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+        }
+      },
+    });
   };
 
   const handleRemoveItem = (sku: string) => {
@@ -825,14 +869,35 @@ export default function WarehouseDetailModal({
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-500 font-medium px-1">
+                <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-slate-500 font-medium px-1">
                   <span>
                     Đang hiển thị: <strong className="text-slate-800 font-bold">{activeList.length}</strong> sản phẩm 
                     {selectedSizePrefix !== "all" && <span> (Size {selectedSizePrefix})</span>}
+                    {selectedSkus.size > 0 && (
+                      <span className="text-emerald-700 font-bold"> · Đã chọn {selectedSkus.size}</span>
+                    )}
                   </span>
-                  <span className="text-[11px] text-emerald-700 font-bold">
-                    {sortOrder === "num_desc" ? "Số giảm dần ↓" : sortOrder === "num_asc" ? "Số tăng dần ↑" : "Theo thời gian"}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-[11px] text-emerald-700 font-bold">
+                      {sortOrder === "num_desc" ? "Số giảm dần ↓" : sortOrder === "num_asc" ? "Số tăng dần ↑" : "Theo thời gian"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={selectAllVisible}
+                      className="flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-800 hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
+                    >
+                      <Check className="h-3 w-3" />
+                      <span>Chọn tất cả</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      disabled={selectedSkus.size === 0}
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition active:scale-95 disabled:opacity-40 cursor-pointer"
+                    >
+                      Bỏ chọn
+                    </button>
+                  </div>
                 </div>
 
                 {activeList.map((it, idx) => {
@@ -843,9 +908,31 @@ export default function WarehouseDetailModal({
                   return (
                     <div
                       key={it.sku}
-                      className="rounded-xl border border-slate-200 bg-white p-2.5 sm:p-3 hover:border-emerald-400 hover:shadow-2xs transition"
+                      className={`rounded-xl border bg-white p-2.5 sm:p-3 transition hover:shadow-2xs ${
+                        selectedSkus.has(it.sku)
+                          ? "border-emerald-400 ring-1 ring-emerald-200"
+                          : "border-slate-200 hover:border-emerald-400"
+                      }`}
                     >
                       <div className="flex items-center justify-between gap-2">
+                        {/* CHECKBOX CHỌN NHIỀU MÃ (BULK SELECT) */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSkuSelected(it.sku);
+                          }}
+                          aria-label={`Chọn mã ${it.sku}`}
+                          aria-pressed={selectedSkus.has(it.sku)}
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition active:scale-90 cursor-pointer ${
+                            selectedSkus.has(it.sku)
+                              ? "border-emerald-600 bg-emerald-600 text-white shadow-2xs"
+                              : "border-slate-300 bg-white text-transparent hover:border-emerald-400"
+                          }`}
+                        >
+                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                        </button>
+
                         {/* THÔNG TIN MÃ: Bấm vào xem lịch sử */}
                         <div 
                           className="flex items-center gap-2.5 min-w-0 cursor-pointer flex-1"
@@ -975,6 +1062,57 @@ export default function WarehouseDetailModal({
             )
           )}
         </div>
+
+        {/* THANH CÔNG CỤ NỔI PHÍA DƯỚI (FLOATING ACTION BAR) ĐIỀU CHUYỂN HÀNG LOẠT */}
+        {activeTab === "items" && !selectedItem && onBulkTransfer && selectedSkus.size > 0 && (
+          <div className="shrink-0 border-t-2 border-emerald-300 bg-emerald-50/95 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 animate-in fade-in slide-in-from-bottom duration-200">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-950">
+              <span className="rounded-lg bg-emerald-600 px-2 py-0.5 text-[11px] font-extrabold text-white">
+                {selectedSkus.size}
+              </span>
+              <span>
+                Đã chọn <strong className="font-black">{selectedSkus.size}</strong> mã sản phẩm
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-950">
+                <span className="hidden sm:inline">Kho đích:</span>
+                <select
+                  value={bulkTarget}
+                  onChange={(e) => setBulkTarget(Number(e.target.value))}
+                  className="rounded-lg border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-800 shadow-2xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  {Array.from({ length: totalWarehouses }, (_, i) => i + 1)
+                    .filter((wh) => wh !== warehouse)
+                    .map((wh) => (
+                      <option key={wh} value={wh}>
+                        Kho {pad(wh)}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <button
+                type="button"
+                disabled={bulkSubmitting}
+                onClick={handleBulkTransfer}
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                <span>{bulkSubmitting ? "Đang chuyển..." : `Xác nhận chuyển ${selectedSkus.size} mã`}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="rounded-xl border border-emerald-300 bg-white px-2.5 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-100 transition active:scale-95 cursor-pointer"
+              >
+                Bỏ chọn
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* FOOTER */}
         <div 

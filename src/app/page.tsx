@@ -19,6 +19,7 @@ import {
 import SearchBar from "@/components/SearchBar";
 import WarehouseDetailModal from "@/components/WarehouseDetailModal";
 import WarehouseGrid from "@/components/WarehouseGrid";
+import WarehouseMapCanvas from "@/components/WarehouseMapCanvas";
 import SizeInventoryManager from "@/components/SizeInventoryManager";
 import PasteImportModal from "@/components/PasteImportModal";
 import NotificationBell from "@/components/NotificationBell";
@@ -93,6 +94,7 @@ export default function Home() {
   const [, setLoading] = useState(true);
   const [isSearchTransferring, setIsSearchTransferring] = useState(false);
   const [searchTargetWarehouse, setSearchTargetWarehouse] = useState(1);
+  const [warehouseView, setWarehouseView] = useState<"grid" | "map">("grid");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const fetchingRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -298,6 +300,12 @@ export default function Home() {
       }
     } catch {
       await enqueueMutation("transfer", { sku, toWarehouse });
+    }
+  }
+
+  async function bulkTransferSkus(skus: string[], toWarehouse: number) {
+    for (const sku of skus) {
+      await transferSku(sku, toWarehouse);
     }
   }
 
@@ -818,27 +826,65 @@ export default function Home() {
                 <span className="text-xs text-slate-400">(Nhấp vào ô kho để xem danh sách mã bên trong)</span>
               </div>
 
-              <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 rounded-md bg-slate-100 border border-slate-300"></span> Trống
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 rounded-md bg-emerald-50 border border-emerald-300"></span> Có hàng
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-3 w-3 rounded-md bg-emerald-500 ring-2 ring-emerald-300"></span> Đang chọn
-                </span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4 text-xs font-medium text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-md bg-slate-100 border border-slate-300"></span> Trống
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-md bg-emerald-50 border border-emerald-300"></span> Có hàng
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-3 w-3 rounded-md bg-emerald-500 ring-2 ring-emerald-300"></span> Đang chọn
+                  </span>
+                </div>
+
+                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setWarehouseView("grid")}
+                    className={`rounded-md px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                      warehouseView === "grid"
+                        ? "bg-white text-slate-900 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    Lưới
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWarehouseView("map")}
+                    className={`rounded-md px-2.5 py-1 text-xs font-bold transition cursor-pointer ${
+                      warehouseView === "map"
+                        ? "bg-white text-slate-900 shadow-2xs"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    Bản đồ
+                  </button>
+                </div>
               </div>
             </div>
 
-            <WarehouseGrid
-              items={items}
-              highlight={activeFoundItem ? activeFoundItem.warehouse : null}
-              highlightWarehouses={matchingItems.map((m) => m.warehouse)}
-              query={query}
-              totalWarehouses={totalWarehouses}
-              onSelect={setOpenWarehouse}
-            />
+            {warehouseView === "grid" ? (
+              <WarehouseGrid
+                items={items}
+                highlight={activeFoundItem ? activeFoundItem.warehouse : null}
+                highlightWarehouses={matchingItems.map((m) => m.warehouse)}
+                query={query}
+                totalWarehouses={totalWarehouses}
+                onSelect={setOpenWarehouse}
+              />
+            ) : (
+              <WarehouseMapCanvas
+                items={items}
+                highlight={activeFoundItem ? activeFoundItem.warehouse : null}
+                highlightWarehouses={matchingItems.map((m) => m.warehouse)}
+                query={query}
+                totalWarehouses={totalWarehouses}
+                onSelect={setOpenWarehouse}
+              />
+            )}
           </section>
         )}
 
@@ -892,6 +938,7 @@ export default function Home() {
           onClose={() => setOpenWarehouse(null)}
           onRemove={removeSku}
           onTransfer={transferSku}
+          onBulkTransfer={bulkTransferSkus}
           onMarkSold={markSoldSku}
           onRestock={restockSku}
           onOpenPaste={(wh) => {
