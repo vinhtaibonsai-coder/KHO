@@ -614,7 +614,7 @@ export default function WarehouseMapCanvas({
           </span>
 
           <label className="flex items-center gap-1.5 text-slate-500">
-            Đổi tên
+            Tên tòa:
             <input
               value={currentBuilding.name}
               onChange={(e) => patchBuilding({ name: e.target.value })}
@@ -622,43 +622,67 @@ export default function WarehouseMapCanvas({
             />
           </label>
 
-          <div className="flex items-center gap-1.5 text-slate-500">
-            Kích thước (Rộng x Cao)
+          <div className="flex items-center gap-2 text-slate-500">
+            <span>Rộng (ngang):</span>
+            <input
+              type="number"
+              min={100}
+              max={950}
+              step={10}
+              value={currentBuilding.width}
+              onChange={(e) => patchBuilding({ width: clamp(Number(e.target.value) || 200, 100, 950) })}
+              className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            />
             <button
               type="button"
               className={btn}
-              onClick={() =>
-                patchBuilding({
-                  width: clamp(currentBuilding.width - 20, 160, 600),
-                  height: clamp(currentBuilding.height - 20, 140, 700),
-                })
-              }
+              onClick={() => patchBuilding({ width: clamp(currentBuilding.width - 20, 100, 950) })}
             >
-              −
+              −20
             </button>
-            <span className="font-bold text-slate-800">
-              {currentBuilding.width}×{currentBuilding.height}
-            </span>
             <button
               type="button"
               className={btn}
-              onClick={() =>
-                patchBuilding({
-                  width: clamp(currentBuilding.width + 20, 160, 600),
-                  height: clamp(currentBuilding.height + 20, 140, 700),
-                })
-              }
+              onClick={() => patchBuilding({ width: clamp(currentBuilding.width + 20, 100, 950) })}
             >
-              +
+              +20
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-slate-500">
+            <span>Dài/Cao (dọc):</span>
+            <input
+              type="number"
+              min={100}
+              max={950}
+              step={10}
+              value={currentBuilding.height}
+              onChange={(e) => patchBuilding({ height: clamp(Number(e.target.value) || 200, 100, 950) })}
+              className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            />
+            <button
+              type="button"
+              className={btn}
+              onClick={() => patchBuilding({ height: clamp(currentBuilding.height - 20, 100, 950) })}
+            >
+              −20
+            </button>
+            <button
+              type="button"
+              className={btn}
+              onClick={() => patchBuilding({ height: clamp(currentBuilding.height + 20, 100, 950) })}
+            >
+              +20
             </button>
           </div>
 
           <button
             type="button"
             onClick={() => removeBuilding(currentBuilding.id)}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100"
+            title="Xóa tòa nhà này. Các ô kho bên trong sẽ tự động ra ngoài tòa nhà, không bị mất kho."
+            className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 hover:bg-rose-100"
           >
-            <Trash2 className="h-3.5 w-3.5" /> Xóa tòa nhà
+            <Trash2 className="h-3.5 w-3.5" /> Xóa tòa nhà (giữ nguyên kho)
           </button>
         </div>
       )}
