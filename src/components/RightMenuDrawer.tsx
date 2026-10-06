@@ -26,7 +26,8 @@ import {
   Database,
   Wifi,
   WifiOff,
-  ClipboardPaste
+  ClipboardPaste,
+  Boxes
 } from "lucide-react";
 import { APP_VERSION, APP_BUILD_TIME } from "@/lib/version";
 import type { Item, ItemHistory, ZaloMessage } from "@/types";
@@ -236,14 +237,19 @@ export default function RightMenuDrawer({
             style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}
           >
             <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
-                <Settings className="h-5 w-5 text-emerald-400" />
+              <div className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Boxes className="h-5 w-5 text-emerald-400" />
               </div>
               <div>
-                <h2 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight">
-                  Menu Quản Lý & Tiện Ích
-                </h2>
-                <p className="text-[11px] text-slate-500 font-medium">Xưởng Lũa Nhựt</p>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                    XƯỞNG LŨA NHỰT
+                  </h2>
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                    v{APP_VERSION}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium">Menu Quản Lý & Tiện Ích Kho</p>
               </div>
             </div>
 

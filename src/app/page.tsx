@@ -411,16 +411,17 @@ export default function Home() {
             <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-xs shrink-0">
               <Boxes className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-400" />
             </div>
-            <div className="min-w-0">
+            {/* Tên xưởng và phiên bản chuyển vào Drawer menu góc phải trên mobile, chỉ hiện trên màn hình máy tính tablet (md+) */}
+            <div className="min-w-0 hidden md:block">
               <div className="flex items-center gap-1.5">
-                <h1 className="text-xs sm:text-base md:text-lg font-black text-slate-900 tracking-tight truncate">
+                <h1 className="text-base font-black text-slate-900 tracking-tight truncate">
                   XƯỞNG LŨA NHỰT
                 </h1>
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                   v{APP_VERSION}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium hidden md:block">
+              <p className="text-[11px] text-slate-500 font-medium truncate">
                 Tra cứu vị trí mã sản phẩm tức thời · Tự động đọc tin nhắn từ {totalWarehouses} nhóm Zalo
               </p>
             </div>
