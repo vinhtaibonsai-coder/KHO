@@ -914,24 +914,26 @@ export default function Home() {
       />
 
       {/* MENU BÊN PHẢI (RIGHT DRAWER): QUẢN LÝ THÊM KHO, XUẤT CSV, THỐNG KÊ, TÍNH NĂNG ĐANG PHÁT TRIỂN */}
-      <RightMenuDrawer
-        isOpen={isMenuOpen}
-        onClose={() => setIsMenuOpen(false)}
-        totalWarehouses={totalWarehouses}
-        items={items}
-        history={history}
-        messages={messages}
-        botStatus={botStatus}
-        dbStatus={dbStatus}
-        onAddWarehouse={addWarehouseHandler}
-        onOpenPaste={() => setIsPasteOpen(true)}
-        onOpenWarehouse={setOpenWarehouse}
-        onSendWebhook={onWebhook}
-        onFilterSkuType={(prefix) => {
-          setQuery(prefix);
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }}
-      />
+      {isMenuOpen && (
+        <RightMenuDrawer
+          isOpen={isMenuOpen}
+          onClose={() => setIsMenuOpen(false)}
+          totalWarehouses={totalWarehouses}
+          items={items}
+          history={history}
+          messages={messages}
+          botStatus={botStatus}
+          dbStatus={dbStatus}
+          onAddWarehouse={addWarehouseHandler}
+          onOpenPaste={() => setIsPasteOpen(true)}
+          onOpenWarehouse={setOpenWarehouse}
+          onSendWebhook={onWebhook}
+          onFilterSkuType={(prefix) => {
+            setQuery(prefix);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+        />
+      )}
 
       {/* THANH ĐIỀU HƯỚNG NỔI PHONG CÁCH GITHUB IOS (FLOATING BOTTOM TAB BAR) */}
       <BottomTabBar

@@ -85,15 +85,20 @@ export default function RightMenuDrawer({
   // Khóa cuộn trang nền an toàn chuẩn Mobile PWA (iOS Safari & Android Chrome)
   useEffect(() => {
     if (!isOpen) return;
-    const originalOverflow = document.body.style.overflow;
+    const scrollY = window.scrollY || window.pageYOffset || 0;
+    const originalBodyOverflow = document.body.style.overflow;
+    const originalHtmlOverflow = document.documentElement.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow = originalOverflow;
+      document.documentElement.style.overflow = originalHtmlOverflow;
+      document.body.style.overflow = originalBodyOverflow;
     };
   }, [isOpen]);
 
-  if (!isOpen || !mounted || typeof document === "undefined") return null;
+  if (!isOpen || typeof document === "undefined") return null;
 
   // Thống kê nhanh theo dòng sản phẩm
   const prefixStats = (() => {
@@ -213,14 +218,14 @@ export default function RightMenuDrawer({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200 touch-none overscroll-none">
-      <div className="absolute inset-0" onClick={onClose} />
-
-      <div className="fixed inset-y-0 right-0 max-w-full flex">
-        <div 
-          className="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-slate-200 animate-in slide-in-from-right duration-200"
-          onClick={(e) => e.stopPropagation()}
-        >
+    <div 
+      className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-xs select-none"
+      onClick={onClose}
+    >
+      <div 
+        className="w-full max-w-md h-full bg-white shadow-2xl flex flex-col border-l border-slate-200"
+        onClick={(e) => e.stopPropagation()}
+      >
           
           {/* HEADER MENU BÊN PHẢI - Thêm safe area padding để không bị tai thỏ & camera che */}
           <div 
@@ -627,7 +632,6 @@ export default function RightMenuDrawer({
             </p>
           </div>
         </div>
-      </div>
 
       {/* POPUP ĐỔI MÃ PIN */}
       {showChangePinModal && (
@@ -709,18 +713,20 @@ export default function RightMenuDrawer({
         </div>
       )}
 
-      {/* HỘP THOẠI XÁC NHẬN THÊM Ô KHO CHUẨN IOS PWA */}
-      <ConfirmModal
-        isOpen={showAddWhConfirm}
-        variant="warning"
-        title={`Thêm Ô Kho ${pad(totalWarehouses + 1)}`}
-        message={`Bạn có chắc chắn muốn tạo thêm KHO ${pad(totalWarehouses + 1)} vào hệ thống không?`}
-        subMessage={`Hệ thống sẽ mở rộng từ ${totalWarehouses} ô kho thành ${totalWarehouses + 1} ô kho vận hành.`}
-        confirmLabel={`Tạo Kho ${pad(totalWarehouses + 1)}`}
-        cancelLabel="Hủy bỏ"
-        onConfirm={executeAddWarehouse}
-        onCancel={() => setShowAddWhConfirm(false)}
-      />
+      {/* HỘP THOẠI XÁC NHẬN THÊM Ô KHO CHUẨN IOS PWA (CHỈ MOUNT KHI MỞ) */}
+      {showAddWhConfirm && (
+        <ConfirmModal
+          isOpen={showAddWhConfirm}
+          variant="warning"
+          title={`Thêm Ô Kho ${pad(totalWarehouses + 1)}`}
+          message={`Bạn có chắc chắn muốn tạo thêm KHO ${pad(totalWarehouses + 1)} vào hệ thống không?`}
+          subMessage={`Hệ thống sẽ mở rộng từ ${totalWarehouses} ô kho thành ${totalWarehouses + 1} ô kho vận hành.`}
+          confirmLabel={`Tạo Kho ${pad(totalWarehouses + 1)}`}
+          cancelLabel="Hủy bỏ"
+          onConfirm={executeAddWarehouse}
+          onCancel={() => setShowAddWhConfirm(false)}
+        />
+      )}
     </div>,
     document.body
   );
