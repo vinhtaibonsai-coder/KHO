@@ -197,6 +197,7 @@ export async function POST(req: Request) {
         total: extracted.validSkus.length,
         addedCount: added.length,
         duplicates,
+        invalidSkus: extracted.invalidSkus,
       });
     }
 
@@ -213,7 +214,13 @@ export async function POST(req: Request) {
         createdAt: new Date().toISOString(),
       };
       await pushMessage(msg);
-      return NextResponse.json({ ok: false, message: msg }, { status: 400 });
+      return NextResponse.json({ 
+        ok: false, 
+        message: msg, 
+        invalidSku: true, 
+        sku: parsed?.sku || body.message.trim(),
+        reason: parsed?.error || "Cú pháp mã không hợp lệ" 
+      }, { status: 400 });
     }
 
     // NGĂN CHẶN TRÙNG MÃ: Hàng độc bản chỉ được ở 1 kho duy nhất

@@ -76,33 +76,24 @@ export default function RightMenuDrawer({
   const [pinChangeError, setPinChangeError] = useState("");
   const [pinChangeLoading, setPinChangeLoading] = useState(false);
 
-  // Khóa cứng cuộn trang nền ngoài chuẩn Mobile PWA (iOS Safari & Android Chrome)
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Khóa cuộn trang nền an toàn chuẩn Mobile PWA (iOS Safari & Android Chrome)
   useEffect(() => {
     if (!isOpen) return;
-    const scrollY = window.scrollY || window.pageYOffset || 0;
-    const originalBodyOverflow = document.body.style.overflow;
-    const originalBodyPosition = document.body.style.position;
-    const originalBodyTop = document.body.style.top;
-    const originalBodyWidth = document.body.style.width;
-    const originalHtmlOverflow = document.documentElement.style.overflow;
-
-    document.documentElement.style.overflow = "hidden";
+    const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    document.body.style.position = "fixed";
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = "100%";
 
     return () => {
-      document.documentElement.style.overflow = originalHtmlOverflow;
-      document.body.style.overflow = originalBodyOverflow;
-      document.body.style.position = originalBodyPosition;
-      document.body.style.top = originalBodyTop;
-      document.body.style.width = originalBodyWidth;
-      window.scrollTo(0, scrollY);
+      document.body.style.overflow = originalOverflow;
     };
   }, [isOpen]);
 
-  if (!isOpen || typeof document === "undefined") return null;
+  if (!isOpen || !mounted || typeof document === "undefined") return null;
 
   // Thống kê nhanh theo dòng sản phẩm
   const prefixStats = (() => {

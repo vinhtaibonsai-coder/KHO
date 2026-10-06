@@ -225,11 +225,12 @@ async function handleGroupMessage(api, message) {
     `[msg] "${text}" từ "${name || groupId}" -> ${label}: ${res.ok ? "OK" : "LỖI"}${res.message?.detail ? " - " + res.message.detail : ""}`
   );
 
-  // CẢNH BÁO TRÙNG MÃ & TỰ ĐỘNG THU HỒI / XÓA TIN NHẮN TRÙNG TRONG NHÓM
+  // CẢNH BÁO TRÙNG MÃ HOẶC MÃ SAI QUY CHUẨN -> TỰ ĐỘNG THU HỒI / XÓA TIN NHẮN TRONG NHÓM & BÁO VÀO MY DOCUMENTS
   const hasDuplicate = res.duplicate || (Array.isArray(res.duplicates) && res.duplicates.length > 0);
+  const hasInvalidSku = res.invalidSku || (Array.isArray(res.invalidSkus) && res.invalidSkus.length > 0);
 
-  if (hasDuplicate) {
-    // 1. TỰ ĐỘNG XÓA / THU HỒI TIN NHẮN TRÙNG KHỎI NHÓM ZALO
+  if (hasDuplicate || hasInvalidSku) {
+    // 1. TỰ ĐỘNG XÓA / THU HỒI TIN NHẮN KHỎI NHÓM ZALO
     try {
       const msgId = message.data?.msgId || message.msgId;
       const cliMsgId = message.data?.cliMsgId || message.cliMsgId;
@@ -240,7 +241,7 @@ async function handleGroupMessage(api, message) {
       // Nếu là chính tài khoản Bot gửi -> Thu hồi tin nhắn (Undo)
       if (message.isSelf && api.undo && msgId && cliMsgId) {
         await api.undo({ msgId, cliMsgId }, groupId, ThreadType.Group);
-        console.log(`[bot-delete] Đã THU HỒI tin nhắn trùng (${text}) khỏi nhóm ${name || groupId}`);
+        console.log(`[bot-delete] Đã THU HỒI tin nhắn vi phạm (${text}) khỏi nhóm ${name || groupId}`);
         deleted = true;
       } 
       
@@ -251,7 +252,7 @@ async function handleGroupMessage(api, message) {
           threadId: groupId,
           type: ThreadType.Group,
         }, false); // onlyMe = false (xóa phía tất cả mọi người trong nhóm)
-        console.log(`[bot-delete] Đã XÓA tin nhắn trùng (${text}) của thành viên khỏi nhóm ${name || groupId}`);
+        console.log(`[bot-delete] Đã XÓA tin nhắn vi phạm (${text}) của thành viên khỏi nhóm ${name || groupId}`);
       }
     } catch (delErr) {
       console.warn(`[bot-delete] Không xóa được tin nhắn trong nhóm (Có thể tài khoản chưa được phân quyền Trưởng/Phó nhóm): ${delErr.message}`);
@@ -262,21 +263,35 @@ async function handleGroupMessage(api, message) {
       const ctx = api.getContext ? api.getContext() : null;
       const send2meId = ctx?.loginInfo?.send2me_id || (api.getOwnId ? api.getOwnId() : null);
 
+      if (!send2meId) {
+        console.warn("[bot-reply] Không tìm thấy send2meId để gửi vào My Documents");
+        return;
+      }
+
+      // Trường hợp 2.1: Báo lỗi mã sai quy chuẩn / Size không hợp lệ
+      if (hasInvalidSku) {
+        let errorDetail = "";
+        if (res.invalidSku) {
+          errorDetail = `👉 Mã nhập sai: [${res.sku || text}]\n⚠️ Lý do: ${res.reason || res.message?.detail || "Không đúng quy chuẩn kho"}`;
+        } else if (Array.isArray(res.invalidSkus)) {
+          errorDetail = res.invalidSkus.map((item) => `👉 Mã [${item.raw}]: ${item.error}`).join("\n");
+        }
+
+        const warningText = `⚠️ [KHO ${pad(warehouse)} - MÃ NHẬP SAI QUY CHUẨN]\nTin nhắn đã bị thu hồi khỏi nhóm do chứa mã không hợp lệ:\n${errorDetail}\n\n👉 Nội dung tin nhắn: "${text}"\n👉 Nhóm gửi: "${name || groupId}"`;
+        await api.sendMessage(warningText, send2meId, ThreadType.User);
+        console.log(`[bot-reply] Đã gửi thông báo MÃ SAI QUY CHUẨN vào "Cloud của tôi" (send2meId: ${send2meId})`);
+      }
+
+      // Trường hợp 2.2: Báo lỗi trùng mã sản phẩm
       if (res.duplicate && res.message?.detail) {
         const warningText = `🚫 [KHO ${pad(warehouse)} - PHÁT HIỆN TRÙNG MÃ]\n${res.message.detail}\n👉 Tin nhắn: "${text}"\n👉 Nhóm gửi: "${name || groupId}"`;
-        
-        if (send2meId) {
-          await api.sendMessage(warningText, send2meId, ThreadType.User);
-          console.log(`[bot-reply] Đã gửi thông báo trùng vào "Cloud của tôi" (send2meId: ${send2meId})`);
-        }
+        await api.sendMessage(warningText, send2meId, ThreadType.User);
+        console.log(`[bot-reply] Đã gửi thông báo trùng vào "Cloud của tôi" (send2meId: ${send2meId})`);
       } else if (Array.isArray(res.duplicates) && res.duplicates.length > 0) {
         const dupList = res.duplicates.join("\n👉 ");
         const warningText = `🚫 [KHO ${pad(warehouse)} - CẢNH BÁO TRÙNG MÃ]\nCác mã sau đã tồn tại ở kho khác nên bị từ chối:\n👉 ${dupList}\n👉 Tin nhắn: "${text}"\n👉 Nhóm gửi: "${name || groupId}"`;
-        
-        if (send2meId) {
-          await api.sendMessage(warningText, send2meId, ThreadType.User);
-          console.log(`[bot-reply] Đã gửi thông báo danh sách trùng vào "Cloud của tôi" (send2meId: ${send2meId})`);
-        }
+        await api.sendMessage(warningText, send2meId, ThreadType.User);
+        console.log(`[bot-reply] Đã gửi thông báo danh sách trùng vào "Cloud của tôi" (send2meId: ${send2meId})`);
       }
     } catch (replyErr) {
       console.error("[bot-reply] Không gửi được tin cảnh báo vào My Documents:", replyErr.message);
