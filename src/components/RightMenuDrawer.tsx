@@ -32,6 +32,7 @@ import { APP_VERSION, APP_BUILD_TIME } from "@/lib/version";
 import type { Item, ItemHistory, ZaloMessage } from "@/types";
 import ZaloLiveFeed from "@/components/ZaloLiveFeed";
 import ZaloSimulator from "@/components/ZaloSimulator";
+import ConfirmModal from "@/components/ConfirmModal";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -162,10 +163,14 @@ export default function RightMenuDrawer({
     }
   };
 
-  const handleCreateWarehouse = async () => {
-    const confirmAdd = window.confirm(`Bạn có chắc chắn muốn tạo thêm KHO ${pad(totalWarehouses + 1)} vào hệ thống không?`);
-    if (!confirmAdd) return;
+  const [showAddWhConfirm, setShowAddWhConfirm] = useState(false);
 
+  const handleCreateWarehouse = () => {
+    setShowAddWhConfirm(true);
+  };
+
+  const executeAddWarehouse = async () => {
+    setShowAddWhConfirm(false);
     setAddingWh(true);
     try {
       await onAddWarehouse();
@@ -706,6 +711,19 @@ export default function RightMenuDrawer({
           </div>
         </div>
       )}
+
+      {/* HỘP THOẠI XÁC NHẬN THÊM Ô KHO CHUẨN IOS PWA */}
+      <ConfirmModal
+        isOpen={showAddWhConfirm}
+        variant="warning"
+        title={`Thêm Ô Kho ${pad(totalWarehouses + 1)}`}
+        message={`Bạn có chắc chắn muốn tạo thêm KHO ${pad(totalWarehouses + 1)} vào hệ thống không?`}
+        subMessage={`Hệ thống sẽ mở rộng từ ${totalWarehouses} ô kho thành ${totalWarehouses + 1} ô kho vận hành.`}
+        confirmLabel={`Tạo Kho ${pad(totalWarehouses + 1)}`}
+        cancelLabel="Hủy bỏ"
+        onConfirm={executeAddWarehouse}
+        onCancel={() => setShowAddWhConfirm(false)}
+      />
     </div>,
     document.body
   );

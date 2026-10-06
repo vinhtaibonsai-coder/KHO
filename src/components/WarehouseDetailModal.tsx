@@ -18,6 +18,7 @@ import {
   ArrowUpNarrowWide,
   SlidersHorizontal
 } from "lucide-react";
+import ConfirmModal, { type ConfirmVariant } from "@/components/ConfirmModal";
 import type { Item, ItemHistory } from "@/types";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -196,47 +197,93 @@ export default function WarehouseDetailModal({
 
   const [actionNotice, setActionNotice] = useState<{ message: string; type: "success" | "info" } | null>(null);
 
+  // State hộp thoại xác nhận chuẩn iOS
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    variant: ConfirmVariant;
+    title: string;
+    sku?: string;
+    message: string;
+    subMessage?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    variant: "sold",
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
   const showNotice = (message: string, type: "success" | "info" = "success") => {
     setActionNotice({ message, type });
     setTimeout(() => setActionNotice(null), 3500);
   };
 
   const handleRemoveItem = (sku: string) => {
-    const confirmRemove = window.confirm(
-      `CẢNH BÁO XUẤT KHO:\nBạn có chắc chắn muốn XUẤT / XOÁ mã [${sku}] khỏi Kho ${pad(warehouse)} không?\n\n(Nếu sản phẩm đã bán cho khách, bạn nên chọn nút "Bán" để lưu lịch sử).`
-    );
-    if (!confirmRemove) return;
-    onRemove(sku);
-    showNotice(`Đã xuất mã [${sku}] khỏi kho thành công!`, "info");
-    if (selectedSku === sku) {
-      setSelectedSku(null);
-    }
+    setConfirmConfig({
+      isOpen: true,
+      variant: "danger",
+      title: "Cảnh Báo Xuất / Xoá Mã",
+      sku,
+      message: `Bạn có chắc chắn muốn XUẤT / XOÁ mã này khỏi Kho ${pad(warehouse)} không?`,
+      subMessage: `Mã sẽ bị xoá khỏi danh sách ô kho hiện tại. Nếu sản phẩm đã bán cho khách, bạn nên dùng nút "Đã Bán" để lưu lịch sử chi tiết.`,
+      confirmLabel: "Xác nhận xuất mã",
+      cancelLabel: "Giữ lại",
+      onConfirm: () => {
+        onRemove(sku);
+        showNotice(`Đã xuất mã [${sku}] khỏi kho thành công!`, "info");
+        if (selectedSku === sku) {
+          setSelectedSku(null);
+        }
+        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
   };
 
   const handleMarkSoldItem = async (sku: string) => {
     if (!onMarkSold) return;
-    const confirmSold = window.confirm(
-      `XÁC NHẬN BÁN:\nBạn có chắc chắn muốn đánh dấu mã [${sku}] là ĐÃ BÁN?\n(Sản phẩm sẽ ẩn khỏi kho nhưng dữ liệu và lịch sử vẫn được lưu vĩnh viễn)`
-    );
-    if (!confirmSold) return;
-    await onMarkSold(sku, "Đã bán cho khách");
-    showNotice(`🎉 Đã đánh dấu BÁN THÀNH CÔNG mã [${sku}]! (Đã lưu lịch sử & thông báo)`, "success");
-    if (selectedSku === sku) {
-      setSelectedSku(null);
-    }
+    setConfirmConfig({
+      isOpen: true,
+      variant: "sold",
+      title: "Xác Nhận Đã Bán",
+      sku,
+      message: `Bạn có chắc chắn muốn đánh dấu mã [${sku}] là ĐÃ BÁN?`,
+      subMessage: `Sản phẩm sẽ ẩn khỏi kho để tránh bán trùng, toàn bộ dữ liệu lịch sử và thông báo vẫn được lưu trữ vĩnh viễn.`,
+      confirmLabel: "Xác nhận đã bán",
+      cancelLabel: "Hủy bỏ",
+      onConfirm: async () => {
+        await onMarkSold(sku, "Đã bán cho khách");
+        showNotice(`🎉 Đã đánh dấu BÁN THÀNH CÔNG mã [${sku}]! (Đã lưu lịch sử & thông báo)`, "success");
+        if (selectedSku === sku) {
+          setSelectedSku(null);
+        }
+        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
   };
 
   const handleRestockItem = async (sku: string) => {
     if (!onRestock) return;
-    const confirmRestock = window.confirm(
-      `XÁC NHẬN NHẬP LẠI:\nKhách trả hàng hoặc muốn nhập lại mã [${sku}] vào Kho ${pad(warehouse)}?`
-    );
-    if (!confirmRestock) return;
-    await onRestock(sku, warehouse, "Khách trả hàng / Nhập lại kho");
-    showNotice(`Đã nhập lại mã [${sku}] vào Kho ${pad(warehouse)} thành công!`, "success");
-    if (selectedSku === sku) {
-      setSelectedSku(null);
-    }
+    setConfirmConfig({
+      isOpen: true,
+      variant: "success",
+      title: "Xác Nhận Nhập Lại Kho",
+      sku,
+      message: `Khách trả hàng hoặc muốn nhập lại mã này vào Kho ${pad(warehouse)}?`,
+      subMessage: `Sản phẩm sẽ được phục hồi trạng thái còn hàng trong Kho ${pad(warehouse)}.`,
+      confirmLabel: `Nhập vào Kho ${pad(warehouse)}`,
+      cancelLabel: "Hủy bỏ",
+      onConfirm: async () => {
+        await onRestock(sku, warehouse, "Khách trả hàng / Nhập lại kho");
+        showNotice(`Đã nhập lại mã [${sku}] vào Kho ${pad(warehouse)} thành công!`, "success");
+        if (selectedSku === sku) {
+          setSelectedSku(null);
+        }
+        setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+      },
+    });
   };
 
   if (typeof document === "undefined") return null;
@@ -945,6 +992,20 @@ export default function WarehouseDetailModal({
           </button>
         </div>
       </div>
+
+      {/* HỘP THOẠI XÁC NHẬN CHUẨN IOS PWA */}
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        variant={confirmConfig.variant}
+        title={confirmConfig.title}
+        sku={confirmConfig.sku}
+        message={confirmConfig.message}
+        subMessage={confirmConfig.subMessage}
+        confirmLabel={confirmConfig.confirmLabel}
+        cancelLabel={confirmConfig.cancelLabel}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>,
     document.body
   );

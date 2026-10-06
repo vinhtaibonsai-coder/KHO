@@ -24,6 +24,7 @@ import PasteImportModal from "@/components/PasteImportModal";
 import NotificationBell from "@/components/NotificationBell";
 import RightMenuDrawer from "@/components/RightMenuDrawer";
 import BottomTabBar, { type BottomTabType } from "@/components/BottomTabBar";
+import ConfirmModal, { type ConfirmVariant } from "@/components/ConfirmModal";
 import { APP_VERSION } from "@/lib/version";
 import type { Item, ItemsResponse, ZaloMessage, ItemHistory } from "@/types";
 import { 
@@ -203,6 +204,25 @@ export default function Home() {
     return exact || matchingItems[0];
   }, [matchingItems, selectedSku, query]);
 
+  // State quản lý hộp thoại xác nhận đẹp chuẩn iOS (thay thế window.confirm)
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    variant: ConfirmVariant;
+    title: string;
+    sku?: string;
+    message: string;
+    subMessage?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    variant: "sold",
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
   async function removeSku(sku: string) {
     setItems((list) => list.filter((i) => i.sku !== sku));
     try {
@@ -353,10 +373,6 @@ export default function Home() {
     if (tab === "paste") {
       setDefaultPasteWarehouse(1);
       setIsPasteOpen(true);
-      return;
-    }
-    if (tab === "zalo") {
-      setIsNotificationOpen(true);
       return;
     }
     if (tab === "menu") {
@@ -655,10 +671,21 @@ export default function Home() {
                       {activeFoundItem.status === "sold" ? (
                         <button
                           type="button"
-                          onClick={async () => {
-                            const confirmRestock = window.confirm(`Khách trả hàng hoặc muốn nhập lại mã [${activeFoundItem.sku}] vào Kho ${pad(activeFoundItem.warehouse)}?`);
-                            if (!confirmRestock) return;
-                            await restockSku(activeFoundItem.sku, activeFoundItem.warehouse);
+                          onClick={() => {
+                            setConfirmConfig({
+                              isOpen: true,
+                              variant: "success",
+                              title: "Xác Nhận Nhập Lại Kho",
+                              sku: activeFoundItem.sku,
+                              message: `Khách trả hàng hoặc bạn muốn nhập lại mã này vào Kho ${pad(activeFoundItem.warehouse)}?`,
+                              subMessage: `Sản phẩm sẽ được phục hồi trạng thái còn hàng tại Kho ${pad(activeFoundItem.warehouse)}.`,
+                              confirmLabel: `Nhập vào Kho ${pad(activeFoundItem.warehouse)}`,
+                              cancelLabel: "Hủy bỏ",
+                              onConfirm: async () => {
+                                await restockSku(activeFoundItem.sku, activeFoundItem.warehouse);
+                                setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+                              },
+                            });
                           }}
                           className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border border-emerald-300 bg-white px-3 py-2 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-50 transition active:scale-95 cursor-pointer"
                         >
@@ -670,12 +697,21 @@ export default function Home() {
                           {/* NÚT ĐÁNH DẤU ĐÃ BÁN */}
                           <button
                             type="button"
-                            onClick={async () => {
-                              const confirmSold = window.confirm(
-                                `XÁC NHẬN BÁN:\nBạn có chắc chắn muốn đánh dấu mã [${activeFoundItem.sku}] là ĐÃ BÁN?\n(Sản phẩm sẽ ẩn khỏi kho nhưng dữ liệu và lịch sử vẫn được lưu vĩnh viễn)`
-                              );
-                              if (!confirmSold) return;
-                              await markSoldSku(activeFoundItem.sku, "Đã bán từ tra cứu nhanh");
+                            onClick={() => {
+                              setConfirmConfig({
+                                isOpen: true,
+                                variant: "sold",
+                                title: "Xác Nhận Bán Hàng",
+                                sku: activeFoundItem.sku,
+                                message: `Bạn có chắc chắn muốn đánh dấu mã [${activeFoundItem.sku}] là ĐÃ BÁN?`,
+                                subMessage: "Sản phẩm sẽ ẩn khỏi kho để tránh xuất trùng, toàn bộ dữ liệu và lịch sử vẫn được lưu trữ vĩnh viễn.",
+                                confirmLabel: "Xác nhận đã bán",
+                                cancelLabel: "Hủy bỏ",
+                                onConfirm: async () => {
+                                  await markSoldSku(activeFoundItem.sku, "Đã bán từ tra cứu nhanh");
+                                  setConfirmConfig((prev) => ({ ...prev, isOpen: false }));
+                                },
+                              });
                             }}
                             className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1 rounded-xl border border-amber-300 bg-amber-500 hover:bg-amber-600 text-white px-3 py-2 text-xs font-bold shadow-2xs transition active:scale-95 cursor-pointer"
                             title="Đánh dấu đã bán"
@@ -818,6 +854,22 @@ export default function Home() {
           </section>
         )}
 
+        {/* TAB 4: NHẬT KÝ & THÔNG BÁO KHO (HIỂN THỊ MÀN HÌNH RIÊNG) */}
+        {activeTab === "zalo" && (
+          <section
+            id="notification-section"
+            className="animate-in fade-in duration-200"
+          >
+            <NotificationBell
+              messages={messages}
+              onOpenWarehouse={setOpenWarehouse}
+              onMarkAllRead={markAllReadHandler}
+              onMarkRead={markReadHandler}
+              embedded={true}
+            />
+          </section>
+        )}
+
       </main>
 
       {/* FOOTER */}
@@ -884,6 +936,20 @@ export default function Home() {
         activeTab={activeTab}
         unreadCount={unreadMessageCount}
         onTabSelect={handleTabSelect}
+      />
+
+      {/* HỘP THOẠI XÁC NHẬN CHUẨN IOS PWA (THAY THẾ WINDOW.CONFIRM MẶC ĐỊNH) */}
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        variant={confirmConfig.variant}
+        title={confirmConfig.title}
+        sku={confirmConfig.sku}
+        message={confirmConfig.message}
+        subMessage={confirmConfig.subMessage}
+        confirmLabel={confirmConfig.confirmLabel}
+        cancelLabel={confirmConfig.cancelLabel}
+        onConfirm={confirmConfig.onConfirm}
+        onCancel={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

@@ -4,7 +4,7 @@ import "./globals.css";
 import PWAProvider from "@/components/PWAProvider";
 
 export const viewport: Viewport = {
-  themeColor: "#059669",
+  themeColor: "#30170C",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

@@ -180,6 +180,7 @@ export default function NotificationBell({
   onMarkRead,
   externalIsOpen,
   onOpenChange,
+  embedded = false,
 }: {
   messages: ZaloMessage[];
   onOpenWarehouse: (warehouse: number) => void;
@@ -187,9 +188,10 @@ export default function NotificationBell({
   onMarkRead?: (id: string) => void;
   externalIsOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  embedded?: boolean;
 }) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
-  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  const isOpen = embedded ? true : (externalIsOpen !== undefined ? externalIsOpen : internalIsOpen);
   const setIsOpen = (val: boolean | ((prev: boolean) => boolean)) => {
     const nextVal = typeof val === "function" ? val(isOpen) : val;
     if (onOpenChange) onOpenChange(nextVal);
@@ -210,9 +212,9 @@ export default function NotificationBell({
     }
   };
 
-  // Khóa cứng cuộn trang nền ngoài chuẩn Mobile PWA (iOS Safari & Android Chrome)
+  // Khóa cứng cuộn trang nền ngoài chuẩn Mobile PWA (iOS Safari & Android Chrome) khi ở dạng modal popover
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || embedded) return;
     const scrollY = window.scrollY || window.pageYOffset || 0;
     const originalBodyOverflow = document.body.style.overflow;
     const originalBodyPosition = document.body.style.position;
@@ -234,7 +236,7 @@ export default function NotificationBell({
       document.body.style.width = originalBodyWidth;
       window.scrollTo(0, scrollY);
     };
-  }, [isOpen]);
+  }, [isOpen, embedded]);
 
   // Lọc bỏ tin PING rác & heartbeat kỹ thuật (giữ lại các thông báo cấu hình/hệ thống thực thụ)
   const cleanMessages = useMemo(() => {
@@ -345,9 +347,295 @@ export default function NotificationBell({
     }
   };
 
+  // NỘI DUNG CHÍNH CỦA BẢNG THÔNG BÁO (DÙNG CHUNG CHO CẢ MODAL POPUP VÀ TAB TRANG)
+  const notificationContent = (
+    <div 
+      className={`w-full rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden flex flex-col ${
+        embedded ? "min-h-[500px]" : "max-h-[85vh] sm:max-h-[80vh] shadow-2xl overscroll-contain"
+      }`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* HEADER BẢNG THÔNG BÁO */}
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/90 px-4 py-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-sm text-slate-900">
+            {embedded ? "Nhật Ký & Thông Báo Kho" : "Thông báo kho"}
+          </span>
+          {unreadCount > 0 && (
+            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-extrabold text-rose-700">
+              {unreadCount} mới
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={handleMarkAll}
+              className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
+            >
+              <CheckCheck className="h-3.5 w-3.5" />
+              <span>Đọc tất cả</span>
+            </button>
+          )}
+          {!embedded && (
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition active:scale-95 cursor-pointer text-sm font-bold flex items-center justify-center min-w-[36px] min-h-[36px]"
+              title="Đóng thông báo"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* THANH TÌM KIẾM MÃ / THÔNG BÁO */}
+      <div className="px-3 py-2 bg-slate-50/70 border-b border-slate-100 shrink-0">
+        <div className="relative flex items-center">
+          <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            placeholder="Tìm mã sản phẩm (vd: 192, 100a), tên kho, nội dung..."
+            className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition shadow-2xs"
+          />
+          {searchKeyword && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchKeyword("");
+                searchInputRef.current?.focus();
+              }}
+              className="absolute right-2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 cursor-pointer"
+              title="Xóa tìm kiếm"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* TẦNG 1: LỌC TRẠNG THÁI ĐỌC */}
+      <div className="flex border-b border-slate-100 bg-slate-50/50 px-3 py-1.5 gap-1.5 text-xs shrink-0">
+        <button
+          type="button"
+          onClick={() => setReadTab("all")}
+          className={`flex-1 rounded-lg py-1 text-center font-bold transition cursor-pointer ${
+            readTab === "all"
+              ? "bg-white text-slate-900 shadow-2xs border border-slate-200"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Tất cả ({readStats.all})
+        </button>
+        <button
+          type="button"
+          onClick={() => setReadTab("unread")}
+          className={`flex-1 rounded-lg py-1 text-center font-bold transition cursor-pointer ${
+            readTab === "unread"
+              ? "bg-white text-rose-700 shadow-2xs border border-slate-200"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Chưa đọc ({readStats.unread})
+        </button>
+        <button
+          type="button"
+          onClick={() => setReadTab("read")}
+          className={`flex-1 rounded-lg py-1 text-center font-bold transition cursor-pointer ${
+            readTab === "read"
+              ? "bg-white text-slate-900 shadow-2xs border border-slate-200"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Đã đọc ({readStats.read})
+        </button>
+      </div>
+
+      {/* TẦNG 2: THANH CUỘN 6 DANH MỤC PHÂN LOẠI CHI TIẾT CÓ TÍN HIỆU CUỘN MỜ MÉP */}
+      <div className="relative border-b border-slate-100 bg-white shrink-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto px-3 py-2.5 no-scrollbar text-xs">
+          <button
+            type="button"
+            onClick={() => setCategoryTab("all")}
+            className={`shrink-0 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer active:scale-95 ${
+              categoryTab === "all"
+                ? "bg-slate-900 text-white shadow-2xs"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            Tất cả
+          </button>
+
+          {(Object.keys(CATEGORY_CONFIG) as Array<Exclude<NotificationCategory, "all">>).map((key) => {
+            const cfg = CATEGORY_CONFIG[key];
+            const Icon = cfg.icon;
+            const count = categoryCounts[key];
+            const isSelected = categoryTab === key;
+
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setCategoryTab(key)}
+                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer border active:scale-95 ${
+                  isSelected
+                    ? `${cfg.badgeBg} ${cfg.badgeText} ${cfg.border} ring-2 ring-slate-400/20 shadow-2xs`
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{cfg.label}</span>
+                {count > 0 && (
+                  <span
+                    className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
+                      isSelected
+                        ? "bg-white/90"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {/* Hiệu ứng gradient mờ mép phải báo hiệu còn nội dung cuộn */}
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent" />
+      </div>
+
+      {/* DANH SÁCH THÔNG BÁO ĐÃ ĐƯỢC PHÂN LOẠI */}
+      <div 
+        className={`flex-1 overflow-y-auto divide-y divide-slate-100 overscroll-contain touch-pan-y ${
+          embedded ? "max-h-[600px]" : ""
+        }`}
+        style={{ WebkitOverflowScrolling: "touch" }}
+        onTouchMove={(e) => !embedded && e.stopPropagation()}
+      >
+        {filteredMessages.length === 0 ? (
+          <div className="py-12 px-4 text-center text-xs text-slate-400">
+            {searchKeyword ? (
+              <div>
+                <p className="font-semibold text-slate-600 mb-1">
+                  Không tìm thấy thông báo nào khớp với &quot;{searchKeyword}&quot;
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Thử đổi từ khóa hoặc xóa tìm kiếm để xem tất cả
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSearchKeyword("")}
+                  className="mt-3 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg cursor-pointer transition text-xs"
+                >
+                  Xóa tìm kiếm
+                </button>
+              </div>
+            ) : (
+              "Không có thông báo nào trong mục này"
+            )}
+          </div>
+        ) : (
+          filteredMessages.map((m) => {
+            const isRead = readIds.has(m.id) || !!m.read;
+            const cat = messageCategoryMap.get(m.id) || "in";
+            const cfg = CATEGORY_CONFIG[cat];
+            const Icon = cfg.icon;
+
+            return (
+              <div
+                key={m.id}
+                onClick={() => handleMarkItemRead(m.id)}
+                className={`p-3.5 flex items-start gap-3 transition cursor-pointer hover:bg-slate-50 ${
+                  !isRead ? "bg-amber-50/30" : "bg-white"
+                }`}
+              >
+                {/* ICON DANH MỤC */}
+                <div
+                  className={`mt-0.5 p-2 rounded-xl border shrink-0 ${cfg.badgeBg} ${cfg.badgeText} ${cfg.border}`}
+                  title={cfg.label}
+                >
+                  <Icon className="h-4 w-4" />
+                </div>
+
+                {/* NỘI DUNG */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* BADGE PHÂN LOẠI */}
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-md border ${cfg.badgeBg} ${cfg.badgeText} ${cfg.border}`}>
+                        {cfg.label}
+                      </span>
+
+                      {m.warehouse ? (
+                        <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                          <HighlightText text={`Kho ${pad(m.warehouse)}`} highlight={searchKeyword} />
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          Chung
+                        </span>
+                      )}
+
+                      <span className="font-mono text-sm font-black text-slate-800 truncate max-w-[220px]">
+                        <HighlightText text={m.message} highlight={searchKeyword} />
+                      </span>
+                    </div>
+
+                    {!isRead && (
+                      <span className="h-2.5 w-2.5 rounded-full bg-rose-600 ring-2 ring-rose-200 shrink-0" title="Chưa đọc" />
+                    )}
+                  </div>
+
+                  <p className={`text-xs leading-relaxed line-clamp-2 ${cat === "duplicate" ? "text-purple-900 font-semibold" : cat === "sold" ? "text-amber-900 font-semibold" : cat === "error" ? "text-rose-700 font-medium" : "text-slate-600"}`}>
+                    <HighlightText text={m.detail} highlight={searchKeyword} />
+                  </p>
+
+                  <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100/60 text-[11px] text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      {fmtFullTime(m.createdAt)}
+                    </span>
+
+                    {/* TÁCH RIÊNG NÚT MỞ KHO ĐỂ KHÔNG BỊ CHUYỂN TRANG NHẦM KHI LƯỚT XEM */}
+                    {m.warehouse && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkItemRead(m.id);
+                          onOpenWarehouse(m.warehouse!);
+                          if (!embedded) setIsOpen(false);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-bold transition active:scale-95 cursor-pointer"
+                      >
+                        <span>Mở kho {pad(m.warehouse)}</span>
+                        <ChevronRight className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
+  // NẾU LÀ EMBEDDED THÌ HIỂN THỊ TRỰC TIẾP TRONG TAB VIEW CỦA MAIN
+  if (embedded) {
+    return notificationContent;
+  }
+
   return (
     <>
-      {/* NÚT CHUÔNG THÔNG BÁO */}
+      {/* NÚT CHUÔNG THÔNG BÁO Ở TOPBAR */}
       <button
         type="button"
         onClick={() => {
@@ -365,288 +653,20 @@ export default function NotificationBell({
         )}
       </button>
 
-      {/* MODAL THÔNG BÁO - PORTAL RA TRỰC TIẾP DOCUMENT.BODY (CHẮC CHẮN PHỦ KÍN TOÀN MÀN HÌNH) */}
+      {/* MODAL THÔNG BÁO - PORTAL RA TRỰC TIẾP DOCUMENT.BODY */}
       {isOpen && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] flex flex-col justify-start sm:justify-start items-center p-2 sm:p-4 animate-in fade-in duration-150 touch-none overscroll-none">
-          
-          {/* LỚP NỀN MỜ CHE TOÀN BỘ MÀN HÌNH & THÔNG TIN KHO BÊN DƯỚI */}
           <div 
             onClick={() => setIsOpen(false)}
             className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm cursor-pointer touch-none"
             aria-hidden="true"
           />
 
-          {/* KHUNG THÔNG BÁO NỔI */}
           <div 
-            className="relative z-10 w-full max-w-lg rounded-2xl border border-slate-200/90 bg-white shadow-2xl overflow-hidden flex flex-col max-h-[85vh] sm:max-h-[80vh] animate-in zoom-in-95 duration-150 overscroll-contain"
+            className="relative z-10 w-full max-w-lg"
             style={{ marginTop: "max(3rem, calc(env(safe-area-inset-top) + 1rem))" }}
-            onClick={(e) => e.stopPropagation()}
           >
-            
-            {/* HEADER MODAL */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/90 px-4 py-3 shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-slate-900">Thông báo kho</span>
-                {unreadCount > 0 && (
-                  <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-extrabold text-rose-700">
-                    {unreadCount} mới
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3">
-                {unreadCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleMarkAll}
-                    className="flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
-                  >
-                    <CheckCheck className="h-3.5 w-3.5" />
-                    <span>Đọc tất cả</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition active:scale-95 cursor-pointer text-sm font-bold flex items-center justify-center min-w-[36px] min-h-[36px]"
-                  title="Đóng thông báo"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* THANH TÌM KIẾM MÃ / THÔNG BÁO */}
-            <div className="px-3 py-2 bg-slate-50/70 border-b border-slate-100 shrink-0">
-              <div className="relative flex items-center">
-                <Search className="absolute left-2.5 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchKeyword}
-                  onChange={(e) => setSearchKeyword(e.target.value)}
-                  placeholder="Tìm mã sản phẩm (vd: 192, 100a), tên kho, nội dung..."
-                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition shadow-2xs"
-                />
-                {searchKeyword && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchKeyword("");
-                      searchInputRef.current?.focus();
-                    }}
-                    className="absolute right-2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 cursor-pointer"
-                    title="Xóa tìm kiếm"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* TẦNG 1: LỌC TRẠNG THÁI ĐỌC */}
-            <div className="flex border-b border-slate-100 bg-slate-50/50 px-3 py-1.5 gap-1.5 text-xs shrink-0">
-              <button
-                type="button"
-                onClick={() => setReadTab("all")}
-                className={`flex-1 rounded-lg py-1 text-center font-bold transition cursor-pointer ${
-                  readTab === "all"
-                    ? "bg-white text-slate-900 shadow-2xs border border-slate-200"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                Tất cả ({readStats.all})
-              </button>
-              <button
-                type="button"
-                onClick={() => setReadTab("unread")}
-                className={`flex-1 rounded-lg py-1 text-center font-bold transition cursor-pointer ${
-                  readTab === "unread"
-                    ? "bg-white text-rose-700 shadow-2xs border border-slate-200"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                Chưa đọc ({readStats.unread})
-              </button>
-              <button
-                type="button"
-                onClick={() => setReadTab("read")}
-                className={`flex-1 rounded-lg py-1 text-center font-bold transition cursor-pointer ${
-                  readTab === "read"
-                    ? "bg-white text-slate-900 shadow-2xs border border-slate-200"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                Đã đọc ({readStats.read})
-              </button>
-            </div>
-
-            {/* TẦNG 2: THANH CUỘN 6 DANH MỤC PHÂN LOẠI CHI TIẾT CÓ TÍN HIỆU CUỘN MỜ MÉP */}
-            <div className="relative border-b border-slate-100 bg-white shrink-0">
-              <div className="flex items-center gap-1.5 overflow-x-auto px-3 py-2.5 no-scrollbar text-xs">
-                <button
-                  type="button"
-                  onClick={() => setCategoryTab("all")}
-                  className={`shrink-0 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer active:scale-95 ${
-                    categoryTab === "all"
-                      ? "bg-slate-900 text-white shadow-2xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  Tất cả
-                </button>
-
-                {(Object.keys(CATEGORY_CONFIG) as Array<Exclude<NotificationCategory, "all">>).map((key) => {
-                  const cfg = CATEGORY_CONFIG[key];
-                  const Icon = cfg.icon;
-                  const count = categoryCounts[key];
-                  const isSelected = categoryTab === key;
-
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setCategoryTab(key)}
-                      className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer border active:scale-95 ${
-                        isSelected
-                          ? `${cfg.badgeBg} ${cfg.badgeText} ${cfg.border} ring-2 ring-slate-400/20 shadow-2xs`
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                      }`}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      <span>{cfg.label}</span>
-                      {count > 0 && (
-                        <span
-                          className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
-                            isSelected
-                              ? "bg-white/90"
-                              : "bg-slate-100 text-slate-700"
-                          }`}
-                        >
-                          {count}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Hiệu ứng gradient mờ mép phải báo hiệu còn nội dung cuộn */}
-              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent" />
-            </div>
-
-            {/* DANH SÁCH THÔNG BÁO ĐÃ ĐƯỢC PHÂN LOẠI */}
-            <div 
-              className="flex-1 overflow-y-auto divide-y divide-slate-100 overscroll-contain touch-pan-y"
-              style={{ WebkitOverflowScrolling: "touch" }}
-              onTouchMove={(e) => e.stopPropagation()}
-            >
-              {filteredMessages.length === 0 ? (
-                <div className="py-12 px-4 text-center text-xs text-slate-400">
-                  {searchKeyword ? (
-                    <div>
-                      <p className="font-semibold text-slate-600 mb-1">
-                        Không tìm thấy thông báo nào khớp với &quot;{searchKeyword}&quot;
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        Thử đổi từ khóa hoặc xóa tìm kiếm để xem tất cả
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setSearchKeyword("")}
-                        className="mt-3 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg cursor-pointer transition text-xs"
-                      >
-                        Xóa tìm kiếm
-                      </button>
-                    </div>
-                  ) : (
-                    "Không có thông báo nào trong mục này"
-                  )}
-                </div>
-              ) : (
-                filteredMessages.map((m) => {
-                  const isRead = readIds.has(m.id) || !!m.read;
-                  const cat = messageCategoryMap.get(m.id) || "in";
-                  const cfg = CATEGORY_CONFIG[cat];
-                  const Icon = cfg.icon;
-
-                  return (
-                    <div
-                      key={m.id}
-                      onClick={() => handleMarkItemRead(m.id)}
-                      className={`p-3.5 flex items-start gap-3 transition cursor-pointer hover:bg-slate-50 ${
-                        !isRead ? "bg-amber-50/30" : "bg-white"
-                      }`}
-                    >
-                      {/* ICON DANH MỤC */}
-                      <div
-                        className={`mt-0.5 p-2 rounded-xl border shrink-0 ${cfg.badgeBg} ${cfg.badgeText} ${cfg.border}`}
-                        title={cfg.label}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </div>
-
-                      {/* NỘI DUNG */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-1 mb-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {/* BADGE PHÂN LOẠI */}
-                            <span className={`inline-flex items-center gap-1 text-[11px] font-extrabold px-2 py-0.5 rounded-md border ${cfg.badgeBg} ${cfg.badgeText} ${cfg.border}`}>
-                              {cfg.label}
-                            </span>
-
-                            {m.warehouse ? (
-                              <span className="font-mono text-xs font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                <HighlightText text={`Kho ${pad(m.warehouse)}`} highlight={searchKeyword} />
-                              </span>
-                            ) : (
-                              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
-                                Chung
-                              </span>
-                            )}
-
-                            <span className="font-mono text-sm font-black text-slate-800 truncate max-w-[220px]">
-                              <HighlightText text={m.message} highlight={searchKeyword} />
-                            </span>
-                          </div>
-
-                          {!isRead && (
-                            <span className="h-2.5 w-2.5 rounded-full bg-rose-600 ring-2 ring-rose-200 shrink-0" title="Chưa đọc" />
-                          )}
-                        </div>
-
-                        <p className={`text-xs leading-relaxed line-clamp-2 ${cat === "duplicate" ? "text-purple-900 font-semibold" : cat === "sold" ? "text-amber-900 font-semibold" : cat === "error" ? "text-rose-700 font-medium" : "text-slate-600"}`}>
-                          <HighlightText text={m.detail} highlight={searchKeyword} />
-                        </p>
-
-                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100/60 text-[11px] text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            {fmtFullTime(m.createdAt)}
-                          </span>
-
-                          {/* TÁCH RIÊNG NÚT MỞ KHO ĐỂ KHÔNG BỊ CHUYỂN TRANG NHẦM KHI LƯỚT XEM */}
-                          {m.warehouse && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMarkItemRead(m.id);
-                                onOpenWarehouse(m.warehouse!);
-                                setIsOpen(false);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 font-bold transition active:scale-95 cursor-pointer"
-                            >
-                              <span>Mở kho {pad(m.warehouse)}</span>
-                              <ChevronRight className="h-3 w-3" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            {notificationContent}
           </div>
         </div>,
         document.body
