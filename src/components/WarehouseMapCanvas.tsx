@@ -1,7 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Layers, Pencil, Plus, RotateCcw, Save, Trash2, ZoomIn, ZoomOut } from "lucide-react";
+import {
+  AlignCenter,
+  AlignEndHorizontal,
+  AlignStartHorizontal,
+  AlignStartVertical,
+  Check,
+  Grid,
+  Layers,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Save,
+  Trash2,
+  ZoomIn,
+  ZoomOut,
+} from "lucide-react";
 import type { Item } from "@/types";
 
 export interface WarehouseLayoutNode {
@@ -30,15 +45,19 @@ export interface MapLayout {
 }
 
 const STORAGE_KEY = "xuong_lua_nhut_warehouse_map_layout_v2";
-const ORIGIN = 30;
+const ORIGIN = 40;
 const NODE_W = 126;
 const NODE_H = 88;
 const FULL_AT = 10;
-const WORLD_W = 1040;
-const WORLD_H = 720;
+// Mở rộng đáng kể vùng di chuyển của tòa nhà và các kho (1600 x 1100 px)
+const WORLD_W = 1600;
+const WORLD_H = 1100;
+const GRID_SIZE = 20;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+const snap = (v: number, snapGrid: boolean, size = GRID_SIZE) =>
+  snapGrid ? Math.round(v / size) * size : v;
 
 // 4 tòa nhà theo đúng ảnh phác thảo của người dùng:
 // - Tòa Trái: hình chữ nhật đứng (kho 1..7)
@@ -52,35 +71,35 @@ function buildDefault(total: number): MapLayout {
       name: "TÒA TRÁI (DỌC)",
       x: ORIGIN,
       y: ORIGIN,
-      width: 220,
-      height: 640,
+      width: 240,
+      height: 720,
       color: "border-sky-300 bg-sky-50/50",
     },
     {
       id: "building-center-top",
       name: "TÒA GIỮA TRÊN (NGANG)",
-      x: 280,
+      x: 320,
       y: ORIGIN,
-      width: 440,
-      height: 300,
+      width: 520,
+      height: 340,
       color: "border-indigo-300 bg-indigo-50/50",
     },
     {
       id: "building-center-bottom",
       name: "TÒA GIỮA DƯỚI (NGANG)",
-      x: 280,
-      y: 360,
-      width: 440,
-      height: 310,
+      x: 320,
+      y: 420,
+      width: 520,
+      height: 350,
       color: "border-emerald-300 bg-emerald-50/50",
     },
     {
       id: "building-right",
       name: "TÒA PHẢI (DỌC)",
-      x: 750,
+      x: 880,
       y: ORIGIN,
-      width: 220,
-      height: 640,
+      width: 240,
+      height: 720,
       color: "border-amber-300 bg-amber-50/50",
     },
   ];
@@ -89,17 +108,17 @@ function buildDefault(total: number): MapLayout {
 
   for (let id = 1; id <= total; id++) {
     if (id <= 7) {
-      // Tòa Trái (dọc): xếp cột đơn hoặc đôi
+      // Tòa Trái (dọc): xếp cột
       const idx = id - 1;
       const col = idx % 1;
       const row = idx;
       nodes.push({
         id,
         buildingId: "building-left",
-        x: 48 + col * 130,
-        y: 65 + row * 80,
-        width: 180,
-        height: 70,
+        x: 60 + col * 140,
+        y: 80 + row * 88,
+        width: 200,
+        height: 76,
         floor: 1,
       });
     } else if (id <= 15) {
@@ -110,10 +129,10 @@ function buildDefault(total: number): MapLayout {
       nodes.push({
         id,
         buildingId: "building-center-top",
-        x: 298 + col * 138,
-        y: 65 + row * 76,
-        width: 130,
-        height: 68,
+        x: 350 + col * 160,
+        y: 80 + row * 82,
+        width: 145,
+        height: 72,
         floor: 1,
       });
     } else if (id <= 23) {
@@ -124,10 +143,10 @@ function buildDefault(total: number): MapLayout {
       nodes.push({
         id,
         buildingId: "building-center-bottom",
-        x: 298 + col * 138,
-        y: 395 + row * 76,
-        width: 130,
-        height: 68,
+        x: 350 + col * 160,
+        y: 470 + row * 82,
+        width: 145,
+        height: 72,
         floor: 1,
       });
     } else {
@@ -138,10 +157,10 @@ function buildDefault(total: number): MapLayout {
       nodes.push({
         id,
         buildingId: "building-right",
-        x: 768 + col * 130,
-        y: 65 + row * 80,
-        width: 180,
-        height: 70,
+        x: 900 + col * 140,
+        y: 80 + row * 88,
+        width: 200,
+        height: 76,
         floor: 1,
       });
     }
@@ -160,8 +179,8 @@ function ensureNodes(layout: MapLayout, total: number): MapLayout {
     const at = nodes.length;
     nodes.push({
       id,
-      x: ORIGIN + (at % 4) * 140,
-      y: 700 + Math.floor(at / 4) * 80,
+      x: ORIGIN + (at % 6) * 160,
+      y: 820 + Math.floor(at / 6) * 95,
       width: NODE_W,
       height: NODE_H,
       floor: 1,
@@ -188,7 +207,8 @@ export default function WarehouseMapCanvas({
   const [raw, setRaw] = useState<MapLayout | null>(null);
   const [edit, setEdit] = useState(false);
   const [scale, setScale] = useState(1);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [snapGrid, setSnapGrid] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
   const [stackTarget, setStackTarget] = useState("");
   const [newBuildingName, setNewBuildingName] = useState("");
@@ -216,7 +236,7 @@ export default function WarehouseMapCanvas({
 
   const movedRef = useRef(false);
 
-  // Tải layout đã lưu (fallback storage key cũ nếu có)
+  // Tải layout đã lưu
   useEffect(() => {
     try {
       const stored =
@@ -248,7 +268,8 @@ export default function WarehouseMapCanvas({
     [layout, totalWarehouses]
   );
 
-  const selectedNode = selected ? layout.nodes.find((n) => n.id === selected) ?? null : null;
+  const singleSelectedNode =
+    selectedIds.length === 1 ? layout.nodes.find((n) => n.id === selectedIds[0]) ?? null : null;
   const currentBuilding = selectedBuilding
     ? layout.buildings.find((b) => b.id === selectedBuilding) ?? null
     : null;
@@ -286,7 +307,10 @@ export default function WarehouseMapCanvas({
   const update = (fn: (l: MapLayout) => MapLayout) => persist(fn(layout));
 
   // --- KÉO THẢ Ô KHO ---
-  const onNodePointerDown = (e: React.PointerEvent<HTMLButtonElement>, node: WarehouseLayoutNode) => {
+  const onNodePointerDown = (
+    e: React.PointerEvent<HTMLButtonElement>,
+    node: WarehouseLayoutNode
+  ) => {
     movedRef.current = false;
     if (!edit) return;
     e.preventDefault();
@@ -300,7 +324,14 @@ export default function WarehouseMapCanvas({
       oy: node.y,
       moved: false,
     };
-    setSelected(node.id);
+
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      setSelectedIds((prev) =>
+        prev.includes(node.id) ? prev.filter((id) => id !== node.id) : [...prev, node.id]
+      );
+    } else if (!selectedIds.includes(node.id)) {
+      setSelectedIds([node.id]);
+    }
     setSelectedBuilding(null);
   };
 
@@ -313,10 +344,13 @@ export default function WarehouseMapCanvas({
     d.moved = true;
     const node = layout.nodes.find((n) => n.id === d.id);
     if (!node) return;
+    const rawX = clamp(d.ox + dx, 0, WORLD_W - (node.width ?? NODE_W));
+    const rawY = clamp(d.oy + dy, 0, WORLD_H - (node.height ?? NODE_H));
+
     setDragNode({
       id: d.id,
-      x: clamp(d.ox + dx, 0, WORLD_W - (node.width ?? NODE_W)),
-      y: clamp(d.oy + dy, 0, WORLD_H - (node.height ?? NODE_H)),
+      x: snap(rawX, snapGrid),
+      y: snap(rawY, snapGrid),
     });
   };
 
@@ -330,24 +364,32 @@ export default function WarehouseMapCanvas({
     if (!d.moved || !dragNode || dragNode.id !== d.id) return;
     movedRef.current = true;
     const { id, x, y } = dragNode;
+    const deltaX = x - d.ox;
+    const deltaY = y - d.oy;
 
-    // Tự động kiểm tra xem ô kho thả vào tòa nhà nào
-    const insideBuilding = layout.buildings.find(
-      (b) => x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height
-    );
+    // Di chuyển ô kho (hoặc toàn bộ các ô kho đang cùng được chọn)
+    const affectedIds = selectedIds.includes(id) && selectedIds.length > 1 ? selectedIds : [id];
 
     update((l) => ({
       ...l,
-      nodes: l.nodes.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              x,
-              y,
-              buildingId: insideBuilding ? insideBuilding.id : n.buildingId,
-            }
-          : n
-      ),
+      nodes: l.nodes.map((n) => {
+        if (!affectedIds.includes(n.id)) return n;
+        const newX = n.id === id ? x : clamp(n.x + deltaX, 0, WORLD_W - (n.width ?? NODE_W));
+        const newY = n.id === id ? y : clamp(n.y + deltaY, 0, WORLD_H - (n.height ?? NODE_H));
+        const insideBuilding = l.buildings.find(
+          (b) =>
+            newX + 20 >= b.x &&
+            newX + 40 <= b.x + b.width &&
+            newY + 20 >= b.y &&
+            newY + 40 <= b.y + b.height
+        );
+        return {
+          ...n,
+          x: newX,
+          y: newY,
+          buildingId: insideBuilding ? insideBuilding.id : n.buildingId,
+        };
+      }),
     }));
     setDragNode(null);
   };
@@ -359,7 +401,13 @@ export default function WarehouseMapCanvas({
       return;
     }
     if (edit) {
-      setSelected(id);
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        setSelectedIds((prev) =>
+          prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+        );
+      } else {
+        setSelectedIds([id]);
+      }
       setSelectedBuilding(null);
       return;
     }
@@ -381,7 +429,7 @@ export default function WarehouseMapCanvas({
       moved: false,
     };
     setSelectedBuilding(b.id);
-    setSelected(null);
+    setSelectedIds([]);
   };
 
   const onBuildingPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -393,10 +441,12 @@ export default function WarehouseMapCanvas({
     d.moved = true;
     const b = layout.buildings.find((item) => item.id === d.id);
     if (!b) return;
+    const rawX = clamp(d.ox + dx, 0, WORLD_W - b.width);
+    const rawY = clamp(d.oy + dy, 0, WORLD_H - b.height);
     setDragBuilding({
       id: d.id,
-      x: clamp(d.ox + dx, 0, WORLD_W - b.width),
-      y: clamp(d.oy + dy, 0, WORLD_H - b.height),
+      x: snap(rawX, snapGrid),
+      y: snap(rawY, snapGrid),
     });
   };
 
@@ -417,7 +467,13 @@ export default function WarehouseMapCanvas({
       ...l,
       buildings: l.buildings.map((b) => (b.id === id ? { ...b, x, y } : b)),
       nodes: l.nodes.map((n) =>
-        n.buildingId === id ? { ...n, x: clamp(n.x + deltaX, 0, WORLD_W - 100), y: clamp(n.y + deltaY, 0, WORLD_H - 60) } : n
+        n.buildingId === id
+          ? {
+              ...n,
+              x: clamp(n.x + deltaX, 0, WORLD_W - (n.width ?? NODE_W)),
+              y: clamp(n.y + deltaY, 0, WORLD_H - (n.height ?? NODE_H)),
+            }
+          : n
       ),
     }));
     setDragBuilding(null);
@@ -432,23 +488,29 @@ export default function WarehouseMapCanvas({
       name,
       x: 100,
       y: 100,
-      width: 320,
-      height: 240,
+      width: 360,
+      height: 260,
       color: "border-slate-300 bg-white/70",
     };
     update((l) => ({
       ...l,
       buildings: [...l.buildings, newB],
-      nodes: selected
-        ? l.nodes.map((n) => (n.id === selected ? { ...n, buildingId: id } : n))
-        : l.nodes,
+      nodes:
+        selectedIds.length > 0
+          ? l.nodes.map((n) => (selectedIds.includes(n.id) ? { ...n, buildingId: id } : n))
+          : l.nodes,
     }));
     setNewBuildingName("");
     setSelectedBuilding(id);
   };
 
   const removeBuilding = (id: string) => {
-    if (!window.confirm("Bạn muốn xóa tòa nhà này? Các kho bên trong sẽ không bị xóa.")) return;
+    if (
+      !window.confirm(
+        "Bạn muốn xóa tòa nhà này? Toàn bộ các kho bên trong sẽ được giữ nguyên 100% và chuyển ra ngoài tòa nhà."
+      )
+    )
+      return;
     update((l) => ({
       ...l,
       buildings: l.buildings.filter((b) => b.id !== id),
@@ -465,13 +527,61 @@ export default function WarehouseMapCanvas({
     }));
   };
 
+  // Căn chỉnh Align nhiều kho
+  const alignSelectedNodes = (type: "left" | "top" | "horizontal" | "vertical" | "same-size") => {
+    if (selectedIds.length < 2) return;
+    const selectedNodesList = layout.nodes.filter((n) => selectedIds.includes(n.id));
+    if (selectedNodesList.length === 0) return;
+
+    if (type === "left") {
+      const minX = Math.min(...selectedNodesList.map((n) => n.x));
+      update((l) => ({
+        ...l,
+        nodes: l.nodes.map((n) => (selectedIds.includes(n.id) ? { ...n, x: minX } : n)),
+      }));
+    } else if (type === "top") {
+      const minY = Math.min(...selectedNodesList.map((n) => n.y));
+      update((l) => ({
+        ...l,
+        nodes: l.nodes.map((n) => (selectedIds.includes(n.id) ? { ...n, y: minY } : n)),
+      }));
+    } else if (type === "horizontal") {
+      // Căn giữa theo trục ngang
+      const avgY = Math.round(
+        selectedNodesList.reduce((acc, cur) => acc + cur.y, 0) / selectedNodesList.length
+      );
+      update((l) => ({
+        ...l,
+        nodes: l.nodes.map((n) => (selectedIds.includes(n.id) ? { ...n, y: avgY } : n)),
+      }));
+    } else if (type === "vertical") {
+      // Căn giữa theo trục dọc
+      const avgX = Math.round(
+        selectedNodesList.reduce((acc, cur) => acc + cur.x, 0) / selectedNodesList.length
+      );
+      update((l) => ({
+        ...l,
+        nodes: l.nodes.map((n) => (selectedIds.includes(n.id) ? { ...n, x: avgX } : n)),
+      }));
+    } else if (type === "same-size") {
+      // Đồng bộ cùng kích thước với kho đầu tiên được chọn
+      const ref = selectedNodesList[0];
+      const w = ref.width ?? NODE_W;
+      const h = ref.height ?? NODE_H;
+      update((l) => ({
+        ...l,
+        nodes: l.nodes.map((n) => (selectedIds.includes(n.id) ? { ...n, width: w, height: h } : n)),
+      }));
+    }
+  };
+
   const applyStack = () => {
     const target = layout.nodes.find((n) => n.id === Number(stackTarget));
-    if (!selected || !target) return;
+    if (selectedIds.length === 0 || !target) return;
     update((l) => ({
       ...l,
       nodes: l.nodes.map((n) =>
-        n.id === selected
+        selectedIds.includes(n.id)
           ? {
               ...n,
               x: target.x,
@@ -486,17 +596,22 @@ export default function WarehouseMapCanvas({
   };
 
   const patchSelected = (patch: Partial<WarehouseLayoutNode>) => {
-    if (!selected) return;
+    if (selectedIds.length === 0) return;
     update((l) => ({
       ...l,
-      nodes: l.nodes.map((n) => (n.id === selected ? { ...n, ...patch } : n)),
+      nodes: l.nodes.map((n) => (selectedIds.includes(n.id) ? { ...n, ...patch } : n)),
     }));
   };
 
   const resetLayout = () => {
-    if (!window.confirm("Đặt lại toàn bộ bố cục bản đồ 4 tòa nhà về chuẩn phác thảo ban đầu?")) return;
+    if (
+      !window.confirm(
+        "Đặt lại toàn bộ bố cục bản đồ 4 tòa nhà về chuẩn phác thảo ban đầu?"
+      )
+    )
+      return;
     persist(buildDefault(totalWarehouses));
-    setSelected(null);
+    setSelectedIds([]);
     setSelectedBuilding(null);
   };
 
@@ -509,17 +624,33 @@ export default function WarehouseMapCanvas({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-medium text-slate-500">
           {edit
-            ? "Chế độ chỉnh sửa: Kéo thả Tòa Nhà hoặc Ô Kho · Nhấp để xem thanh công cụ."
+            ? "Chế độ chỉnh sửa: Giữ Shift/Ctrl để chọn nhiều kho để căn chỉnh (Align) · Bật lưới Snap để kéo thẳng hàng."
             : "Nhấp ô kho để mở chi tiết · Bản đồ 4 khối tòa nhà chuẩn theo mặt bằng kho."}
-          {savedAt && <span className="ml-2 font-semibold text-emerald-600">Tự động lưu {savedAt}</span>}
+          {savedAt && (
+            <span className="ml-2 font-semibold text-emerald-600">Tự động lưu {savedAt}</span>
+          )}
         </p>
 
         <div className="flex items-center gap-1.5">
           <button
             type="button"
+            onClick={() => setSnapGrid((v) => !v)}
+            title="Bật/Tắt chế độ hút lưới 20px giúp kéo thẳng hàng"
+            className={`${btn} ${
+              snapGrid ? "border-indigo-400 bg-indigo-50 text-indigo-700 font-extrabold" : ""
+            }`}
+          >
+            <Grid className="h-3.5 w-3.5" />
+            Lưới canh (Snap): {snapGrid ? "BẬT" : "TẮT"}
+          </button>
+
+          <span className="hidden h-5 w-px bg-slate-200 sm:block" />
+
+          <button
+            type="button"
             className={`${btn} px-2`}
             aria-label="Thu nhỏ"
-            onClick={() => setScale((s) => clamp(Number((s - 0.15).toFixed(2)), 0.5, 1.6))}
+            onClick={() => setScale((s) => clamp(Number((s - 0.15).toFixed(2)), 0.4, 1.6))}
           >
             <ZoomOut className="h-4 w-4" />
           </button>
@@ -530,7 +661,7 @@ export default function WarehouseMapCanvas({
             type="button"
             className={`${btn} px-2`}
             aria-label="Phóng to"
-            onClick={() => setScale((s) => clamp(Number((s + 0.15).toFixed(2)), 0.5, 1.6))}
+            onClick={() => setScale((s) => clamp(Number((s + 0.15).toFixed(2)), 0.4, 1.6))}
           >
             <ZoomIn className="h-4 w-4" />
           </button>
@@ -538,7 +669,7 @@ export default function WarehouseMapCanvas({
             type="button"
             onClick={() => {
               setEdit((v) => !v);
-              setSelected(null);
+              setSelectedIds([]);
               setSelectedBuilding(null);
             }}
             className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold shadow-2xs transition ${
@@ -560,11 +691,62 @@ export default function WarehouseMapCanvas({
             value={newBuildingName}
             onChange={(e) => setNewBuildingName(e.target.value)}
             placeholder="Tên tòa nhà mới"
-            className="w-40 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="w-36 rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
           <button type="button" onClick={addBuilding} className={`${btn} border-indigo-200`}>
             <Plus className="h-3.5 w-3.5" /> Thêm tòa nhà
           </button>
+
+          <span className="hidden h-5 w-px bg-indigo-200 sm:block" />
+
+          {/* CĂN CHỈNH KHI CHỌN NHIỀU KHO */}
+          {selectedIds.length >= 2 && (
+            <div className="flex items-center gap-1 rounded-lg bg-indigo-100/80 p-1">
+              <span className="px-1 text-[11px] font-extrabold text-indigo-900">
+                Canh {selectedIds.length} kho:
+              </span>
+              <button
+                type="button"
+                onClick={() => alignSelectedNodes("left")}
+                title="Căn thẳng mép trái"
+                className={btn}
+              >
+                <AlignStartVertical className="h-3.5 w-3.5" /> Mép trái
+              </button>
+              <button
+                type="button"
+                onClick={() => alignSelectedNodes("top")}
+                title="Căn thẳng mép trên"
+                className={btn}
+              >
+                <AlignStartHorizontal className="h-3.5 w-3.5" /> Mép trên
+              </button>
+              <button
+                type="button"
+                onClick={() => alignSelectedNodes("horizontal")}
+                title="Căn hàng ngang"
+                className={btn}
+              >
+                <AlignCenter className="h-3.5 w-3.5" /> Hàng ngang
+              </button>
+              <button
+                type="button"
+                onClick={() => alignSelectedNodes("vertical")}
+                title="Căn hàng dọc"
+                className={btn}
+              >
+                <AlignEndHorizontal className="h-3.5 w-3.5" /> Hàng dọc
+              </button>
+              <button
+                type="button"
+                onClick={() => alignSelectedNodes("same-size")}
+                title="Làm đều kích thước các kho đang chọn"
+                className={btn}
+              >
+                Đều cỡ ô
+              </button>
+            </div>
+          )}
 
           <span className="hidden h-5 w-px bg-indigo-200 sm:block" />
 
@@ -575,7 +757,7 @@ export default function WarehouseMapCanvas({
           >
             <option value="">Kho đích xếp chồng…</option>
             {visibleNodes
-              .filter((n) => n.id !== selected)
+              .filter((n) => !selectedIds.includes(n.id))
               .map((n) => (
                 <option key={n.id} value={n.id}>
                   Kho {pad(n.id)}
@@ -584,7 +766,7 @@ export default function WarehouseMapCanvas({
           </select>
           <button
             type="button"
-            disabled={!selected || !stackTarget}
+            disabled={selectedIds.length === 0 || !stackTarget}
             onClick={applyStack}
             className={`${btn} border-indigo-200`}
           >
@@ -627,23 +809,25 @@ export default function WarehouseMapCanvas({
             <input
               type="number"
               min={100}
-              max={950}
+              max={1500}
               step={10}
               value={currentBuilding.width}
-              onChange={(e) => patchBuilding({ width: clamp(Number(e.target.value) || 200, 100, 950) })}
+              onChange={(e) =>
+                patchBuilding({ width: clamp(Number(e.target.value) || 200, 100, 1500) })
+              }
               className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400"
             />
             <button
               type="button"
               className={btn}
-              onClick={() => patchBuilding({ width: clamp(currentBuilding.width - 20, 100, 950) })}
+              onClick={() => patchBuilding({ width: clamp(currentBuilding.width - 20, 100, 1500) })}
             >
               −20
             </button>
             <button
               type="button"
               className={btn}
-              onClick={() => patchBuilding({ width: clamp(currentBuilding.width + 20, 100, 950) })}
+              onClick={() => patchBuilding({ width: clamp(currentBuilding.width + 20, 100, 1500) })}
             >
               +20
             </button>
@@ -654,23 +838,25 @@ export default function WarehouseMapCanvas({
             <input
               type="number"
               min={100}
-              max={950}
+              max={1000}
               step={10}
               value={currentBuilding.height}
-              onChange={(e) => patchBuilding({ height: clamp(Number(e.target.value) || 200, 100, 950) })}
+              onChange={(e) =>
+                patchBuilding({ height: clamp(Number(e.target.value) || 200, 100, 1000) })
+              }
               className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400"
             />
             <button
               type="button"
               className={btn}
-              onClick={() => patchBuilding({ height: clamp(currentBuilding.height - 20, 100, 950) })}
+              onClick={() => patchBuilding({ height: clamp(currentBuilding.height - 20, 100, 1000) })}
             >
               −20
             </button>
             <button
               type="button"
               className={btn}
-              onClick={() => patchBuilding({ height: clamp(currentBuilding.height + 20, 100, 950) })}
+              onClick={() => patchBuilding({ height: clamp(currentBuilding.height + 20, 100, 1000) })}
             >
               +20
             </button>
@@ -688,16 +874,16 @@ export default function WarehouseMapCanvas({
       )}
 
       {/* THANH CẤU HÌNH Ô KHO ĐANG CHỌN */}
-      {edit && selectedNode && (
+      {edit && selectedIds.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-slate-200 bg-white p-2.5 text-xs shadow-xs">
           <span className="font-mono text-xs font-extrabold text-emerald-800">
-            📦 KHO {pad(selectedNode.id)}
+            📦 {selectedIds.length === 1 ? `KHO ${pad(selectedIds[0])}` : `Đang chọn ${selectedIds.length} kho`}
           </span>
 
           <label className="flex items-center gap-1.5 text-slate-500">
             Gán vào tòa nhà:
             <select
-              value={selectedNode.buildingId ?? ""}
+              value={singleSelectedNode?.buildingId ?? ""}
               onChange={(e) => patchSelected({ buildingId: e.target.value || undefined })}
               className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400"
             >
@@ -710,51 +896,91 @@ export default function WarehouseMapCanvas({
             </select>
           </label>
 
-          <div className="flex items-center gap-1.5 text-slate-500">
-            Tầng
+          {/* CHỈNH SỬA DÀI/RỘNG Ô KHO TRỰC TIẾP */}
+          <div className="flex items-center gap-2 text-slate-500">
+            <span>Rộng ô:</span>
+            <input
+              type="number"
+              min={60}
+              max={400}
+              step={10}
+              value={singleSelectedNode?.width ?? NODE_W}
+              onChange={(e) =>
+                patchSelected({ width: clamp(Number(e.target.value) || NODE_W, 60, 400) })
+              }
+              className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            />
             <button
               type="button"
               className={btn}
-              onClick={() => patchSelected({ floor: Math.max(1, (selectedNode.floor ?? 1) - 1) })}
+              onClick={() =>
+                patchSelected({ width: clamp((singleSelectedNode?.width ?? NODE_W) - 10, 60, 400) })
+              }
             >
               −
             </button>
-            <span className="w-4 text-center font-bold text-slate-800">{selectedNode.floor ?? 1}</span>
             <button
               type="button"
               className={btn}
-              onClick={() => patchSelected({ floor: (selectedNode.floor ?? 1) + 1 })}
+              onClick={() =>
+                patchSelected({ width: clamp((singleSelectedNode?.width ?? NODE_W) + 10, 60, 400) })
+              }
+            >
+              +
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-slate-500">
+            <span>Dài/Cao ô:</span>
+            <input
+              type="number"
+              min={40}
+              max={300}
+              step={5}
+              value={singleSelectedNode?.height ?? NODE_H}
+              onChange={(e) =>
+                patchSelected({ height: clamp(Number(e.target.value) || NODE_H, 40, 300) })
+              }
+              className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+            />
+            <button
+              type="button"
+              className={btn}
+              onClick={() =>
+                patchSelected({ height: clamp((singleSelectedNode?.height ?? NODE_H) - 8, 40, 300) })
+              }
+            >
+              −
+            </button>
+            <button
+              type="button"
+              className={btn}
+              onClick={() =>
+                patchSelected({ height: clamp((singleSelectedNode?.height ?? NODE_H) + 8, 40, 300) })
+              }
             >
               +
             </button>
           </div>
 
           <div className="flex items-center gap-1.5 text-slate-500">
-            Kích thước ô
+            <span>Tầng</span>
             <button
               type="button"
               className={btn}
               onClick={() =>
-                patchSelected({
-                  width: clamp((selectedNode.width ?? NODE_W) - 10, 70, 320),
-                  height: clamp((selectedNode.height ?? NODE_H) - 8, 50, 220),
-                })
+                patchSelected({ floor: Math.max(1, (singleSelectedNode?.floor ?? 1) - 1) })
               }
             >
               −
             </button>
-            <span className="font-bold text-slate-800">
-              {selectedNode.width ?? NODE_W}×{selectedNode.height ?? NODE_H}
+            <span className="w-4 text-center font-bold text-slate-800">
+              {singleSelectedNode?.floor ?? 1}
             </span>
             <button
               type="button"
               className={btn}
-              onClick={() =>
-                patchSelected({
-                  width: clamp((selectedNode.width ?? NODE_W) + 10, 70, 320),
-                  height: clamp((selectedNode.height ?? NODE_H) + 8, 50, 220),
-                })
-              }
+              onClick={() => patchSelected({ floor: (singleSelectedNode?.floor ?? 1) + 1 })}
             >
               +
             </button>
@@ -763,12 +989,12 @@ export default function WarehouseMapCanvas({
       )}
 
       {/* KHUNG BẢN ĐỒ 2D CANVAS */}
-      <div className="relative h-[520px] overflow-auto rounded-xl border border-slate-200 bg-slate-100 sm:h-[620px]">
+      <div className="relative h-[560px] overflow-auto rounded-xl border border-slate-200 bg-slate-100 sm:h-[660px]">
         <div style={{ width: WORLD_W * scale, height: WORLD_H * scale, position: "relative" }}>
           <div
             onClick={() => {
               if (edit) {
-                setSelected(null);
+                setSelectedIds([]);
                 setSelectedBuilding(null);
               }
             }}
@@ -782,12 +1008,15 @@ export default function WarehouseMapCanvas({
               transformOrigin: "top left",
             }}
           >
-            {/* LỚP NỀN LƯỚI */}
+            {/* LỚP NỀN LƯỚI TỌA ĐỘ */}
             <div
               className="pointer-events-none absolute inset-0"
               style={{
-                backgroundImage: "radial-gradient(circle, #cbd5e1 1.2px, transparent 1.2px)",
-                backgroundSize: "24px 24px",
+                backgroundImage: snapGrid
+                  ? "linear-gradient(to right, #cbd5e1 1px, transparent 1px), linear-gradient(to bottom, #cbd5e1 1px, transparent 1px)"
+                  : "radial-gradient(circle, #cbd5e1 1.2px, transparent 1.2px)",
+                backgroundSize: snapGrid ? "20px 20px" : "24px 24px",
+                opacity: snapGrid ? 0.45 : 1,
               }}
             />
 
@@ -807,12 +1036,12 @@ export default function WarehouseMapCanvas({
                     e.stopPropagation();
                     if (edit) {
                       setSelectedBuilding(b.id);
-                      setSelected(null);
+                      setSelectedIds([]);
                     }
                   }}
                   className={`absolute rounded-2xl border-2 transition-colors ${
                     isBuildingSelected
-                      ? "border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-400"
+                      ? "border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-400"
                       : b.color || "border-slate-300 bg-white/50"
                   }`}
                   style={{
@@ -826,12 +1055,12 @@ export default function WarehouseMapCanvas({
                   }}
                 >
                   <div className="flex items-center justify-between p-2">
-                    <span className="rounded-md bg-slate-800 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-xs">
+                    <span className="rounded-md bg-slate-800 px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-xs">
                       {b.name}
                     </span>
                     {edit && (
-                      <span className="text-[10px] font-semibold text-slate-400">
-                        Kéo để di chuyển tòa
+                      <span className="text-[10px] font-bold text-slate-500 bg-white/80 rounded px-1.5 py-0.5">
+                        {b.width}×{b.height}px
                       </span>
                     )}
                   </div>
@@ -848,6 +1077,8 @@ export default function WarehouseMapCanvas({
               const floor = n.floor ?? 1;
               const isMatched =
                 highlight === n.id || highlightWarehouses.includes(n.id);
+              const isNodeSelected = edit && selectedIds.includes(n.id);
+
               const badge =
                 stat.count === 0
                   ? { cls: "bg-slate-100 text-slate-400", text: "Trống" }
@@ -855,8 +1086,8 @@ export default function WarehouseMapCanvas({
                   ? { cls: "bg-amber-100 text-amber-700", text: `Đầy ${stat.count}` }
                   : { cls: "bg-emerald-100 text-emerald-800", text: `${stat.count} mã` };
               const cls = edit
-                ? selected === n.id
-                  ? "border-indigo-400 bg-white ring-2 ring-indigo-500 shadow-lg"
+                ? isNodeSelected
+                  ? "border-indigo-500 bg-white ring-2 ring-indigo-500 shadow-xl"
                   : "border-slate-300 bg-white hover:border-indigo-300 hover:shadow-md"
                 : isMatched
                 ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400/70 shadow-md"
@@ -873,7 +1104,7 @@ export default function WarehouseMapCanvas({
                   onPointerUp={onNodePointerUp}
                   onPointerCancel={onNodePointerUp}
                   onClick={(e) => onNodeClick(e, n.id)}
-                  title={`KHO ${pad(n.id)} · ${stat.count} mã · ${buildingName(n.buildingId) || "Không nhóm"}`}
+                  title={`KHO ${pad(n.id)} · ${stat.count} mã · ${buildingName(n.buildingId) || "Ngoài tòa"}`}
                   style={{
                     left: pos.x,
                     top: pos.y,
