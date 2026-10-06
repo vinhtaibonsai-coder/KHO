@@ -556,6 +556,7 @@ export default function Home() {
               onChange={setQuery} 
               inputRef={searchInputRef}
               autoFocus={true}
+              availableSkus={items.map((i) => i.sku)}
             />
 
             {/* MÀN HÌNH CHỜ TRA CỨU PHONG CÁCH GITHUB IOS (KHI CHƯA NHẬP MÃ) */}

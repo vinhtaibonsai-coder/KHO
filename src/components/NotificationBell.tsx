@@ -350,8 +350,8 @@ export default function NotificationBell({
   // NỘI DUNG CHÍNH CỦA BẢNG THÔNG BÁO (DÙNG CHUNG CHO CẢ MODAL POPUP VÀ TAB TRANG)
   const notificationContent = (
     <div 
-      className={`w-full rounded-2xl border border-slate-200/90 bg-white shadow-xs overflow-hidden flex flex-col ${
-        embedded ? "min-h-[500px]" : "max-h-[85vh] sm:max-h-[80vh] shadow-2xl overscroll-contain"
+      className={`w-full rounded-2xl border border-slate-200/90 bg-white overflow-hidden flex flex-col ${
+        embedded ? "shadow-xs" : "max-h-[85vh] sm:max-h-[80vh] shadow-2xl overscroll-contain"
       }`}
       onClick={(e) => e.stopPropagation()}
     >
@@ -512,10 +512,12 @@ export default function NotificationBell({
 
       {/* DANH SÁCH THÔNG BÁO ĐÃ ĐƯỢC PHÂN LOẠI */}
       <div 
-        className={`flex-1 overflow-y-auto divide-y divide-slate-100 overscroll-contain touch-pan-y ${
-          embedded ? "max-h-[600px]" : ""
+        className={`divide-y divide-slate-100 ${
+          embedded 
+            ? "w-full" 
+            : "flex-1 overflow-y-auto overscroll-contain touch-pan-y"
         }`}
-        style={{ WebkitOverflowScrolling: "touch" }}
+        style={embedded ? undefined : { WebkitOverflowScrolling: "touch" }}
         onTouchMove={(e) => !embedded && e.stopPropagation()}
       >
         {filteredMessages.length === 0 ? (
