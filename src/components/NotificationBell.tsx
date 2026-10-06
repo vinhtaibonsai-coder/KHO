@@ -465,7 +465,7 @@ export default function NotificationBell({
             onClick={() => setCategoryTab("all")}
             className={`shrink-0 px-3 py-1.5 rounded-xl font-bold transition cursor-pointer active:scale-95 ${
               categoryTab === "all"
-                ? "bg-slate-900 text-white shadow-2xs"
+                ? "bg-emerald-600 text-white shadow-xs"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
           >

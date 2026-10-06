@@ -115,13 +115,13 @@ export default function BottomTabBar({
               >
                 <div className={`h-12 w-12 rounded-full flex items-center justify-center shadow-lg transition-all duration-200 border-2 ${
                   isActive
-                    ? "bg-emerald-600 text-white border-white ring-4 ring-emerald-500/25 scale-105"
-                    : "bg-slate-900 text-white border-white hover:bg-emerald-600 shadow-slate-900/30"
+                    ? "bg-emerald-600 text-white border-white ring-4 ring-emerald-500/25 scale-105 shadow-emerald-600/30"
+                    : "bg-emerald-700 text-white border-white hover:bg-emerald-600 shadow-emerald-700/25"
                 }`}>
                   <Search className="h-5 w-5 stroke-[2.5]" />
                 </div>
                 <span className={`text-[10px] sm:text-[11px] mt-0.5 tracking-tight font-black ${
-                  isActive ? "text-emerald-700" : "text-slate-800"
+                  isActive ? "text-emerald-700" : "text-emerald-900"
                 }`}>
                   {tab.label}
                 </span>
@@ -136,12 +136,12 @@ export default function BottomTabBar({
               onClick={() => onTabSelect(tab.id)}
               className={`relative flex-1 flex flex-col items-center justify-center py-1.5 px-2 rounded-full transition-all duration-200 cursor-pointer active:scale-95 ${
                 isActive
-                  ? "bg-slate-900 text-white font-bold shadow-xs"
-                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                  ? "bg-emerald-600 text-white font-bold shadow-xs shadow-emerald-600/20"
+                  : "text-slate-600 hover:text-emerald-800 hover:bg-emerald-50/60"
               }`}
             >
               <div className="relative">
-                <Icon className={`h-5 w-5 ${isActive ? "text-emerald-400 stroke-[2.2]" : "text-slate-500"}`} />
+                <Icon className={`h-5 w-5 ${isActive ? "text-white stroke-[2.2]" : "text-slate-500"}`} />
 
                 {/* Badge số lượng thông báo chưa đọc */}
                 {tab.badge && (

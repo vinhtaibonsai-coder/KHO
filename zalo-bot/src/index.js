@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Zalo, ThreadType, LoginQRCallbackEventType } from "zca-js";
+import { Zalo, ThreadType, LoginQRCallbackEventType, TextStyle } from "zca-js";
 import pngjs from "pngjs";
 import jsQR from "jsqr";
 import qrcodeTerminal from "qrcode-terminal";
@@ -270,28 +270,82 @@ async function handleGroupMessage(api, message) {
 
       // Trường hợp 2.1: Báo lỗi mã sai quy chuẩn / Size không hợp lệ
       if (hasInvalidSku) {
+        const title = `🚨 [CẢNH BÁO] MÃ NHẬP SAI QUY CHUẨN KHO`;
         let errorDetail = "";
         if (res.invalidSku) {
-          errorDetail = `👉 Mã nhập sai: [${res.sku || text}]\n⚠️ Lý do: ${res.reason || res.message?.detail || "Không đúng quy chuẩn kho"}`;
+          errorDetail = `• Mã vi phạm: [${res.sku || text}]\n• Chi tiết lỗi: ${res.reason || res.message?.detail || "Không đúng quy chuẩn mã kho"}`;
         } else if (Array.isArray(res.invalidSkus)) {
-          errorDetail = res.invalidSkus.map((item) => `👉 Mã [${item.raw}]: ${item.error}`).join("\n");
+          errorDetail = res.invalidSkus.map((item) => `• Mã [${item.raw}]: ${item.error}`).join("\n");
         }
 
-        const warningText = `⚠️ [KHO ${pad(warehouse)} - MÃ NHẬP SAI QUY CHUẨN]\nTin nhắn đã bị thu hồi khỏi nhóm do chứa mã không hợp lệ:\n${errorDetail}\n\n👉 Nội dung tin nhắn: "${text}"\n👉 Nhóm gửi: "${name || groupId}"`;
-        await api.sendMessage(warningText, send2meId, ThreadType.User);
-        console.log(`[bot-reply] Đã gửi thông báo MÃ SAI QUY CHUẨN vào "Cloud của tôi" (send2meId: ${send2meId})`);
+        const msgLines = [
+          title,
+          "",
+          `📍 Vị trí: KHO ${pad(warehouse)}`,
+          `👥 Nhóm Zalo: ${name || `Kho ${warehouse}`}`,
+          "",
+          `📋 THÔNG TIN LỖI:`,
+          errorDetail,
+          "",
+          `💬 Tin nhắn gốc: "${text}"`,
+          "",
+          `🛡️ TRẠNG THÁI: Tin nhắn đã được hệ thống tự động thu hồi/xóa khỏi nhóm để tránh sai sót kiểm kho.`
+        ];
+        const fullMsg = msgLines.join("\n");
+
+        await api.sendMessage(
+          {
+            msg: fullMsg,
+            styles: [
+              { start: 0, len: title.length, st: TextStyle.Bold },
+              { start: 0, len: title.length, st: TextStyle.Red },
+            ],
+          },
+          send2meId,
+          ThreadType.User
+        );
+        console.log(`[bot-reply] Đã gửi thông báo MÃ SAI QUY CHUẨN chuẩn đẹp vào "Cloud của tôi" (send2meId: ${send2meId})`);
       }
 
       // Trường hợp 2.2: Báo lỗi trùng mã sản phẩm
-      if (res.duplicate && res.message?.detail) {
-        const warningText = `🚫 [KHO ${pad(warehouse)} - PHÁT HIỆN TRÙNG MÃ]\n${res.message.detail}\n👉 Tin nhắn: "${text}"\n👉 Nhóm gửi: "${name || groupId}"`;
-        await api.sendMessage(warningText, send2meId, ThreadType.User);
-        console.log(`[bot-reply] Đã gửi thông báo trùng vào "Cloud của tôi" (send2meId: ${send2meId})`);
-      } else if (Array.isArray(res.duplicates) && res.duplicates.length > 0) {
-        const dupList = res.duplicates.join("\n👉 ");
-        const warningText = `🚫 [KHO ${pad(warehouse)} - CẢNH BÁO TRÙNG MÃ]\nCác mã sau đã tồn tại ở kho khác nên bị từ chối:\n👉 ${dupList}\n👉 Tin nhắn: "${text}"\n👉 Nhóm gửi: "${name || groupId}"`;
-        await api.sendMessage(warningText, send2meId, ThreadType.User);
-        console.log(`[bot-reply] Đã gửi thông báo danh sách trùng vào "Cloud của tôi" (send2meId: ${send2meId})`);
+      if (hasDuplicate) {
+        const title = `🚫 [CẢNH BÁO] PHÁT HIỆN TRÙNG MÃ KHO`;
+        let dupDetail = "";
+        if (res.duplicate && res.message?.detail) {
+          dupDetail = res.message.detail;
+        } else if (Array.isArray(res.duplicates) && res.duplicates.length > 0) {
+          dupDetail = res.duplicates.map((d) => `• ${d}`).join("\n");
+        } else {
+          dupDetail = "Mã sản phẩm đã tồn tại ở kho khác!";
+        }
+
+        const msgLines = [
+          title,
+          "",
+          `📍 Vị trí gửi: KHO ${pad(warehouse)}`,
+          `👥 Nhóm Zalo: ${name || `Kho ${warehouse}`}`,
+          "",
+          `📋 CHI TIẾT TRÙNG LẶP:`,
+          dupDetail,
+          "",
+          `💬 Tin nhắn gốc: "${text}"`,
+          "",
+          `🛡️ TRẠNG THÁI: Đã từ chối nạp trùng và thu hồi/xóa tin nhắn khỏi nhóm để bảo vệ tính độc bản của mã hàng.`
+        ];
+        const fullMsg = msgLines.join("\n");
+
+        await api.sendMessage(
+          {
+            msg: fullMsg,
+            styles: [
+              { start: 0, len: title.length, st: TextStyle.Bold },
+              { start: 0, len: title.length, st: TextStyle.Orange },
+            ],
+          },
+          send2meId,
+          ThreadType.User
+        );
+        console.log(`[bot-reply] Đã gửi thông báo TRÙNG MÃ chuẩn đẹp vào "Cloud của tôi" (send2meId: ${send2meId})`);
       }
     } catch (replyErr) {
       console.error("[bot-reply] Không gửi được tin cảnh báo vào My Documents:", replyErr.message);
