@@ -37,7 +37,8 @@ create table if not exists public.warehouse_history (
 
 create table if not exists public.warehouse_settings (
   id text primary key,
-  total_warehouses integer not null default 30 check (total_warehouses between 1 and 100)
+  total_warehouses integer not null default 30 check (total_warehouses between 1 and 100),
+  map_layout jsonb
 );
 insert into public.warehouse_settings (id, total_warehouses) values ('default', 30)
 on conflict (id) do nothing;

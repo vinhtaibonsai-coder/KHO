@@ -730,10 +730,19 @@ export async function setWarehouseCount(count: number): Promise<number> {
   if (supabaseEnabled) {
     try {
       const sb = getSupabase();
-      await sb!.from("warehouse_settings").upsert(
-        { id: "default", total_warehouses: target },
-        { onConflict: "id" }
-      );
+      // Thử update trước để không đè mất map_layout
+      const { data: updated } = await sb!
+        .from("warehouse_settings")
+        .update({ total_warehouses: target })
+        .eq("id", "default")
+        .select();
+
+      if (!updated || updated.length === 0) {
+        await sb!.from("warehouse_settings").upsert(
+          { id: "default", total_warehouses: target },
+          { onConflict: "id" }
+        );
+      }
     } catch (err) {
       console.warn("Lưu warehouse_settings Supabase:", err);
     }
@@ -752,10 +761,18 @@ export async function addWarehouse(): Promise<number> {
   if (supabaseEnabled) {
     try {
       const sb = getSupabase();
-      await sb!.from("warehouse_settings").upsert(
-        { id: "default", total_warehouses: next },
-        { onConflict: "id" }
-      );
+      const { data: updated } = await sb!
+        .from("warehouse_settings")
+        .update({ total_warehouses: next })
+        .eq("id", "default")
+        .select();
+
+      if (!updated || updated.length === 0) {
+        await sb!.from("warehouse_settings").upsert(
+          { id: "default", total_warehouses: next },
+          { onConflict: "id" }
+        );
+      }
     } catch (err) {
       console.warn("Lưu warehouse_settings Supabase:", err);
     }
@@ -803,8 +820,17 @@ export async function saveWarehouseMapLayout(layout: MapLayout): Promise<MapLayo
   if (supabaseEnabled) {
     try {
       const sb = getSupabase();
+      // Đọc total_warehouses hiện tại để không bị ghi đè thành null khi upsert
+      const { data: existing } = await sb!
+        .from("warehouse_settings")
+        .select("total_warehouses")
+        .eq("id", "default")
+        .maybeSingle();
+
+      const totalWh = existing?.total_warehouses ?? DEFAULT_TOTAL_WAREHOUSES;
+
       await sb!.from("warehouse_settings").upsert(
-        { id: "default", map_layout: layout },
+        { id: "default", total_warehouses: totalWh, map_layout: layout },
         { onConflict: "id" }
       );
     } catch (err) {

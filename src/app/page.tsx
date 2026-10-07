@@ -172,13 +172,16 @@ export default function Home() {
     };
   }, [fetchData]);
 
-  // Tự động trỏ con trỏ vào ô tra cứu khi vừa vào trang
+  // Tự động trỏ con trỏ vào ô tra cứu khi vừa vào trang (đặt con trỏ ở cuối chuỗi, không bôi đen text)
   useEffect(() => {
     const focusTimer = setTimeout(() => {
-      const el = searchInputRef.current || document.getElementById("main-search-input") as HTMLInputElement;
+      const el = searchInputRef.current || (document.getElementById("main-search-input") as HTMLInputElement | null);
       if (el) {
         el.focus({ preventScroll: true });
-        el.select();
+        const len = el.value.length;
+        try {
+          el.setSelectionRange(len, len);
+        } catch {}
       }
     }, 200);
     return () => clearTimeout(focusTimer);
@@ -392,12 +395,15 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
 
     if (tab === "search") {
-      // Focus ngay lập tức và bôi đen toàn bộ chữ hiện có để gõ đè nhanh
+      // Focus và đặt con trỏ ở cuối ô tìm kiếm (không bôi đen text để tránh bị ghi đè nhầm)
       const triggerFocus = () => {
         const input = searchInputRef.current || (document.getElementById("main-search-input") as HTMLInputElement | null);
         if (input) {
-          input.focus();
-          input.select();
+          input.focus({ preventScroll: true });
+          const len = input.value.length;
+          try {
+            input.setSelectionRange(len, len);
+          } catch {}
         }
       };
       triggerFocus();
