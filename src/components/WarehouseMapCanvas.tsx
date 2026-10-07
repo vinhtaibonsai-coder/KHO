@@ -254,6 +254,34 @@ export default function WarehouseMapCanvas({
   const [dragNode, setDragNode] = useState<{ id: number; x: number; y: number } | null>(null);
   const [dragBuilding, setDragBuilding] = useState<{ id: string; x: number; y: number } | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [activeFloorFilter, setActiveFloorFilter] = useState<number | "all">("all");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Lưu giá trị đang gõ tạm thời trong các ô input kích thước để tránh nhảy loạn khi đang nhập số
+  const [inputBuildingWidth, setInputBuildingWidth] = useState<string>("");
+  const [inputBuildingHeight, setInputBuildingHeight] = useState<string>("");
+  const [inputNodeWidth, setInputNodeWidth] = useState<string>("");
+  const [inputNodeHeight, setInputNodeHeight] = useState<string>("");
+
+  // Tự động căn tỷ lệ zoom (scale) tối ưu theo kích thước màn hình điện thoại / máy tính
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const updateAutoFit = () => {
+      const containerW = containerRef.current?.clientWidth || window.innerWidth;
+      if (containerW < 640) {
+        // Màn hình điện thoại dọc: tự động thu nhỏ ~55% - 60% để nhìn bao quát toàn bộ cụm tòa nhà
+        const fitScale = clamp(Number((containerW / 1200).toFixed(2)), 0.45, 0.75);
+        setScale((prev) => (prev === 1 ? fitScale : prev));
+      } else if (containerW < 1024) {
+        // Tablet: thu nhỏ vừa phải ~75% - 85%
+        const fitScale = clamp(Number((containerW / 1300).toFixed(2)), 0.65, 0.9);
+        setScale((prev) => (prev === 1 ? fitScale : prev));
+      }
+    };
+    updateAutoFit();
+    window.addEventListener("resize", updateAutoFit);
+    return () => window.removeEventListener("resize", updateAutoFit);
+  }, []);
 
   const dragNodeRef = useRef<{
     id: number;
@@ -339,6 +367,29 @@ export default function WarehouseMapCanvas({
   const currentBuilding = selectedBuilding
     ? layout.buildings.find((b) => b.id === selectedBuilding) ?? null
     : null;
+
+  // Đồng bộ giá trị input khi đổi kho hoặc đổi tòa nhà được chọn
+  useEffect(() => {
+    if (currentBuilding) {
+      setInputBuildingWidth(String(currentBuilding.width));
+      setInputBuildingHeight(String(currentBuilding.height));
+    }
+  }, [currentBuilding?.id, currentBuilding?.width, currentBuilding?.height]);
+
+  useEffect(() => {
+    if (singleSelectedNode) {
+      setInputNodeWidth(String(singleSelectedNode.width ?? NODE_W));
+      setInputNodeHeight(String(singleSelectedNode.height ?? NODE_H));
+    }
+  }, [singleSelectedNode?.id, singleSelectedNode?.width, singleSelectedNode?.height]);
+
+  const maxFloor = useMemo(() => {
+    let m = 1;
+    for (const n of visibleNodes) {
+      if ((n.floor ?? 1) > m) m = n.floor ?? 1;
+    }
+    return m;
+  }, [visibleNodes]);
 
   const stats = useMemo(() => {
     const map = new Map<number, { count: number; matched: string[] }>();
@@ -712,6 +763,38 @@ export default function WarehouseMapCanvas({
         </p>
 
         <div className="flex items-center gap-1.5">
+          {/* BỘ LỌC CHỌN XEM TẦNG */}
+          {maxFloor > 1 && (
+            <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5 text-xs shadow-2xs">
+              <span className="px-2 text-[11px] font-extrabold text-slate-500">Xem tầng:</span>
+              <button
+                type="button"
+                onClick={() => setActiveFloorFilter("all")}
+                className={`rounded-md px-2 py-1 text-xs font-bold transition ${
+                  activeFloorFilter === "all"
+                    ? "bg-slate-800 text-white shadow-2xs"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Cả 2 tầng
+              </button>
+              {Array.from({ length: maxFloor }, (_, i) => i + 1).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setActiveFloorFilter(f)}
+                  className={`rounded-md px-2 py-1 text-xs font-bold transition ${
+                    activeFloorFilter === f
+                      ? "bg-indigo-600 text-white shadow-2xs"
+                      : "text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  Tầng {f}
+                </button>
+              ))}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => setSnapGrid((v) => !v)}
@@ -887,27 +970,45 @@ export default function WarehouseMapCanvas({
           <div className="flex items-center gap-2 text-slate-500">
             <span>Rộng (ngang):</span>
             <input
-              type="number"
-              min={100}
-              max={1500}
-              step={10}
-              value={currentBuilding.width}
-              onChange={(e) =>
-                patchBuilding({ width: clamp(Number(e.target.value) || 200, 100, 1500) })
-              }
+              type="text"
+              inputMode="numeric"
+              value={inputBuildingWidth}
+              onChange={(e) => setInputBuildingWidth(e.target.value)}
+              onBlur={() => {
+                const val = clamp(Number(inputBuildingWidth) || currentBuilding.width, 100, 1500);
+                setInputBuildingWidth(String(val));
+                patchBuilding({ width: val });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = clamp(Number(inputBuildingWidth) || currentBuilding.width, 100, 1500);
+                  setInputBuildingWidth(String(val));
+                  patchBuilding({ width: val });
+                  e.currentTarget.blur();
+                }
+              }}
+              title="Nhập số và bấm ra ngoài (hoặc Enter) để áp dụng"
               className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400"
             />
             <button
               type="button"
               className={btn}
-              onClick={() => patchBuilding({ width: clamp(currentBuilding.width - 20, 100, 1500) })}
+              onClick={() => {
+                const val = clamp(currentBuilding.width - 20, 100, 1500);
+                setInputBuildingWidth(String(val));
+                patchBuilding({ width: val });
+              }}
             >
               −20
             </button>
             <button
               type="button"
               className={btn}
-              onClick={() => patchBuilding({ width: clamp(currentBuilding.width + 20, 100, 1500) })}
+              onClick={() => {
+                const val = clamp(currentBuilding.width + 20, 100, 1500);
+                setInputBuildingWidth(String(val));
+                patchBuilding({ width: val });
+              }}
             >
               +20
             </button>
@@ -916,27 +1017,45 @@ export default function WarehouseMapCanvas({
           <div className="flex items-center gap-2 text-slate-500">
             <span>Dài/Cao (dọc):</span>
             <input
-              type="number"
-              min={100}
-              max={1000}
-              step={10}
-              value={currentBuilding.height}
-              onChange={(e) =>
-                patchBuilding({ height: clamp(Number(e.target.value) || 200, 100, 1000) })
-              }
+              type="text"
+              inputMode="numeric"
+              value={inputBuildingHeight}
+              onChange={(e) => setInputBuildingHeight(e.target.value)}
+              onBlur={() => {
+                const val = clamp(Number(inputBuildingHeight) || currentBuilding.height, 100, 1000);
+                setInputBuildingHeight(String(val));
+                patchBuilding({ height: val });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = clamp(Number(inputBuildingHeight) || currentBuilding.height, 100, 1000);
+                  setInputBuildingHeight(String(val));
+                  patchBuilding({ height: val });
+                  e.currentTarget.blur();
+                }
+              }}
+              title="Nhập số và bấm ra ngoài (hoặc Enter) để áp dụng"
               className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400"
             />
             <button
               type="button"
               className={btn}
-              onClick={() => patchBuilding({ height: clamp(currentBuilding.height - 20, 100, 1000) })}
+              onClick={() => {
+                const val = clamp(currentBuilding.height - 20, 100, 1000);
+                setInputBuildingHeight(String(val));
+                patchBuilding({ height: val });
+              }}
             >
               −20
             </button>
             <button
               type="button"
               className={btn}
-              onClick={() => patchBuilding({ height: clamp(currentBuilding.height + 20, 100, 1000) })}
+              onClick={() => {
+                const val = clamp(currentBuilding.height + 20, 100, 1000);
+                setInputBuildingHeight(String(val));
+                patchBuilding({ height: val });
+              }}
             >
               +20
             </button>
@@ -980,31 +1099,45 @@ export default function WarehouseMapCanvas({
           <div className="flex items-center gap-2 text-slate-500">
             <span>Rộng ô:</span>
             <input
-              type="number"
-              min={60}
-              max={400}
-              step={10}
-              value={singleSelectedNode?.width ?? NODE_W}
-              onChange={(e) =>
-                patchSelected({ width: clamp(Number(e.target.value) || NODE_W, 60, 400) })
-              }
+              type="text"
+              inputMode="numeric"
+              value={inputNodeWidth}
+              onChange={(e) => setInputNodeWidth(e.target.value)}
+              onBlur={() => {
+                const val = clamp(Number(inputNodeWidth) || (singleSelectedNode?.width ?? NODE_W), 60, 400);
+                setInputNodeWidth(String(val));
+                patchSelected({ width: val });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = clamp(Number(inputNodeWidth) || (singleSelectedNode?.width ?? NODE_W), 60, 400);
+                  setInputNodeWidth(String(val));
+                  patchSelected({ width: val });
+                  e.currentTarget.blur();
+                }
+              }}
+              title="Nhập số và bấm ra ngoài (hoặc Enter) để áp dụng"
               className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400"
             />
             <button
               type="button"
               className={btn}
-              onClick={() =>
-                patchSelected({ width: clamp((singleSelectedNode?.width ?? NODE_W) - 10, 60, 400) })
-              }
+              onClick={() => {
+                const val = clamp((singleSelectedNode?.width ?? NODE_W) - 10, 60, 400);
+                setInputNodeWidth(String(val));
+                patchSelected({ width: val });
+              }}
             >
               −
             </button>
             <button
               type="button"
               className={btn}
-              onClick={() =>
-                patchSelected({ width: clamp((singleSelectedNode?.width ?? NODE_W) + 10, 60, 400) })
-              }
+              onClick={() => {
+                const val = clamp((singleSelectedNode?.width ?? NODE_W) + 10, 60, 400);
+                setInputNodeWidth(String(val));
+                patchSelected({ width: val });
+              }}
             >
               +
             </button>
@@ -1013,31 +1146,45 @@ export default function WarehouseMapCanvas({
           <div className="flex items-center gap-2 text-slate-500">
             <span>Dài/Cao ô:</span>
             <input
-              type="number"
-              min={40}
-              max={300}
-              step={5}
-              value={singleSelectedNode?.height ?? NODE_H}
-              onChange={(e) =>
-                patchSelected({ height: clamp(Number(e.target.value) || NODE_H, 40, 300) })
-              }
+              type="text"
+              inputMode="numeric"
+              value={inputNodeHeight}
+              onChange={(e) => setInputNodeHeight(e.target.value)}
+              onBlur={() => {
+                const val = clamp(Number(inputNodeHeight) || (singleSelectedNode?.height ?? NODE_H), 40, 300);
+                setInputNodeHeight(String(val));
+                patchSelected({ height: val });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = clamp(Number(inputNodeHeight) || (singleSelectedNode?.height ?? NODE_H), 40, 300);
+                  setInputNodeHeight(String(val));
+                  patchSelected({ height: val });
+                  e.currentTarget.blur();
+                }
+              }}
+              title="Nhập số và bấm ra ngoài (hoặc Enter) để áp dụng"
               className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-center font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400"
             />
             <button
               type="button"
               className={btn}
-              onClick={() =>
-                patchSelected({ height: clamp((singleSelectedNode?.height ?? NODE_H) - 8, 40, 300) })
-              }
+              onClick={() => {
+                const val = clamp((singleSelectedNode?.height ?? NODE_H) - 8, 40, 300);
+                setInputNodeHeight(String(val));
+                patchSelected({ height: val });
+              }}
             >
               −
             </button>
             <button
               type="button"
               className={btn}
-              onClick={() =>
-                patchSelected({ height: clamp((singleSelectedNode?.height ?? NODE_H) + 8, 40, 300) })
-              }
+              onClick={() => {
+                const val = clamp((singleSelectedNode?.height ?? NODE_H) + 8, 40, 300);
+                setInputNodeHeight(String(val));
+                patchSelected({ height: val });
+              }}
             >
               +
             </button>
@@ -1069,7 +1216,7 @@ export default function WarehouseMapCanvas({
       )}
 
       {/* KHUNG BẢN ĐỒ 2D CANVAS */}
-      <div className="relative h-[560px] overflow-auto rounded-xl border border-slate-200 bg-slate-100 sm:h-[660px]">
+      <div ref={containerRef} className="relative h-[560px] overflow-auto rounded-xl border border-slate-200 bg-slate-100 sm:h-[660px]">
         <div style={{ width: WORLD_W * scale, height: WORLD_H * scale, position: "relative" }}>
           <div
             onClick={() => {
@@ -1169,7 +1316,9 @@ export default function WarehouseMapCanvas({
             })}
 
             {/* CÁC Ô KHO */}
-            {visibleNodes.map((n) => {
+            {visibleNodes
+              .filter((n) => activeFloorFilter === "all" || (n.floor ?? 1) === activeFloorFilter)
+              .map((n) => {
               const stat = stats.get(n.id) ?? { count: 0, matched: [] };
               const pos = dragNode && dragNode.id === n.id ? dragNode : n;
               const w = n.width ?? NODE_W;
@@ -1178,6 +1327,11 @@ export default function WarehouseMapCanvas({
               const isMatched =
                 highlight === n.id || highlightWarehouses.includes(n.id);
               const isNodeSelected = edit && selectedIds.includes(n.id);
+
+              // Khi ở chế độ xem 'Cả 2 tầng', các ô tầng 2 trở lên sẽ được lệch nhẹ (offset) lên trên-phải
+              // để lộ rõ ô tầng 1 bên dưới, không bao giờ bị che lấp hoàn toàn
+              const floorOffsetX = activeFloorFilter === "all" && floor > 1 ? (floor - 1) * 12 : 0;
+              const floorOffsetY = activeFloorFilter === "all" && floor > 1 ? -(floor - 1) * 12 : 0;
 
               const badge =
                 stat.count === 0
@@ -1204,24 +1358,33 @@ export default function WarehouseMapCanvas({
                   onPointerUp={onNodePointerUp}
                   onPointerCancel={onNodePointerUp}
                   onClick={(e) => onNodeClick(e, n.id)}
-                  title={`KHO ${pad(n.id)} · ${stat.count} mã · ${buildingName(n.buildingId) || "Ngoài tòa"}`}
+                  title={`KHO ${pad(n.id)} (Tầng ${floor}) · ${stat.count} mã · ${buildingName(n.buildingId) || "Ngoài tòa"}`}
                   style={{
-                    left: pos.x,
-                    top: pos.y,
+                    left: pos.x + floorOffsetX,
+                    top: pos.y + floorOffsetY,
                     width: w,
                     height: h,
-                    zIndex: 10 + floor,
+                    zIndex: 10 + floor * 5,
                     touchAction: edit ? "none" : "auto",
                     cursor: edit ? "grab" : "pointer",
                   }}
-                  className={`absolute flex flex-col justify-between rounded-lg border p-2 text-left transition-shadow ${cls} ${
-                    floor > 1 && !isMatched ? "shadow-md" : ""
+                  className={`absolute flex flex-col justify-between rounded-lg border p-2 text-left transition-all ${cls} ${
+                    floor > 1
+                      ? "ring-2 ring-indigo-400/80 shadow-lg border-indigo-300 bg-indigo-50/40"
+                      : "shadow-xs"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-1">
-                    <span className="font-mono text-xs font-extrabold tracking-tight text-slate-800">
-                      KHO {pad(n.id)}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="font-mono text-xs font-extrabold tracking-tight text-slate-800">
+                        KHO {pad(n.id)}
+                      </span>
+                      {floor > 1 && (
+                        <span className="rounded bg-indigo-600 px-1 py-0.2 text-[9px] font-black text-white shadow-2xs">
+                          T{floor}
+                        </span>
+                      )}
+                    </div>
                     <span
                       className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ${badge.cls}`}
                     >
@@ -1249,11 +1412,9 @@ export default function WarehouseMapCanvas({
                     <span className="truncate font-semibold">
                       {buildingName(n.buildingId) || "Ngoài tòa"}
                     </span>
-                    {floor > 1 && (
-                      <span className="rounded bg-indigo-100 px-1 font-bold text-indigo-700">
-                        T{floor}
-                      </span>
-                    )}
+                    <span className={`rounded px-1 font-bold ${floor > 1 ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-600"}`}>
+                      Tầng {floor}
+                    </span>
                   </div>
                 </button>
               );
