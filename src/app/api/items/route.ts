@@ -7,6 +7,8 @@ import {
   getItems,
   getMessages,
   getWarehouseCount,
+  getWarehouseMapLayout,
+  saveWarehouseMapLayout,
   getBotStatus,
   getDatabaseStatus,
   markAllMessagesRead,
@@ -23,11 +25,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const [items, messages, history, totalWarehouses, botStatus, dbStatus] = await Promise.all([
+    const [items, messages, history, totalWarehouses, mapLayout, botStatus, dbStatus] = await Promise.all([
       getItems(),
       getMessages(),
       getHistory(),
       getWarehouseCount(),
+      getWarehouseMapLayout(),
       getBotStatus(),
       getDatabaseStatus(),
     ]);
@@ -36,6 +39,7 @@ export async function GET() {
       messages,
       history,
       totalWarehouses,
+      mapLayout,
       botStatus,
       dbStatus,
     });
@@ -52,6 +56,12 @@ export async function POST(req: Request) {
   }
 
   try {
+    // 0. Lưu bố cục sơ đồ kho
+    if (body.action === "save_map_layout" && body.layout) {
+      const saved = await saveWarehouseMapLayout(body.layout);
+      return NextResponse.json({ ok: true, layout: saved });
+    }
+
     // 0. Đặt lại số lượng kho
     if (body.action === "set_warehouse_count" && body.count) {
       const newTotal = await setWarehouseCount(Number(body.count));

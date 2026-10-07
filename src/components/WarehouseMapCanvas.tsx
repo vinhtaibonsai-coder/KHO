@@ -275,26 +275,53 @@ export default function WarehouseMapCanvas({
 
   const movedRef = useRef(false);
 
-  // Tải layout đã lưu
+  // Tải layout đã lưu (ưu tiên API server/database, fallback localStorage)
   useEffect(() => {
+    let isMounted = true;
+
+    // 1. Đọc ngay từ localStorage để hiển thị tức thì không bị giật UI
     try {
       const stored =
         localStorage.getItem(STORAGE_KEY) ||
         localStorage.getItem("xuong_lua_nhut_warehouse_map_layout_v1");
-      if (!stored) return;
-      const parsed = JSON.parse(stored) as MapLayout;
-      if (
-        parsed &&
-        Array.isArray(parsed.nodes) &&
-        Array.isArray(parsed.buildings) &&
-        parsed.buildings.length > 0 &&
-        parsed.buildings[0].width !== undefined
-      ) {
-        setRaw(parsed);
+      if (stored) {
+        const parsed = JSON.parse(stored) as MapLayout;
+        if (
+          parsed &&
+          Array.isArray(parsed.nodes) &&
+          Array.isArray(parsed.buildings) &&
+          parsed.buildings.length > 0 &&
+          parsed.buildings[0].width !== undefined
+        ) {
+          setRaw(parsed);
+        }
       }
-    } catch {
-      // layout hỏng -> dùng bố cục mặc định
-    }
+    } catch {}
+
+    // 2. Fetch layout mới nhất từ database / server API
+    fetch("/api/items")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted || !data || !data.mapLayout) return;
+        const serverLayout = data.mapLayout as MapLayout;
+        if (
+          Array.isArray(serverLayout.nodes) &&
+          Array.isArray(serverLayout.buildings) &&
+          serverLayout.buildings.length > 0
+        ) {
+          setRaw(serverLayout);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(serverLayout));
+          } catch {}
+        }
+      })
+      .catch((err) => {
+        console.warn("Lỗi đồng bộ layout bản đồ từ server:", err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const layout = useMemo(
@@ -330,17 +357,31 @@ export default function WarehouseMapCanvas({
   const buildingName = (id?: string) =>
     layout.buildings.find((b) => b.id === id)?.name ?? "";
 
-  // Tự động lưu vào localStorage sau mỗi thay đổi
+  // Tự động lưu vào localStorage và đồng bộ lên Database qua API
   const persist = (next: MapLayout) => {
     setRaw(next);
+    const timeStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      setSavedAt(
-        new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
-      );
+      setSavedAt(timeStr);
     } catch {
       // hết dung lượng lưu trữ
     }
+
+    // Đồng bộ lên server database
+    fetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "save_map_layout", layout: next }),
+    })
+      .then((res) => {
+        if (res.ok) {
+          setSavedAt(`${timeStr} (Đã đồng bộ DB)`);
+        }
+      })
+      .catch((err) => {
+        console.warn("Không thể đồng bộ layout lên DB:", err);
+      });
   };
 
   const update = (fn: (l: MapLayout) => MapLayout) => persist(fn(layout));

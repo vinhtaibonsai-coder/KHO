@@ -40,6 +40,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
 export default function RightMenuDrawer({
   isOpen,
   onClose,
+  embedded = false,
   totalWarehouses,
   items,
   history,
@@ -54,6 +55,7 @@ export default function RightMenuDrawer({
 }: {
   isOpen: boolean;
   onClose: () => void;
+  embedded?: boolean;
   totalWarehouses: number;
   items: Item[];
   history: ItemHistory[];
@@ -84,7 +86,7 @@ export default function RightMenuDrawer({
 
   // Khóa cuộn trang nền an toàn chuẩn Mobile PWA (iOS Safari & Android Chrome)
   useEffect(() => {
-    if (!isOpen) return;
+    if (embedded || !isOpen) return;
     const scrollY = window.scrollY || window.pageYOffset || 0;
     const originalBodyOverflow = document.body.style.overflow;
     const originalHtmlOverflow = document.documentElement.style.overflow;
@@ -96,9 +98,9 @@ export default function RightMenuDrawer({
       document.documentElement.style.overflow = originalHtmlOverflow;
       document.body.style.overflow = originalBodyOverflow;
     };
-  }, [isOpen]);
+  }, [isOpen, embedded]);
 
-  if (!isOpen || typeof document === "undefined") return null;
+  if (!embedded && (!isOpen || typeof document === "undefined")) return null;
 
   // Thống kê nhanh theo dòng sản phẩm
   const prefixStats = (() => {
@@ -217,15 +219,8 @@ export default function RightMenuDrawer({
     }
   };
 
-  return createPortal(
-    <div 
-      className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-xs select-none"
-      onClick={onClose}
-    >
-      <div 
-        className="w-full max-w-md h-full bg-white shadow-2xl flex flex-col border-l border-slate-200"
-        onClick={(e) => e.stopPropagation()}
-      >
+  const drawerContent = (
+    <>
           
           {/* HEADER MENU BÊN PHẢI - Thêm safe area padding để không bị tai thỏ & camera che */}
           <div 
@@ -631,7 +626,6 @@ export default function RightMenuDrawer({
               Bản cập nhật: {APP_BUILD_TIME}
             </p>
           </div>
-        </div>
 
       {/* POPUP ĐỔI MÃ PIN */}
       {showChangePinModal && (
@@ -727,6 +721,28 @@ export default function RightMenuDrawer({
           onCancel={() => setShowAddWhConfirm(false)}
         />
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="flex flex-col bg-white rounded-2xl border border-slate-200/80 shadow-xs animate-in fade-in duration-200">
+        {drawerContent}
+      </div>
+    );
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-xs select-none"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md h-full bg-white shadow-2xl flex flex-col border-l border-slate-200"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {drawerContent}
+      </div>
     </div>,
     document.body
   );

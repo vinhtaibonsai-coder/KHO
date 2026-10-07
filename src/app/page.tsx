@@ -8,7 +8,6 @@ import {
   CheckCircle2, 
   AlertCircle,
   Warehouse,
-  Menu,
   ShoppingBag,
   ArrowRightLeft,
   RotateCcw,
@@ -389,11 +388,6 @@ export default function Home() {
       setIsPasteOpen(true);
       return;
     }
-    if (tab === "menu") {
-      setIsMenuOpen(true);
-      return;
-    }
-
     setActiveTab(tab);
     window.scrollTo({ top: 0, behavior: "smooth" });
 
@@ -530,15 +524,6 @@ export default function Home() {
               <RefreshCw className="h-4 w-4" />
             </button>
 
-            {/* NÚT MENU BÊN PHẢI (RIGHT DRAWER) */}
-            <button
-              type="button"
-              onClick={() => setIsMenuOpen(true)}
-              className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-slate-900 bg-slate-900 text-white hover:bg-slate-800 transition active:scale-95 shadow-2xs cursor-pointer"
-              title="Mở menu quản lý & tiện ích bên phải"
-            >
-              <Menu className="h-4 w-4 text-white" />
-            </button>
           </div>
         </div>
       </header>
@@ -814,6 +799,28 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+
+                  {/* BẢN ĐỒ KHO HIỂN THỊ TRỰC TIẾP VỊ TRÍ TOÀ VÀ KHO TÌM THẤY */}
+                  <div className="mt-4 pt-4 border-t border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Warehouse className="h-4 w-4 text-emerald-600" />
+                        Vị trí trực tiếp trên bản đồ kho &amp; toà nhà:
+                      </span>
+                      <span className="text-[11px] font-semibold text-emerald-700">
+                        Kho {pad(activeFoundItem.warehouse)} đang được khoanh vùng nổi bật
+                      </span>
+                    </div>
+
+                    <WarehouseMapCanvas
+                      items={items}
+                      highlight={activeFoundItem.warehouse}
+                      highlightWarehouses={matchingItems.map((m) => m.warehouse)}
+                      query={query}
+                      totalWarehouses={totalWarehouses}
+                      onSelect={setOpenWarehouse}
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-center text-sm font-semibold text-rose-700">
@@ -924,6 +931,34 @@ export default function Home() {
               onMarkAllRead={markAllReadHandler}
               onMarkRead={markReadHandler}
               embedded={true}
+            />
+          </section>
+        )}
+
+        {/* TAB 5: MENU QUẢN LÝ & TIỆN ÍCH (EMBEDDED RIGHT MENU) */}
+        {activeTab === "menu" && (
+          <section
+            id="menu-section"
+            className="animate-in fade-in duration-200"
+          >
+            <RightMenuDrawer
+              embedded={true}
+              isOpen={true}
+              onClose={() => setActiveTab("search")}
+              totalWarehouses={totalWarehouses}
+              items={items}
+              history={history}
+              messages={messages}
+              botStatus={botStatus}
+              dbStatus={dbStatus}
+              onAddWarehouse={addWarehouseHandler}
+              onOpenPaste={() => setIsPasteOpen(true)}
+              onOpenWarehouse={setOpenWarehouse}
+              onSendWebhook={onWebhook}
+              onFilterSkuType={(prefix) => {
+                setQuery(prefix);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
             />
           </section>
         )}

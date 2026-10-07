@@ -34,11 +34,37 @@ export interface ZaloMessage {
   read?: boolean;
 }
 
+export interface WarehouseLayoutNode {
+  id: number;
+  buildingId?: string;
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  floor?: number;
+}
+
+export interface Building {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color?: string;
+}
+
+export interface MapLayout {
+  buildings: Building[];
+  nodes: WarehouseLayoutNode[];
+}
+
 export interface ItemsResponse {
   items: Item[];
   messages: ZaloMessage[];
   history: ItemHistory[];
   totalWarehouses: number;
+  mapLayout?: MapLayout | null;
   botStatus?: {
     online: boolean;
     lastPing: string | null;

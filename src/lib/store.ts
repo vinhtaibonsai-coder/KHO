@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { Item, ZaloMessage, ItemHistory } from "@/types";
+import type { Item, ZaloMessage, ItemHistory, MapLayout } from "@/types";
 import { getSupabase, supabaseEnabled } from "@/lib/supabase-server";
 
 export const DEFAULT_TOTAL_WAREHOUSES = 30;
@@ -14,6 +14,7 @@ interface DB {
   messages: ZaloMessage[];
   history: ItemHistory[];
   totalWarehouses?: number;
+  mapLayout?: MapLayout | null;
 }
 
 function initialSeed(): DB {
@@ -764,6 +765,63 @@ export async function addWarehouse(): Promise<number> {
   db.totalWarehouses = next;
   saveDB(db);
   return next;
+}
+
+export async function getWarehouseMapLayout(): Promise<MapLayout | null> {
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      const { data, error } = await sb!
+        .from("warehouse_settings")
+        .select("map_layout")
+        .eq("id", "default")
+        .maybeSingle();
+
+      if (!error && data && data.map_layout) {
+        if (typeof data.map_layout === "object") {
+          return data.map_layout as MapLayout;
+        }
+        if (typeof data.map_layout === "string") {
+          return JSON.parse(data.map_layout) as MapLayout;
+        }
+      }
+    } catch (err) {
+      console.warn("Lấy map_layout từ Supabase thất bại, thử local DB:", err);
+    }
+  }
+
+  // Fallback đọc từ file database.json cục bộ
+  try {
+    const local = loadDB();
+    if (local.mapLayout) return local.mapLayout;
+  } catch {}
+
+  return null;
+}
+
+export async function saveWarehouseMapLayout(layout: MapLayout): Promise<MapLayout> {
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      await sb!.from("warehouse_settings").upsert(
+        { id: "default", map_layout: layout },
+        { onConflict: "id" }
+      );
+    } catch (err) {
+      console.warn("Lưu map_layout lên Supabase thất bại:", err);
+    }
+  }
+
+  // Luôn lưu bản sao vào database.json cục bộ
+  try {
+    const local = loadDB();
+    local.mapLayout = layout;
+    saveDB(local);
+  } catch (err) {
+    console.error("Lưu map_layout vào database.json lỗi:", err);
+  }
+
+  return layout;
 }
 
 export async function ensureWarehouseExists(warehouseNumber: number): Promise<number> {
