@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AlignCenter,
   AlignEndHorizontal,
@@ -59,11 +59,16 @@ const FULL_AT = 10;
 const WORLD_W = 1600;
 const WORLD_H = 1100;
 const GRID_SIZE = 20;
+const MIN_SCALE = 0.2;
+const MAX_SCALE = 3;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 const snap = (v: number, snapGrid: boolean, size = GRID_SIZE) =>
   snapGrid ? Math.round(v / size) * size : v;
+
+// useLayoutEffect an toàn khi render trên server (SSR không cảnh báo)
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 export function getWarehouseBuildingInfo(
   warehouseId: number,
@@ -271,26 +276,6 @@ export default function WarehouseMapCanvas({
   const [inputNodeWidth, setInputNodeWidth] = useState<string>("");
   const [inputNodeHeight, setInputNodeHeight] = useState<string>("");
 
-  // Tự động căn tỷ lệ zoom (scale) tối ưu theo kích thước màn hình điện thoại / máy tính
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const updateAutoFit = () => {
-      const containerW = containerRef.current?.clientWidth || window.innerWidth;
-      if (containerW < 640) {
-        // Màn hình điện thoại dọc: tự động thu nhỏ ~55% - 60% để nhìn bao quát toàn bộ cụm tòa nhà
-        const fitScale = clamp(Number((containerW / 1200).toFixed(2)), 0.45, 0.75);
-        setScale((prev) => (prev === 1 ? fitScale : prev));
-      } else if (containerW < 1024) {
-        // Tablet: thu nhỏ vừa phải ~75% - 85%
-        const fitScale = clamp(Number((containerW / 1300).toFixed(2)), 0.65, 0.9);
-        setScale((prev) => (prev === 1 ? fitScale : prev));
-      }
-    };
-    updateAutoFit();
-    window.addEventListener("resize", updateAutoFit);
-    return () => window.removeEventListener("resize", updateAutoFit);
-  }, []);
-
   // Đồng bộ trạng thái toàn màn hình (user bấm ESC / thoát bằng gesture của trình duyệt)
   useEffect(() => {
     const onFsChange = () => setFullscreen(!!document.fullscreenElement);
@@ -329,6 +314,93 @@ export default function WarehouseMapCanvas({
   } | null>(null);
 
   const movedRef = useRef(false);
+
+  // --- PAN (1 ngón tay) + PINCH-TO-ZOOM (2 ngón tay) TRÊN BẢN ĐỒ ---
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const panRef = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
+  const pinchRef = useRef<{
+    dist: number;
+    scale: number;
+    mx: number;
+    my: number;
+    sl: number;
+    st: number;
+  } | null>(null);
+
+  // Bắt đầu pan (1 ngón) hoặc pinch (từ ngón thứ 2 trở đi)
+  const onMapPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = containerRef.current;
+    if (!el) return;
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointersRef.current.size === 1) {
+      panRef.current = { x: e.clientX, y: e.clientY, sl: el.scrollLeft, st: el.scrollTop };
+    } else if (pointersRef.current.size >= 2) {
+      panRef.current = null;
+      const [a, b] = [...pointersRef.current.values()];
+      const rect = el.getBoundingClientRect();
+      pinchRef.current = {
+        dist: Math.hypot(a.x - b.x, a.y - b.y),
+        scale,
+        mx: (a.x + b.x) / 2 - rect.left,
+        my: (a.y + b.y) / 2 - rect.top,
+        sl: el.scrollLeft,
+        st: el.scrollTop,
+      };
+    }
+  };
+
+  const onMapPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const pts = pointersRef.current;
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Đang có 2+ ngón tay -> pinch zoom quanh điểm giữa 2 ngón tay
+    const pinch = pinchRef.current;
+    if (pinch && pts.size >= 2) {
+      const [a, b] = [...pts.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinch.dist < 10) return;
+      const next = clamp(Number((pinch.scale * (dist / pinch.dist)).toFixed(3)), MIN_SCALE, MAX_SCALE);
+      const rect = el.getBoundingClientRect();
+      const midX = (a.x + b.x) / 2 - rect.left;
+      const midY = (a.y + b.y) / 2 - rect.top;
+      // Giữ điểm bản đồ đang nằm dưới giữa 2 ngón tay đứng yên
+      el.scrollLeft = ((pinch.sl + pinch.mx) / pinch.scale) * next - midX;
+      el.scrollTop = ((pinch.st + pinch.my) / pinch.scale) * next - midY;
+      setScale(next);
+      return;
+    }
+
+    // 1 ngón tay -> pan (kéo trượt tự do như Google Maps)
+    const pan = panRef.current;
+    if (pan && pts.size === 1) {
+      const dx = e.clientX - pan.x;
+      const dy = e.clientY - pan.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) movedRef.current = true;
+      el.scrollLeft = pan.sl - dx;
+      el.scrollTop = pan.st - dy;
+    }
+  };
+
+  const onMapPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(e.pointerId);
+    if (pointersRef.current.size < 2) pinchRef.current = null;
+    if (pointersRef.current.size === 0) {
+      panRef.current = null;
+      return;
+    }
+    // Còn 1 ngón tay đang giữ -> neo lại làm mốc pan mới
+    const [rest] = [...pointersRef.current.values()];
+    const el = containerRef.current;
+    panRef.current = el
+      ? { x: rest.x, y: rest.y, sl: el.scrollLeft, st: el.scrollTop }
+      : null;
+  };
+
+  const zoomBy = (delta: number) =>
+    setScale((s) => clamp(Number((s + delta).toFixed(2)), MIN_SCALE, MAX_SCALE));
 
   // Tải layout đã lưu (ưu tiên API server/database, fallback localStorage)
   useEffect(() => {
@@ -388,6 +460,23 @@ export default function WarehouseMapCanvas({
     () => layout.nodes.filter((n) => n.id >= 1 && n.id <= totalWarehouses),
     [layout, totalWarehouses]
   );
+
+  const didFitRef = useRef(false);
+
+  // Fit-to-screen: tự động scale vừa chiều ngang khi mới load để không bị choáng ngợp bởi world map rộng
+  useIsoLayoutEffect(() => {
+    if (didFitRef.current) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const w = el.clientWidth || (typeof window !== "undefined" ? window.innerWidth : 0);
+    if (!w) return;
+    let maxX = 0;
+    for (const b of layout.buildings) maxX = Math.max(maxX, b.x + b.width);
+    for (const n of visibleNodes) maxX = Math.max(maxX, n.x + (n.width ?? NODE_W));
+    if (maxX <= 0) return;
+    setScale(clamp(Number(((w - 24) / maxX).toFixed(2)), MIN_SCALE, 1));
+    didFitRef.current = true;
+  }, [layout, visibleNodes]);
 
   const singleSelectedNode =
     selectedIds.length === 1 ? layout.nodes.find((n) => n.id === selectedIds[0]) ?? null : null;
@@ -828,7 +917,7 @@ export default function WarehouseMapCanvas({
         <p className="text-xs font-medium text-slate-500">
           {edit
             ? "Chế độ chỉnh sửa: Giữ Shift/Ctrl để chọn nhiều kho để căn chỉnh (Align) · Bật lưới Snap để kéo thẳng hàng."
-            : "Nhấp ô kho để mở chi tiết · Bản đồ 4 khối tòa nhà chuẩn theo mặt bằng kho."}
+            : "Nhấp ô kho để mở chi tiết · Vuốt để di chuyển bản đồ, pinch 2 ngón tay (hoặc nút +/−) để zoom."}
           {savedAt && (
             <span className="ml-2 font-semibold text-emerald-600">Tự động lưu {savedAt}</span>
           )}
@@ -886,7 +975,7 @@ export default function WarehouseMapCanvas({
             type="button"
             className={`${btn} px-2`}
             aria-label="Thu nhỏ"
-            onClick={() => setScale((s) => clamp(Number((s - 0.15).toFixed(2)), 0.4, 1.6))}
+            onClick={() => zoomBy(-0.15)}
           >
             <ZoomOut className="h-4 w-4" />
           </button>
@@ -897,7 +986,7 @@ export default function WarehouseMapCanvas({
             type="button"
             className={`${btn} px-2`}
             aria-label="Phóng to"
-            onClick={() => setScale((s) => clamp(Number((s + 0.15).toFixed(2)), 0.4, 1.6))}
+            onClick={() => zoomBy(0.15)}
           >
             <ZoomIn className="h-4 w-4" />
           </button>
@@ -1307,13 +1396,23 @@ export default function WarehouseMapCanvas({
       >
         <div
           ref={containerRef}
-          className={`relative min-h-0 overflow-auto rounded-xl border border-slate-200 bg-slate-100 ${
+          onPointerDown={onMapPointerDown}
+          onPointerMove={onMapPointerMove}
+          onPointerUp={onMapPointerEnd}
+          onPointerCancel={onMapPointerEnd}
+          style={{ touchAction: "none" }}
+          className={`relative min-h-0 select-none overflow-auto rounded-xl border border-slate-200 bg-slate-100 ${
             fullscreen ? "flex-1" : "h-[560px] sm:h-[660px]"
           }`}
         >
         <div style={{ width: WORLD_W * scale, height: WORLD_H * scale, position: "relative" }}>
           <div
             onClick={() => {
+              // Vừa pan/drag bản đồ -> không gọi là click (không bôi selection)
+              if (movedRef.current) {
+                movedRef.current = false;
+                return;
+              }
               if (edit) {
                 setSelectedIds([]);
                 setSelectedBuilding(null);
@@ -1515,6 +1614,31 @@ export default function WarehouseMapCanvas({
             })}
           </div>
         </div>
+        </div>
+
+        {/* NÚT ZOOM FAB NỔI DỄ BẰM BẰNG 1 TAY TRÊN MOBILE */}
+        <div className="absolute bottom-3 left-3 z-50 flex flex-col items-center gap-2">
+          <button
+            type="button"
+            aria-label="Phóng to"
+            title="Phóng to"
+            onClick={() => zoomBy(0.2)}
+            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-700 shadow-lg transition hover:bg-white active:scale-95"
+          >
+            <ZoomIn className="h-6 w-6" />
+          </button>
+          <span className="rounded-full bg-slate-800/85 px-2 py-0.5 text-[10px] font-black text-white shadow">
+            {Math.round(scale * 100)}%
+          </span>
+          <button
+            type="button"
+            aria-label="Thu nhỏ"
+            title="Thu nhỏ"
+            onClick={() => zoomBy(-0.2)}
+            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-700 shadow-lg transition hover:bg-white active:scale-95"
+          >
+            <ZoomOut className="h-6 w-6" />
+          </button>
         </div>
 
         {/* NÚT THOÁT TOÀN MÀN HÌNH */}
