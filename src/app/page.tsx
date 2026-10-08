@@ -855,7 +855,7 @@ export default function Home() {
                     <span className="h-3 w-3 rounded-md bg-slate-100 border border-slate-300"></span> Trống
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-md bg-emerald-50 border border-emerald-300"></span> Có hàng
+                    <span className="h-3 w-3 rounded-md bg-emerald-50 border border-emerald-300"></span> Có hàng ({activeItems.length} mã)
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="h-3 w-3 rounded-md bg-emerald-500 ring-2 ring-emerald-300"></span> Đang chọn

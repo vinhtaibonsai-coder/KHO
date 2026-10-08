@@ -54,7 +54,6 @@ const STORAGE_KEY = "xuong_lua_nhut_warehouse_map_layout_v2";
 const ORIGIN = 40;
 const NODE_W = 126;
 const NODE_H = 88;
-const FULL_AT = 10;
 // Mở rộng đáng kể vùng di chuyển của tòa nhà và các kho (1600 x 1100 px)
 const WORLD_W = 1600;
 const WORLD_H = 1100;
@@ -1529,8 +1528,6 @@ export default function WarehouseMapCanvas({
               const badge =
                 stat.count === 0
                   ? { cls: "bg-slate-100 text-slate-400", text: "Trống" }
-                  : stat.count >= FULL_AT
-                  ? { cls: "bg-amber-100 text-amber-700", text: `Đầy ${stat.count}` }
                   : { cls: "bg-emerald-100 text-emerald-800", text: `${stat.count} mã` };
               const cls = edit
                 ? isNodeSelected
@@ -1551,7 +1548,9 @@ export default function WarehouseMapCanvas({
                   onPointerUp={onNodePointerUp}
                   onPointerCancel={onNodePointerUp}
                   onClick={(e) => onNodeClick(e, n.id)}
-                  title={`KHO ${pad(n.id)} (Tầng ${floor}) · ${stat.count} mã · ${buildingName(n.buildingId) || "Ngoài tòa"}`}
+                  title={`KHO ${pad(n.id)} (Tầng ${floor}) · ${
+                    stat.count === 0 ? "Trống" : `Có hàng (${stat.count} mã)`
+                  } · ${buildingName(n.buildingId) || "Ngoài tòa"}`}
                   style={{
                     left: pos.x + floorOffsetX,
                     top: pos.y + floorOffsetY,
