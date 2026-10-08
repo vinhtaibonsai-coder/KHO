@@ -1617,15 +1617,19 @@ export default function WarehouseMapCanvas({
         </div>
 
         {/* NÚT ZOOM FAB NỔI DỄ BẰM BẰNG 1 TAY TRÊN MOBILE */}
-        <div className="absolute bottom-3 left-3 z-50 flex flex-col items-center gap-2">
+        <div
+          className={`absolute right-3 z-50 flex flex-col items-center gap-1.5 ${
+            fullscreen ? "top-16" : "top-3"
+          }`}
+        >
           <button
             type="button"
             aria-label="Phóng to"
             title="Phóng to"
             onClick={() => zoomBy(0.2)}
-            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-700 shadow-lg transition hover:bg-white active:scale-95"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-700 shadow-lg transition hover:bg-white active:scale-95"
           >
-            <ZoomIn className="h-6 w-6" />
+            <ZoomIn className="h-5 w-5" />
           </button>
           <span className="rounded-full bg-slate-800/85 px-2 py-0.5 text-[10px] font-black text-white shadow">
             {Math.round(scale * 100)}%
@@ -1635,9 +1639,9 @@ export default function WarehouseMapCanvas({
             aria-label="Thu nhỏ"
             title="Thu nhỏ"
             onClick={() => zoomBy(-0.2)}
-            className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-700 shadow-lg transition hover:bg-white active:scale-95"
+            className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-700 shadow-lg transition hover:bg-white active:scale-95"
           >
-            <ZoomOut className="h-6 w-6" />
+            <ZoomOut className="h-5 w-5" />
           </button>
         </div>
 
