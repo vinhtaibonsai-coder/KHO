@@ -7,8 +7,14 @@ import {
   AlignStartHorizontal,
   AlignStartVertical,
   Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
   Grid,
   Layers,
+  Maximize2,
+  Minimize2,
   Pencil,
   Plus,
   RotateCcw,
@@ -255,7 +261,9 @@ export default function WarehouseMapCanvas({
   const [dragBuilding, setDragBuilding] = useState<{ id: string; x: number; y: number } | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [activeFloorFilter, setActiveFloorFilter] = useState<number | "all">("all");
+  const [fullscreen, setFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
 
   // Lưu giá trị đang gõ tạm thời trong các ô input kích thước để tránh nhảy loạn khi đang nhập số
   const [inputBuildingWidth, setInputBuildingWidth] = useState<string>("");
@@ -282,6 +290,25 @@ export default function WarehouseMapCanvas({
     window.addEventListener("resize", updateAutoFit);
     return () => window.removeEventListener("resize", updateAutoFit);
   }, []);
+
+  // Đồng bộ trạng thái toàn màn hình (user bấm ESC / thoát bằng gesture của trình duyệt)
+  useEffect(() => {
+    const onFsChange = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    const next = !fullscreen;
+    setFullscreen(next);
+    const el = wrapRef.current;
+    try {
+      if (next) void el?.requestFullscreen?.().catch(() => {});
+      else if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => {});
+    } catch {
+      // Trình duyệt không hỗ trợ Fullscreen API (vd: iOS Safari) -> dùng lớp phủ fixed là đủ
+    }
+  };
 
   const dragNodeRef = useRef<{
     id: number;
@@ -734,6 +761,51 @@ export default function WarehouseMapCanvas({
     }));
   };
 
+  // D-Pad: dịch chuyển kho / tòa nhà đúng 1 bước lưới (snap grid) bằng thao tác chạm
+  const nudge = (dirX: number, dirY: number) => {
+    const step = snapGrid ? GRID_SIZE : 1;
+    const mx = dirX * step;
+    const my = dirY * step;
+
+    if (selectedBuilding) {
+      const b = layout.buildings.find((item) => item.id === selectedBuilding);
+      if (!b) return;
+      const nx = clamp(b.x + mx, 0, WORLD_W - b.width);
+      const ny = clamp(b.y + my, 0, WORLD_H - b.height);
+      const deltaX = nx - b.x;
+      const deltaY = ny - b.y;
+      if (deltaX === 0 && deltaY === 0) return;
+      update((l) => ({
+        ...l,
+        buildings: l.buildings.map((item) => (item.id === b.id ? { ...item, x: nx, y: ny } : item)),
+        nodes: l.nodes.map((n) =>
+          n.buildingId === b.id
+            ? {
+                ...n,
+                x: clamp(n.x + deltaX, 0, WORLD_W - (n.width ?? NODE_W)),
+                y: clamp(n.y + deltaY, 0, WORLD_H - (n.height ?? NODE_H)),
+              }
+            : n
+        ),
+      }));
+      return;
+    }
+
+    if (selectedIds.length === 0) return;
+    update((l) => ({
+      ...l,
+      nodes: l.nodes.map((n) =>
+        selectedIds.includes(n.id)
+          ? {
+              ...n,
+              x: clamp(n.x + mx, 0, WORLD_W - (n.width ?? NODE_W)),
+              y: clamp(n.y + my, 0, WORLD_H - (n.height ?? NODE_H)),
+            }
+          : n
+      ),
+    }));
+  };
+
   const resetLayout = () => {
     if (
       !window.confirm(
@@ -762,10 +834,10 @@ export default function WarehouseMapCanvas({
           )}
         </p>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
           {/* BỘ LỌC CHỌN XEM TẦNG */}
           {maxFloor > 1 && (
-            <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5 text-xs shadow-2xs">
+            <div className="flex flex-wrap items-center rounded-lg border border-slate-200 bg-white p-0.5 text-xs shadow-2xs">
               <span className="px-2 text-[11px] font-extrabold text-slate-500">Xem tầng:</span>
               <button
                 type="button"
@@ -803,8 +875,9 @@ export default function WarehouseMapCanvas({
               snapGrid ? "border-indigo-400 bg-indigo-50 text-indigo-700 font-extrabold" : ""
             }`}
           >
-            <Grid className="h-3.5 w-3.5" />
-            Lưới canh (Snap): {snapGrid ? "BẬT" : "TẮT"}
+            <Grid className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden sm:inline">Lưới canh (Snap): {snapGrid ? "BẬT" : "TẮT"}</span>
+            <span className="sm:hidden">Snap: {snapGrid ? "BẬT" : "TẮT"}</span>
           </button>
 
           <span className="hidden h-5 w-px bg-slate-200 sm:block" />
@@ -830,6 +903,15 @@ export default function WarehouseMapCanvas({
           </button>
           <button
             type="button"
+            className={`${btn} px-2`}
+            aria-label={fullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+            title={fullscreen ? "Thoát toàn màn hình" : "Xem toàn màn hình (không bị header/toolbar che)"}
+            onClick={toggleFullscreen}
+          >
+            {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setEdit((v) => !v);
               setSelectedIds([]);
@@ -842,7 +924,8 @@ export default function WarehouseMapCanvas({
             }`}
           >
             {edit ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-            {edit ? "Xong chỉnh sửa" : "Chỉnh sửa bố cục"}
+            <span className="hidden sm:inline">{edit ? "Xong chỉnh sửa" : "Chỉnh sửa bố cục"}</span>
+            <span className="sm:hidden">{edit ? "Xong" : "Chỉnh sửa"}</span>
           </button>
         </div>
       </div>
@@ -864,7 +947,7 @@ export default function WarehouseMapCanvas({
 
           {/* CĂN CHỈNH KHI CHỌN NHIỀU KHO */}
           {selectedIds.length >= 2 && (
-            <div className="flex items-center gap-1 rounded-lg bg-indigo-100/80 p-1">
+            <div className="flex flex-wrap items-center gap-1 rounded-lg bg-indigo-100/80 p-1">
               <span className="px-1 text-[11px] font-extrabold text-indigo-900">
                 Canh {selectedIds.length} kho:
               </span>
@@ -1216,7 +1299,18 @@ export default function WarehouseMapCanvas({
       )}
 
       {/* KHUNG BẢN ĐỒ 2D CANVAS */}
-      <div ref={containerRef} className="relative h-[560px] overflow-auto rounded-xl border border-slate-200 bg-slate-100 sm:h-[660px]">
+      <div
+        ref={wrapRef}
+        className={`relative ${
+          fullscreen ? "fixed inset-0 z-[9999] flex flex-col gap-2 bg-slate-200 p-2" : ""
+        }`}
+      >
+        <div
+          ref={containerRef}
+          className={`relative min-h-0 overflow-auto rounded-xl border border-slate-200 bg-slate-100 ${
+            fullscreen ? "flex-1" : "h-[560px] sm:h-[660px]"
+          }`}
+        >
         <div style={{ width: WORLD_W * scale, height: WORLD_H * scale, position: "relative" }}>
           <div
             onClick={() => {
@@ -1277,7 +1371,7 @@ export default function WarehouseMapCanvas({
                     isBuildingSelected
                       ? "border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-400"
                       : hasHighlightWarehouse && !edit
-                      ? "border-emerald-500 bg-emerald-50/70 ring-4 ring-emerald-400/40 shadow-lg"
+                      ? "border-orange-500 bg-orange-50/70 ring-4 ring-orange-500/50 shadow-lg"
                       : b.color || "border-slate-300 bg-white/50"
                   }`}
                   style={{
@@ -1294,13 +1388,13 @@ export default function WarehouseMapCanvas({
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span
                         className={`rounded-md px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-xs ${
-                          hasHighlightWarehouse && !edit ? "bg-emerald-700 animate-pulse" : "bg-slate-800"
+                          hasHighlightWarehouse && !edit ? "bg-orange-600 animate-pulse" : "bg-slate-800"
                         }`}
                       >
                         🏢 {b.name}
                       </span>
                       {hasHighlightWarehouse && !edit && (
-                        <span className="rounded bg-emerald-200 px-1.5 py-0.5 text-[10px] font-black text-emerald-900 border border-emerald-400">
+                        <span className="rounded bg-orange-300 px-1.5 py-0.5 text-[10px] font-black text-orange-950 border border-orange-500 animate-pulse">
                           🎯 Có {matchedInBuilding.length} kho khớp tìm kiếm
                         </span>
                       )}
@@ -1344,7 +1438,7 @@ export default function WarehouseMapCanvas({
                   ? "border-indigo-500 bg-white ring-2 ring-indigo-500 shadow-xl"
                   : "border-slate-300 bg-white hover:border-indigo-300 hover:shadow-md"
                 : isMatched
-                ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400/70 shadow-md"
+                ? "border-orange-500 bg-orange-50 ring-4 ring-orange-500/50 shadow-lg animate-warehouse-active"
                 : stat.count > 0
                 ? "border-emerald-300 bg-emerald-50/95 hover:shadow-md"
                 : "border-slate-300 bg-white hover:shadow-md";
@@ -1396,13 +1490,13 @@ export default function WarehouseMapCanvas({
                     {stat.matched.slice(0, 2).map((sku) => (
                       <span
                         key={sku}
-                        className="block truncate rounded bg-emerald-600 px-1 py-0.5 font-mono text-[9px] font-bold text-white"
+                        className="block truncate rounded bg-orange-500 px-1 py-0.5 font-mono text-[9px] font-bold text-white shadow-xs"
                       >
                         {sku}
                       </span>
                     ))}
                     {stat.matched.length > 2 && (
-                      <span className="block font-mono text-[9px] font-bold text-emerald-700">
+                      <span className="block font-mono text-[9px] font-bold text-orange-700">
                         +{stat.matched.length - 2} khớp
                       </span>
                     )}
@@ -1421,6 +1515,68 @@ export default function WarehouseMapCanvas({
             })}
           </div>
         </div>
+        </div>
+
+        {/* NÚT THOÁT TOÀN MÀN HÌNH */}
+        {fullscreen && (
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            aria-label="Thoát toàn màn hình"
+            className="absolute right-4 top-4 z-50 inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-slate-300 bg-white/95 text-slate-700 shadow-lg hover:bg-white"
+          >
+            <Minimize2 className="h-5 w-5" />
+          </button>
+        )}
+
+        {/* CỤM PHIM D-PAD DỊCH CHUYỂN KHO / TÒA NHÀ THEO BƯỚC LƯỚI */}
+        {edit && (selectedIds.length > 0 || selectedBuilding) && (
+          <div className="absolute bottom-3 right-3 z-50">
+            <div className="grid grid-cols-3 gap-1 rounded-2xl border border-slate-300 bg-white/95 p-2 shadow-xl backdrop-blur">
+              <span />
+              <button
+                type="button"
+                aria-label="Lên"
+                onClick={() => nudge(0, -1)}
+                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 active:bg-indigo-100"
+              >
+                <ChevronUp className="h-6 w-6" />
+              </button>
+              <span />
+
+              <button
+                type="button"
+                aria-label="Trái"
+                onClick={() => nudge(-1, 0)}
+                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 active:bg-indigo-100"
+              >
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-center text-[10px] font-black leading-tight text-slate-500">
+                {snapGrid ? GRID_SIZE : 1}px
+              </span>
+              <button
+                type="button"
+                aria-label="Phải"
+                onClick={() => nudge(1, 0)}
+                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 active:bg-indigo-100"
+              >
+                <ChevronRight className="h-6 w-6" />
+              </button>
+
+              <span />
+              <button
+                type="button"
+                aria-label="Xuống"
+                onClick={() => nudge(0, 1)}
+                className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-700 active:bg-indigo-100"
+              >
+                <ChevronDown className="h-6 w-6" />
+              </button>
+              <span />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -27,15 +27,33 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
+    // Lọc trùng lặp ngay trong danh sách input (nếu người dùng paste lặp lại 1 mã trong cùng đoạn text)
+    const uniqueValidSkus = Array.from(new Set(validSkus));
+
     const importedItems = [];
-    const duplicates: { sku: string; existingWarehouse: number }[] = [];
+    const duplicates: { sku: string; existingWarehouse: number; reason: string }[] = [];
     const successfullyAdded: string[] = [];
 
-    for (const sku of validSkus) {
-      // KIỂM TRA TRÙNG MÃ: Nếu mã đã có ở kho khác thì chặn lại
+    for (const sku of uniqueValidSkus) {
+      // KIỂM TRA TRÙNG MÃ:
+      // Hàng độc bản đang active:
+      // - Nếu đang ở kho khác -> trùng kho khác
+      // - Nếu đang ở chính kho này -> đã có sẵn trong kho, không nạp đè/thêm
       const existing = await findItem(sku);
-      if (existing && existing.warehouse !== warehouse) {
-        duplicates.push({ sku, existingWarehouse: existing.warehouse });
+      if (existing && existing.status !== "sold") {
+        if (existing.warehouse !== warehouse) {
+          duplicates.push({
+            sku,
+            existingWarehouse: existing.warehouse,
+            reason: `Đang ở Kho ${existing.warehouse}`,
+          });
+        } else {
+          duplicates.push({
+            sku,
+            existingWarehouse: existing.warehouse,
+            reason: `Đã có sẵn trong Kho ${warehouse}`,
+          });
+        }
         continue;
       }
 
@@ -46,7 +64,7 @@ export async function POST(req: Request) {
 
     let detailMsg = `Đã nạp ${successfullyAdded.length} mã vào Kho ${warehouse}`;
     if (duplicates.length > 0) {
-      detailMsg += `. Bỏ qua ${duplicates.length} mã trùng: ${duplicates.map(d => `${d.sku} (ở Kho ${d.existingWarehouse})`).join(", ")}`;
+      detailMsg += `. Bỏ qua ${duplicates.length} mã trùng: ${duplicates.map(d => `${d.sku} (${d.reason})`).join(", ")}`;
     }
 
     // Ghi lại vào nhật ký tin nhắn

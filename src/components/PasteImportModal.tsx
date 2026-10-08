@@ -73,23 +73,52 @@ export default function PasteImportModal({
     };
   }, [isOpen]);
 
-  // Tự động phân loại xem trước: Mã Hợp Lệ, Mã Trùng Kho Khác, Mã Lỗi/Sai Chuẩn
+  // Tự động phân loại xem trước: Mã Hợp Lệ, Mã Trùng (Kho Này hoặc Kho Khác hoặc lặp lại), Mã Lỗi/Sai Chuẩn
   const analysis = useMemo(() => {
     const res = extractValidSkusFromText(rawText);
     
-    // Map tra cứu vị trí kho hiện tại của các mã
+    // Map tra cứu vị trí kho hiện tại của các mã (chỉ tính mã chưa bán/active)
     const itemMap = new Map<string, number>();
     for (const it of existingItems) {
-      itemMap.set(it.sku, it.warehouse);
+      if (it.status !== "sold") {
+        itemMap.set(it.sku, it.warehouse);
+      }
     }
 
     const availableSkus: typeof res.details = [];
-    const duplicateSkus: { sku: string; existingWarehouse: number }[] = [];
+    const duplicateSkus: { sku: string; existingWarehouse: number; reason: string }[] = [];
+    const seenInText = new Set<string>();
 
     for (const d of res.details) {
-      const curWh = itemMap.get(d.normalizedSku);
-      if (curWh !== undefined && curWh !== warehouse) {
-        duplicateSkus.push({ sku: d.normalizedSku, existingWarehouse: curWh });
+      const code = d.normalizedSku;
+
+      // 1. Kiểm tra lặp lại nhiều lần ngay trong đoạn text vừa dán
+      if (seenInText.has(code)) {
+        duplicateSkus.push({
+          sku: code,
+          existingWarehouse: warehouse,
+          reason: "Lặp lại trong danh sách",
+        });
+        continue;
+      }
+      seenInText.add(code);
+
+      // 2. Kiểm tra tồn tại trong kho
+      const curWh = itemMap.get(code);
+      if (curWh !== undefined) {
+        if (curWh === warehouse) {
+          duplicateSkus.push({
+            sku: code,
+            existingWarehouse: curWh,
+            reason: `Đã có trong Kho ${pad(warehouse)}`,
+          });
+        } else {
+          duplicateSkus.push({
+            sku: code,
+            existingWarehouse: curWh,
+            reason: `Đang ở Kho ${pad(curWh)}`,
+          });
+        }
       } else {
         availableSkus.push(d);
       }
@@ -316,21 +345,21 @@ export default function PasteImportModal({
               </div>
             )}
 
-            {/* KHỐI 2: MÃ BỊ TRÙNG Ở KHO KHÁC */}
+            {/* KHỐI 2: MÃ BỊ TRÙNG */}
             {analysis.duplicateSkus.length > 0 && (
               <div className="space-y-1">
                 <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1">
-                  ⚠ Mã bị trùng (Đang ở kho khác, sẽ tự động bỏ qua):
+                  ⚠ Mã bị trùng (Đã có trong kho hoặc lặp lại, sẽ tự động bỏ qua):
                 </span>
                 <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-white rounded-lg border border-amber-200">
-                  {analysis.duplicateSkus.map((d) => (
+                  {analysis.duplicateSkus.map((d, idx) => (
                     <span
-                      key={d.sku}
+                      key={`${d.sku}-${idx}`}
                       className="inline-flex items-center gap-1 rounded bg-amber-50 border border-amber-300 px-2 py-0.5 text-xs shadow-2xs text-amber-900"
                     >
                       <span className="font-mono font-bold line-through text-slate-500">{d.sku}</span>
                       <span className="font-bold text-[10px] bg-amber-200 px-1 rounded text-amber-900">
-                        Đang ở Kho {pad(d.existingWarehouse)}
+                        {d.reason}
                       </span>
                     </span>
                   ))}

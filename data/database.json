@@ -120,5 +120,320 @@
     }
   ],
   "history": [],
-  "totalWarehouses": 31
+  "totalWarehouses": 31,
+  "mapLayout": {
+    "nodes": [
+      {
+        "x": 940,
+        "y": 320,
+        "id": 1,
+        "floor": 1,
+        "width": 130,
+        "height": 50,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 1060,
+        "y": 320,
+        "id": 2,
+        "floor": 1,
+        "width": 120,
+        "height": 50,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 1180,
+        "y": 320,
+        "id": 3,
+        "floor": 1,
+        "width": 60,
+        "height": 140,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 1060,
+        "y": 420,
+        "id": 4,
+        "floor": 1,
+        "width": 120,
+        "height": 50,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 940,
+        "y": 420,
+        "id": 5,
+        "floor": 1,
+        "width": 120,
+        "height": 50,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 940,
+        "y": 480,
+        "id": 6,
+        "floor": 1,
+        "width": 120,
+        "height": 50,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 1060,
+        "y": 480,
+        "id": 7,
+        "floor": 1,
+        "width": 120,
+        "height": 50,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 1180,
+        "y": 500,
+        "id": 8,
+        "floor": 1,
+        "width": 60,
+        "height": 120,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 1020,
+        "y": 620,
+        "id": 9,
+        "floor": 1,
+        "width": 110,
+        "height": 52,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 900,
+        "y": 620,
+        "id": 10,
+        "floor": 1,
+        "width": 110,
+        "height": 52,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 347.3939393939395,
+        "y": 689.0952380952385,
+        "id": 11,
+        "floor": 1,
+        "width": 100,
+        "height": 48,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 452.06060606060623,
+        "y": 691,
+        "id": 12,
+        "floor": 1,
+        "width": 100,
+        "height": 48,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 552.9177489177489,
+        "y": 692.428571428572,
+        "id": 13,
+        "floor": 1,
+        "width": 100,
+        "height": 48,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 660,
+        "y": 700,
+        "id": 14,
+        "floor": 1,
+        "width": 110,
+        "height": 50,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 640,
+        "y": 640,
+        "id": 15,
+        "floor": 2,
+        "width": 110,
+        "height": 50,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 540,
+        "y": 640,
+        "id": 16,
+        "floor": 2,
+        "width": 100,
+        "height": 48,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 440,
+        "y": 620,
+        "id": 17,
+        "floor": 1,
+        "width": 100,
+        "height": 50,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 340,
+        "y": 620,
+        "id": 18,
+        "floor": 1,
+        "width": 100,
+        "height": 50,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 338,
+        "y": 556,
+        "id": 19,
+        "floor": 1,
+        "width": 100,
+        "height": 48,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 545.9047619047619,
+        "y": 347.47619047619105,
+        "id": 20,
+        "floor": 1,
+        "width": 300,
+        "height": 90,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 200,
+        "y": 620,
+        "id": 21,
+        "floor": 1,
+        "width": 60,
+        "height": 100,
+        "buildingId": "b-muwtud1l"
+      },
+      {
+        "x": 200,
+        "y": 360,
+        "id": 22,
+        "floor": 1,
+        "width": 60,
+        "height": 125,
+        "buildingId": "b-muwtud1l"
+      },
+      {
+        "x": 517,
+        "y": 448,
+        "id": 23,
+        "floor": 1,
+        "width": 130,
+        "height": 68,
+        "buildingId": "b-muwtrbay"
+      },
+      {
+        "x": 100,
+        "y": 1000,
+        "id": 24,
+        "floor": 1,
+        "width": 180,
+        "height": 70
+      },
+      {
+        "x": 860,
+        "y": 940,
+        "id": 25,
+        "floor": 1,
+        "width": 120,
+        "height": 50,
+        "buildingId": "b-muwsxj3x"
+      },
+      {
+        "x": 620,
+        "y": 1000,
+        "id": 26,
+        "floor": 1,
+        "width": 180,
+        "height": 70
+      },
+      {
+        "x": 340,
+        "y": 1020,
+        "id": 27,
+        "floor": 1,
+        "width": 180,
+        "height": 70
+      },
+      {
+        "x": 643.3333333333334,
+        "y": 879.5238095238093,
+        "id": 28,
+        "floor": 1,
+        "width": 180,
+        "height": 70
+      },
+      {
+        "x": 100,
+        "y": 920,
+        "id": 29,
+        "floor": 1,
+        "width": 180,
+        "height": 56
+      },
+      {
+        "x": 900,
+        "y": 20,
+        "id": 30,
+        "floor": 1,
+        "width": 180,
+        "height": 70,
+        "buildingId": "b-muwtpzd3"
+      },
+      {
+        "x": 800,
+        "y": 1000,
+        "id": 31,
+        "floor": 1,
+        "width": 180,
+        "height": 70
+      }
+    ],
+    "buildings": [
+      {
+        "x": 880,
+        "y": 320,
+        "id": "b-muwsxj3x",
+        "name": "Nhà sau",
+        "color": "border-slate-300 bg-white/70",
+        "width": 400,
+        "height": 450
+      },
+      {
+        "x": 271.42857142857133,
+        "y": 0,
+        "id": "b-muwtpzd3",
+        "name": "Kho Ngoài trời",
+        "color": "border-slate-300 bg-white/70",
+        "width": 860,
+        "height": 260
+      },
+      {
+        "x": 320,
+        "y": 340,
+        "id": "b-muwtrbay",
+        "name": "Nhà Chính",
+        "color": "border-slate-300 bg-white/70",
+        "width": 540,
+        "height": 430
+      },
+      {
+        "x": 58.09523809523809,
+        "y": 347.6190476190477,
+        "id": "b-muwtud1l",
+        "name": "Nhà trước",
+        "color": "border-slate-300 bg-white/70",
+        "width": 220,
+        "height": 380
+      }
+    ]
+  }
 }

@@ -43,7 +43,7 @@ export default function WarehouseGrid({
             onClick={() => onSelect(w)}
             className={`group relative flex flex-col justify-between rounded-xl p-3.5 text-left transition-all duration-200 cursor-pointer min-h-[110px] ${
               isSelected
-                ? "border-2 border-emerald-500 bg-emerald-50/90 ring-4 ring-emerald-500/20 shadow-md animate-warehouse-active"
+                ? "border-2 border-orange-500 bg-orange-50/90 ring-4 ring-orange-500/30 shadow-md animate-warehouse-active"
                 : hasItem
                 ? "border border-emerald-200 bg-emerald-50/30 hover:border-emerald-400 hover:bg-emerald-50/60 hover:shadow-xs"
                 : "border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80 shadow-2xs"
@@ -54,7 +54,7 @@ export default function WarehouseGrid({
               <span
                 className={`font-mono text-sm font-extrabold tracking-tight ${
                   isSelected
-                    ? "text-emerald-900"
+                    ? "text-orange-950"
                     : hasItem
                     ? "text-slate-900"
                     : "text-slate-600"
@@ -66,7 +66,7 @@ export default function WarehouseGrid({
               <span
                 className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold font-mono ${
                   isSelected
-                    ? "bg-emerald-600 text-white"
+                    ? "bg-orange-500 text-white"
                     : hasItem
                     ? "bg-emerald-100 text-emerald-800"
                     : "bg-slate-100 text-slate-400"
@@ -87,7 +87,7 @@ export default function WarehouseGrid({
                         key={it.sku}
                         className={`inline-block rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold border shadow-2xs truncate max-w-full ${
                           isMatched
-                            ? "bg-emerald-600 text-white border-emerald-700 font-bold ring-1 ring-emerald-300"
+                            ? "bg-orange-500 text-white border-orange-600 font-bold ring-1 ring-orange-300"
                             : "bg-white text-slate-700 border-emerald-200/80"
                         }`}
                       >

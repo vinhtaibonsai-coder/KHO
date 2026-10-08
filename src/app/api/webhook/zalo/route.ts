@@ -155,16 +155,21 @@ export async function POST(req: Request) {
       const isOut = body.message.trim().startsWith("-") || body.message.trim().toUpperCase().startsWith("XK");
       const added: string[] = [];
       const duplicates: string[] = [];
+      const uniqueSkus = Array.from(new Set(extracted.validSkus));
 
-      for (const sku of extracted.validSkus) {
+      for (const sku of uniqueSkus) {
         if (isOut) {
           await removeItem(sku);
           added.push(sku);
         } else {
-          // Kiểm tra trùng mã ở kho khác
+          // Kiểm tra trùng mã: Đang ở kho khác HOẶC đã có sẵn trong chính kho này
           const existing = await findItem(sku);
-          if (existing && existing.warehouse !== warehouse) {
-            duplicates.push(`${sku} (ở Kho ${existing.warehouse})`);
+          if (existing && existing.status !== "sold") {
+            if (existing.warehouse !== warehouse) {
+              duplicates.push(`${sku} (ở Kho ${existing.warehouse})`);
+            } else {
+              duplicates.push(`${sku} (đã có ở Kho ${warehouse})`);
+            }
             continue;
           }
           await upsertItem(sku, warehouse);
@@ -174,7 +179,7 @@ export async function POST(req: Request) {
 
       let detail = isOut 
         ? `Đã xuất ${added.length} mã khỏi Kho ${warehouse}` 
-        : `Đã nạp thành công ${added.length}/${extracted.validSkus.length} mã vào Kho ${warehouse}: ${added.slice(0, 5).join(", ")}${added.length > 5 ? "..." : ""}`;
+        : `Đã nạp thành công ${added.length}/${uniqueSkus.length} mã vào Kho ${warehouse}${added.length > 0 ? `: ${added.slice(0, 5).join(", ")}${added.length > 5 ? "..." : ""}` : ""}`;
       
       if (duplicates.length > 0) {
         detail += ` | Bỏ qua trùng: ${duplicates.join(", ")}`;
@@ -194,7 +199,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         ok: added.length > 0,
         message: msg,
-        total: extracted.validSkus.length,
+        total: uniqueSkus.length,
         addedCount: added.length,
         duplicates,
         invalidSkus: extracted.invalidSkus,
@@ -226,18 +231,32 @@ export async function POST(req: Request) {
     // NGĂN CHẶN TRÙNG MÃ: Hàng độc bản chỉ được ở 1 kho duy nhất
     if (parsed.action !== "out") {
       const existing = await findItem(parsed.sku);
-      if (existing && existing.warehouse !== warehouse) {
-        const msg: ZaloMessage = {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          groupId: body.groupId,
-          warehouse,
-          message: body.message,
-          status: "error",
-          detail: `CẢNH BÁO TRÙNG MÃ: [${parsed.sku}] hiện đang nằm ở Kho ${existing.warehouse}. Không thể nạp trùng vào Kho ${warehouse}!`,
-          createdAt: new Date().toISOString(),
-        };
-        await pushMessage(msg);
-        return NextResponse.json({ ok: false, message: msg, duplicate: true }, { status: 409 });
+      if (existing && existing.status !== "sold") {
+        if (existing.warehouse !== warehouse) {
+          const msg: ZaloMessage = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            groupId: body.groupId,
+            warehouse,
+            message: body.message,
+            status: "error",
+            detail: `CẢNH BÁO TRÙNG MÃ: [${parsed.sku}] hiện đang nằm ở Kho ${existing.warehouse}. Không thể nạp trùng vào Kho ${warehouse}!`,
+            createdAt: new Date().toISOString(),
+          };
+          await pushMessage(msg);
+          return NextResponse.json({ ok: false, message: msg, duplicate: true }, { status: 409 });
+        } else {
+          const msg: ZaloMessage = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            groupId: body.groupId,
+            warehouse,
+            message: body.message,
+            status: "error",
+            detail: `CẢNH BÁO TRÙNG MÃ: [${parsed.sku}] đã có sẵn trong Kho ${warehouse} rồi!`,
+            createdAt: new Date().toISOString(),
+          };
+          await pushMessage(msg);
+          return NextResponse.json({ ok: false, message: msg, duplicate: true }, { status: 409 });
+        }
       }
     }
 
