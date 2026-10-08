@@ -28,7 +28,10 @@ export default function WarehouseGrid({
         const list = items.filter((it) => it.warehouse === w && it.status !== "sold");
         const count = list.length;
         const hasItem = count > 0;
-        const isSelected = highlight === w || (highlightWarehouses && highlightWarehouses.includes(w));
+        // Chỉ kho đang được CHỌN TRỰC TIEP (props highlight) mới nhấp nháy cam rực rỡ.
+        // Các kho còn lại trong kết quả tìm kiếm chỉ viền nhẹ, không nhấp nháy.
+        const isActive = highlight === w;
+        const isCandidate = !isActive && !!highlightWarehouses?.includes(w);
 
         // Nếu đang tìm kiếm, ưu tiên hiển thị những mã khớp với query trước
         const matchedList = cleanQuery ? list.filter((it) => it.sku.toUpperCase().includes(cleanQuery)) : [];
@@ -42,8 +45,10 @@ export default function WarehouseGrid({
             type="button"
             onClick={() => onSelect(w)}
             className={`group relative flex flex-col justify-between rounded-xl p-3.5 text-left transition-all duration-200 cursor-pointer min-h-[110px] ${
-              isSelected
-                ? "border-2 border-orange-500 bg-orange-50/90 ring-4 ring-orange-500/30 shadow-md animate-warehouse-active"
+              isActive
+                ? "border-2 border-orange-500 bg-orange-50/90 ring-4 ring-orange-500/50 shadow-lg animate-warehouse-active"
+                : isCandidate
+                ? "border border-orange-300 bg-orange-50/40 hover:border-orange-400 hover:shadow-xs"
                 : hasItem
                 ? "border border-emerald-200 bg-emerald-50/30 hover:border-emerald-400 hover:bg-emerald-50/60 hover:shadow-xs"
                 : "border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80 shadow-2xs"
@@ -53,7 +58,7 @@ export default function WarehouseGrid({
             <div className="flex items-center justify-between w-full">
               <span
                 className={`font-mono text-sm font-extrabold tracking-tight ${
-                  isSelected
+                  isActive
                     ? "text-orange-950"
                     : hasItem
                     ? "text-slate-900"
@@ -65,7 +70,7 @@ export default function WarehouseGrid({
 
               <span
                 className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-bold font-mono ${
-                  isSelected
+                  isActive
                     ? "bg-orange-500 text-white"
                     : hasItem
                     ? "bg-emerald-100 text-emerald-800"
@@ -81,7 +86,7 @@ export default function WarehouseGrid({
               {hasItem ? (
                 <div className="flex flex-wrap gap-1">
                   {displayList.slice(0, 3).map((it) => {
-                    const isMatched = cleanQuery && it.sku.toUpperCase().includes(cleanQuery);
+                    const isMatched = isActive && cleanQuery && it.sku.toUpperCase().includes(cleanQuery);
                     return (
                       <span
                         key={it.sku}

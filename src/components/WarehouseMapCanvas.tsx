@@ -1444,12 +1444,12 @@ export default function WarehouseMapCanvas({
               const pos = dragBuilding && dragBuilding.id === b.id ? dragBuilding : b;
               const isBuildingSelected = edit && selectedBuilding === b.id;
 
-              // Kiểm tra xem tòa nhà này có chứa kho đang được tìm thấy không
+              // Chỉ nháy cam cho tòa nhà chứa kho đang được CHỌN TRỰC TIẾP (highlight)
               const buildingWarehouses = visibleNodes.filter((n) => n.buildingId === b.id);
-              const matchedInBuilding = buildingWarehouses.filter(
-                (n) => highlight === n.id || highlightWarehouses.includes(n.id)
-              );
-              const hasHighlightWarehouse = matchedInBuilding.length > 0;
+              const containsActive = highlight !== null && buildingWarehouses.some((n) => n.id === highlight);
+              const matchedInBuilding = containsActive
+                ? buildingWarehouses.filter((n) => n.id === highlight)
+                : [];
 
               return (
                 <div
@@ -1468,7 +1468,7 @@ export default function WarehouseMapCanvas({
                   className={`absolute rounded-2xl border-2 transition-all ${
                     isBuildingSelected
                       ? "border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-400"
-                      : hasHighlightWarehouse && !edit
+                      : containsActive && !edit
                       ? "border-orange-500 bg-orange-50/70 ring-4 ring-orange-500/50 shadow-lg"
                       : b.color || "border-slate-300 bg-white/50"
                   }`}
@@ -1477,7 +1477,7 @@ export default function WarehouseMapCanvas({
                     top: pos.y,
                     width: b.width,
                     height: b.height,
-                    zIndex: hasHighlightWarehouse ? 3 : 2,
+                    zIndex: containsActive ? 3 : 2,
                     touchAction: edit ? "none" : "auto",
                     cursor: edit ? "grab" : "default",
                   }}
@@ -1486,14 +1486,14 @@ export default function WarehouseMapCanvas({
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span
                         className={`rounded-md px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-wider text-white shadow-xs ${
-                          hasHighlightWarehouse && !edit ? "bg-orange-600 animate-pulse" : "bg-slate-800"
+                          containsActive && !edit ? "bg-orange-600 animate-pulse" : "bg-slate-800"
                         }`}
                       >
                         🏢 {b.name}
                       </span>
-                      {hasHighlightWarehouse && !edit && (
+                      {containsActive && !edit && (
                         <span className="rounded bg-orange-300 px-1.5 py-0.5 text-[10px] font-black text-orange-950 border border-orange-500 animate-pulse">
-                          🎯 Có {matchedInBuilding.length} kho khớp tìm kiếm
+                          🎯 Kho {matchedInBuilding.map((n) => pad(n.id)).join(", ")} đang chọn
                         </span>
                       )}
                     </div>
@@ -1516,8 +1516,8 @@ export default function WarehouseMapCanvas({
               const w = n.width ?? NODE_W;
               const h = n.height ?? NODE_H;
               const floor = n.floor ?? 1;
-              const isMatched =
-                highlight === n.id || highlightWarehouses.includes(n.id);
+              const isActive = highlight === n.id;
+              const isMatched = isActive || highlightWarehouses.includes(n.id);
               const isNodeSelected = edit && selectedIds.includes(n.id);
 
               // Khi ở chế độ xem 'Cả 2 tầng', các ô tầng 2 trở lên sẽ được lệch nhẹ (offset) lên trên-phải
@@ -1533,8 +1533,10 @@ export default function WarehouseMapCanvas({
                 ? isNodeSelected
                   ? "border-indigo-500 bg-white ring-2 ring-indigo-500 shadow-xl"
                   : "border-slate-300 bg-white hover:border-indigo-300 hover:shadow-md"
-                : isMatched
+                : isActive
                 ? "border-orange-500 bg-orange-50 ring-4 ring-orange-500/50 shadow-lg animate-warehouse-active"
+                : isMatched
+                ? "border-orange-300 bg-orange-50/60 shadow-xs"
                 : stat.count > 0
                 ? "border-emerald-300 bg-emerald-50/95 hover:shadow-md"
                 : "border-slate-300 bg-white hover:shadow-md";
@@ -1585,15 +1587,16 @@ export default function WarehouseMapCanvas({
                   </div>
 
                   <div className="space-y-0.5 overflow-hidden">
-                    {stat.matched.slice(0, 2).map((sku) => (
-                      <span
-                        key={sku}
-                        className="block truncate rounded bg-orange-500 px-1 py-0.5 font-mono text-[9px] font-bold text-white shadow-xs"
-                      >
-                        {sku}
-                      </span>
-                    ))}
-                    {stat.matched.length > 2 && (
+                    {isActive &&
+                      stat.matched.slice(0, 2).map((sku) => (
+                        <span
+                          key={sku}
+                          className="block truncate rounded bg-orange-500 px-1 py-0.5 font-mono text-[9px] font-bold text-white shadow-xs"
+                        >
+                          {sku}
+                        </span>
+                      ))}
+                    {isActive && stat.matched.length > 2 && (
                       <span className="block font-mono text-[9px] font-bold text-orange-700">
                         +{stat.matched.length - 2} khớp
                       </span>
