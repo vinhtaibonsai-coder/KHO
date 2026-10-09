@@ -12,6 +12,36 @@ let qrTimer = null;
 let lastQrMtime = 0;
 let quitting = false;
 
+// Fix err.log: "Unable to move the cache: Access is denied (0x5)" / "Gpu Cache Creation failed: -2"
+// Tắt GPU disk cache + hardware acceleration trước whenReady để app nhẹ, không crash GPU.
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch("disable-gpu-shader-disk-cache");
+app.commandLine.appendSwitch("disable-gpu-process-crash-limit");
+
+// UserData riêng, cố định theo tên app để nhiều instance / nhiều bản không đụng nhau.
+const legacyUserData = app.getPath("userData");
+const userDataPath = path.join(app.getPath("appData"), "zalo-bot-desktop");
+app.setPath("userData", userDataPath);
+try {
+  fs.mkdirSync(userDataPath, { recursive: true });
+  for (const f of ["config.json", ".zalo-session.json", "zalo-mapping.json", "qr.png"]) {
+    const from = path.join(legacyUserData, f);
+    const to = path.join(userDataPath, f);
+    if (!fs.existsSync(to) && fs.existsSync(from)) fs.copyFileSync(from, to);
+  }
+} catch {}
+
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  });
+}
+
 const DEFAULTS = {
   webhookUrl: "http://localhost:3000/api/webhook/zalo",
   webhookSecret: "",
@@ -246,6 +276,8 @@ app.whenReady().then(() => {
   const cfg = loadConfig();
   app.setLoginItemSettings({ openAtLogin: !!cfg.startWithWindows, path: process.execPath });
   createWindow();
+  win.show();
+  win.focus();
   tray = new Tray(trayIcon(false));
   tray.setToolTip(`Zalo Bot Desktop — ${cfg.botName}`);
   rebuildTray();
