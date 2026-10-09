@@ -51,14 +51,14 @@
   <header>
     <div class="dot" id="statusDot"></div>
     <h1>Zalo Bot Desktop</h1>
-    <span class="bot-label" id="botLabel">—</span>
+    <span class="bot-label" id="botLabel">â€”</span>
     <span class="badge off" id="statusBadge">Offline</span>
   </header>
 
   <nav>
-    <button class="active" data-tab="qr">Đăng nhập QR</button>
-    <button data-tab="manage">Quản lý</button>
-    <button data-tab="config">Cấu hình</button>
+    <button class="active" data-tab="qr">ÄÄƒng nháº­p QR</button>
+    <button data-tab="manage">Quáº£n lÃ½</button>
+    <button data-tab="config">Cáº¥u hÃ¬nh</button>
     <button data-tab="log">Log</button>
   </nav>
 
@@ -66,175 +66,69 @@
     <!-- TAB QR -->
     <section class="tab active" id="tab-qr">
       <div class="card">
-        <h2>Quét mã QR bằng Zalo</h2>
+        <h2>QuÃ©t mÃ£ QR báº±ng Zalo</h2>
         <div id="qrBox">
-          <img id="qrImg" alt="Mã QR đăng nhập Zalo" hidden />
+          <img id="qrImg" alt="MÃ£ QR Ä‘Äƒng nháº­p Zalo" hidden />
           <div id="qrPlaceholder" style="width:320px;height:320px;display:flex;align-items:center;justify-content:center;background:var(--panel2);border-radius:14px;color:var(--muted);font-size:13px;text-align:center;padding:20px;">
-            Bật Bot ở tab Quản lý để hiển thị mã QR.<br/>Mã QR tự biến mất sau khi đăng nhập thành công.
+            Báº­t Bot á»Ÿ tab Quáº£n lÃ½ Ä‘á»ƒ hiá»ƒn thá»‹ mÃ£ QR.<br/>MÃ£ QR tá»± biáº¿n máº¥t sau khi Ä‘Äƒng nháº­p thÃ nh cÃ´ng.
           </div>
-          <div id="qrHint">Mở Zalo trên điện thoại → <b>Quét mã</b> → quét ảnh trên.<br/>Session được lưu lại, lần sau khỏi quét (trừ khi hết hạn).</div>
+          <div id="qrHint">Má»Ÿ Zalo trÃªn Ä‘iá»‡n thoáº¡i â†’ <b>QuÃ©t mÃ£</b> â†’ quÃ©t áº£nh trÃªn.<br/>Session Ä‘Æ°á»£c lÆ°u láº¡i, láº§n sau khá»i quÃ©t (trá»« khi háº¿t háº¡n).</div>
         </div>
       </div>
     </section>
 
-    <!-- TAB QUẢN LÝ -->
+    <!-- TAB QUáº¢N LÃ -->
     <section class="tab" id="tab-manage">
       <div class="card">
-        <h2>Trạng thái bot</h2>
-        <div class="kv"><span>Tên bot (máy)</span><b id="mBotName">—</b></div>
-        <div class="kv"><span>UID tài khoản Zalo</span><b id="mUid">đang lấy từ log...</b></div>
-        <div class="kv"><span>Kết nối</span><b id="mConn">Offline</b></div>
-        <div class="kv"><span>Phân vùng kho</span><b id="mShards">—</b></div>
+        <h2>Tráº¡ng thÃ¡i bot</h2>
+        <div class="kv"><span>TÃªn bot (mÃ¡y)</span><b id="mBotName">â€”</b></div>
+        <div class="kv"><span>UID tÃ i khoáº£n Zalo</span><b id="mUid">Ä‘ang láº¥y tá»« log...</b></div>
+        <div class="kv"><span>Káº¿t ná»‘i</span><b id="mConn">Offline</b></div>
+        <div class="kv"><span>PhÃ¢n vÃ¹ng kho</span><b id="mShards">â€”</b></div>
         <div class="row" style="margin-top:16px">
-          <button class="btn" id="btnStart">▶ Bật Bot</button>
-          <button class="btn red" id="btnStop" disabled>■ Tắt Bot</button>
-          <button class="btn ghost" id="btnShowQr">Xem lại QR</button>
+          <button class="btn" id="btnStart">â–¶ Báº­t Bot</button>
+          <button class="btn red" id="btnStop" disabled>â–  Táº¯t Bot</button>
+          <button class="btn ghost" id="btnShowQr">Xem láº¡i QR</button>
         </div>
       </div>
     </section>
 
-    <!-- TAB CẤU HÌNH -->
+    <!-- TAB Cáº¤U HÃŒNH -->
     <section class="tab" id="tab-config">
       <div class="card">
-        <h2>Cấu hình kết nối</h2>
+        <h2>Cáº¥u hÃ¬nh káº¿t ná»‘i</h2>
         <div class="row"><label>Webhook URL</label><input type="text" id="cWebhook" placeholder="http://localhost:3000/api/webhook/zalo" /></div>
-        <div class="row"><label>Webhook Secret</label><input type="password" id="cSecret" placeholder="ZALO_WEBHOOK_SECRET (bỏ trống nếu bot tự đọc .env)" /></div>
-        <div class="row"><label>Bot Name (Máy)</label><input type="text" id="cName" placeholder="May 1 / May 2" /></div>
+        <div class="row"><label>Webhook Secret</label><input type="password" id="cSecret" placeholder="ZALO_WEBHOOK_SECRET (bá» trá»‘ng náº¿u bot tá»± Ä‘á»c .env)" /></div>
+        <div class="row"><label>Bot Name (MÃ¡y)</label><input type="text" id="cName" placeholder="May 1 / May 2" /></div>
         <div class="row">
-          <label>Kho phụ trách</label>
+          <label>Kho phá»¥ trÃ¡ch</label>
           <select id="cShards">
-            <option value="all">All (tất cả kho)</option>
+            <option value="all">All (táº¥t cáº£ kho)</option>
             <option value="1-15">1-15</option>
             <option value="16-30">16-30</option>
-            <option value="custom">Tùy chỉnh...</option>
+            <option value="custom">TÃ¹y chá»‰nh...</option>
           </select>
         </div>
-        <div class="row" id="customShardRow" hidden><label>Thủ công</label><input type="text" id="cShardsCustom" placeholder="VD: 1-5,10,20-25" /></div>
+        <div class="row" id="customShardRow" hidden><label>Thá»§ cÃ´ng</label><input type="text" id="cShardsCustom" placeholder="VD: 1-5,10,20-25" /></div>
         <div class="row">
-          <label class="switch"><input type="checkbox" id="cAutoStart" /> Tự động bật Bot khi mở app</label>
-          <label class="switch"><input type="checkbox" id="cWinBoot" /> Khởi động cùng Windows</label>
+          <label class="switch"><input type="checkbox" id="cAutoStart" /> Tá»± Ä‘á»™ng báº­t Bot khi má»Ÿ app</label>
+          <label class="switch"><input type="checkbox" id="cWinBoot" /> Khá»Ÿi Ä‘á»™ng cÃ¹ng Windows</label>
         </div>
-        <div class="row"><button class="btn" id="btnSave">💾 Lưu cấu hình</button><span class="hint" id="saveHint"></span></div>
+        <div class="row"><button class="btn" id="btnSave">ðŸ’¾ LÆ°u cáº¥u hÃ¬nh</button><span class="hint" id="saveHint"></span></div>
       </div>
     </section>
 
     <!-- TAB LOG -->
     <section class="tab" id="tab-log">
       <div class="row" style="margin-bottom:10px">
-        <button class="btn ghost" id="btnClearLog">Xóa log</button>
-        <span class="hint">Nhật ký xử lý trực tiếp từ bot worker</span>
+        <button class="btn ghost" id="btnClearLog">XÃ³a log</button>
+        <span class="hint">Nháº­t kÃ½ xá»­ lÃ½ trá»±c tiáº¿p tá»« bot worker</span>
       </div>
       <div id="logView"></div>
     </section>
   </main>
 
-<script>
-  const api = window.zaloBot;
-  let online = false;
-  let showQrTab = false;
+<script src="app.js"></script>
 
-  const $ = (id) => document.getElementById(id);
-
-  // ---- Tabs ----
-  document.querySelectorAll("nav button").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll("nav button").forEach((b) => b.classList.remove("active"));
-      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
-      btn.classList.add("active");
-      $("tab-" + btn.dataset.tab).classList.add("active");
-    });
-  });
-  function gotoTab(name) {
-    document.querySelector(`nav button[data-tab="${name}"]`)?.click();
-  }
-
-  // ---- Status ----
-  function renderStatus(s) {
-    online = !!s.online;
-    $("statusDot").classList.toggle("on", online);
-    $("statusBadge").className = "badge " + (online ? "on" : "off");
-    $("statusBadge").textContent = online ? "Online" : "Offline";
-    $("botLabel").textContent = s.botName || "";
-    $("mBotName").textContent = s.botName || "—";
-    $("mConn").textContent = online ? "Đang kết nối Zalo" : "Offline";
-    $("btnStart").disabled = online;
-    $("btnStop").disabled = !online;
-  }
-  api.onStatus(renderStatus);
-  api.botStatus().then(renderStatus);
-
-  // ---- QR ----
-  api.onQr((dataUrl) => {
-    if (dataUrl) {
-      $("qrImg").src = dataUrl;
-      $("qrImg").hidden = false;
-      $("qrPlaceholder").hidden = true;
-      if (showQrTab) gotoTab("qr");
-    } else {
-      $("qrImg").hidden = true;
-      $("qrPlaceholder").hidden = false;
-      $("qrPlaceholder").innerHTML = "Đăng nhập thành công — QR đã ẩn.<br/>Bot đang chạy, xem tab Log để theo dõi.";
-    }
-  });
-  api.onShowQr(() => gotoTab("qr"));
-  $("btnShowQr").addEventListener("click", () => gotoTab("qr"));
-
-  // ---- Log ----
-  const logView = $("logView");
-  api.onLog((entry) => {
-    const div = document.createElement("div");
-    div.className = "lv-" + (entry.level || "info");
-    const t = new Date(entry.ts).toLocaleTimeString("vi-VN");
-    div.textContent = `[${t}] ${entry.line}`;
-    logView.appendChild(div);
-    while (logView.childNodes.length > 800) logView.removeChild(logView.firstChild);
-    logView.scrollTop = logView.scrollHeight;
-    const uid = entry.line.match(/uid\s+(\d+)/i);
-    if (uid) $("mUid").textContent = uid[1];
-  });
-  $("btnClearLog").addEventListener("click", () => { logView.innerHTML = ""; });
-
-  // ---- Manage ----
-  $("btnStart").addEventListener("click", () => { showQrTab = true; api.start(); gotoTab("qr"); });
-  $("btnStop").addEventListener("click", () => api.stop());
-
-  // ---- Config ----
-  async function loadConfig() {
-    const cfg = await api.getConfig();
-    $("cWebhook").value = cfg.webhookUrl || "";
-    $("cSecret").value = cfg.webhookSecret || "";
-    $("cName").value = cfg.botName || "";
-    $("mShards").textContent = cfg.warehouses || "all";
-    const known = ["all", "1-15", "16-30"];
-    if (known.includes(cfg.warehouses)) {
-      $("cShards").value = cfg.warehouses;
-      $("customShardRow").hidden = true;
-    } else {
-      $("cShards").value = "custom";
-      $("cShardsCustom").value = cfg.warehouses || "";
-      $("customShardRow").hidden = false;
-    }
-    $("cAutoStart").checked = !!cfg.autoStartBot;
-    $("cWinBoot").checked = !!cfg.startWithWindows;
-  }
-  $("cShards").addEventListener("change", () => {
-    $("customShardRow").hidden = $("cShards").value !== "custom";
-  });
-  $("btnSave").addEventListener("click", async () => {
-    const warehouses = $("cShards").value === "custom" ? ($("cShardsCustom").value.trim() || "all") : $("cShards").value;
-    const cfg = await api.setConfig({
-      webhookUrl: $("cWebhook").value.trim(),
-      webhookSecret: $("cSecret").value.trim(),
-      botName: $("cName").value.trim() || "Bot",
-      warehouses,
-      autoStartBot: $("cAutoStart").checked,
-      startWithWindows: $("cWinBoot").checked,
-    });
-    $("mShards").textContent = cfg.warehouses;
-    $("saveHint").textContent = "Đã lưu! Bật/Tắt lại bot để áp dụng.";
-    setTimeout(() => { $("saveHint").textContent = ""; }, 3000);
-  });
-  loadConfig();
-</script>
 </body>
 </html>
