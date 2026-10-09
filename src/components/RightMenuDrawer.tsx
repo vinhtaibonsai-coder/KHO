@@ -60,7 +60,7 @@ export default function RightMenuDrawer({
   items: Item[];
   history: ItemHistory[];
   messages: ZaloMessage[];
-  botStatus?: { online: boolean; lastPing: string | null };
+  botStatus?: { online: boolean; lastPing: string | null; bots?: { name: string; online: boolean; lastPing: string | null }[] };
   dbStatus?: { connected: boolean; type: "supabase" | "local"; latencyMs?: number; itemCount?: number };
   onAddWarehouse: () => Promise<void>;
   onOpenPaste: () => void;
@@ -568,32 +568,39 @@ export default function RightMenuDrawer({
                   </span>
                 </div>
 
-                {/* Zalo Bot Status */}
-                <div className="p-3.5 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`h-8 w-8 rounded-xl text-white flex items-center justify-center shrink-0 shadow-2xs ${
-                      botStatus?.online ? "bg-emerald-600" : "bg-amber-500"
+                {/* Zalo Bot Status (đa máy: liệt kê từng bot) */}
+                {(botStatus?.bots?.length
+                  ? botStatus.bots
+                  : [{ name: "Bot", online: !!botStatus?.online, lastPing: botStatus?.lastPing ?? null }]
+                ).map((bot) => (
+                  <div key={bot.name} className="p-3.5 flex items-center justify-between border-t border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className={`h-8 w-8 rounded-xl text-white flex items-center justify-center shrink-0 shadow-2xs ${
+                        bot.online ? "bg-emerald-600" : "bg-amber-500"
+                      }`}>
+                        <Radio className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-900 block">
+                          Bot {bot.name}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {bot.online
+                            ? `Đang chạy${bot.lastPing ? ` · ping ${new Date(bot.lastPing).toLocaleTimeString("vi-VN")}` : ""}`
+                            : "Chưa bật / mất kết nối"}
+                        </span>
+                      </div>
+                    </div>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${
+                      bot.online
+                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                        : "bg-amber-50 text-amber-800 border border-amber-200"
                     }`}>
-                      <Radio className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-900 block">
-                        Bot Quét Tin Nhắn
-                      </span>
-                      <span className="text-[11px] text-slate-400 font-medium">
-                        {botStatus?.online ? "Đang chạy trên máy tính" : "Chưa bật bot trên máy"}
-                      </span>
-                    </div>
+                      <span className={`h-1.5 w-1.5 rounded-full ${bot.online ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
+                      {bot.online ? "Online" : "Tắt"}
+                    </span>
                   </div>
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${
-                    botStatus?.online 
-                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200" 
-                      : "bg-amber-50 text-amber-800 border border-amber-200"
-                  }`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${botStatus?.online ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`} />
-                    {botStatus?.online ? "Online" : "Tắt"}
-                  </span>
-                </div>
+                ))}
               </div>
             </div>
 

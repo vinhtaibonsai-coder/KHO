@@ -1,0 +1,52 @@
+{
+  "name": "zalo-bot-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App desktop Windows điều hành Zalo Bot kho: quét QR, bật/tắt, cấu hình đa máy, tray hệ thống",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.warehouse.zalobotdesktop",
+    "productName": "Zalo Bot Desktop",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../zalo-bot",
+        "to": "zalo-bot",
+        "filter": [
+          "**/*",
+          "!qr.png",
+          "!**/.zalo-session.json",
+          "!**/node_modules/.cache/**"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Zalo Bot Desktop"
+    }
+  }
+}

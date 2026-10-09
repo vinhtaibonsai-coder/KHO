@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Zalo, ThreadType, LoginQRCallbackEventType, TextStyle } from "zca-js";
@@ -20,8 +21,21 @@ try {
 
 const WEBHOOK_URL = process.env.WEBHOOK_URL ?? "http://localhost:3000/api/webhook/zalo";
 const MAPPING_FILE = process.env.MAPPING_FILE ?? path.join(BOT_DIR, "zalo-mapping.json");
-const SESSION_FILE = path.join(BOT_DIR, ".zalo-session.json");
-const QR_FILE = path.join(BOT_DIR, "qr.png");
+const SESSION_FILE = process.env.SESSION_FILE ?? path.join(BOT_DIR, ".zalo-session.json");
+const QR_FILE = process.env.QR_FILE ?? path.join(BOT_DIR, "qr.png");
+
+// ĐA MÁY: tên bot (May 1 / May 2...) — env BOT_NAME / MACHINE_ID, mặc định lấy hostname
+const BOT_NAME = (process.env.BOT_NAME || process.env.MACHINE_ID || os.hostname() || "Bot").trim() || "Bot";
+
+// ĐA MÁY: phân vùng kho phụ trách — env BOT_WAREHOUSES ('1-15', '16-30', '1-5,10', 'all')
+const BOT_WAREHOUSES_SPEC = (process.env.BOT_WAREHOUSES || "all").trim();
+let BOT_SHARDS;
+try {
+  BOT_SHARDS = parseWarehouseShards(BOT_WAREHOUSES_SPEC);
+} catch (err) {
+  console.error(`[config] ${err.message}`);
+  process.exit(1);
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pad = (n) => String(n).padStart(2, "0");
@@ -72,6 +86,39 @@ function loadMapping() {
   }
 }
 
+/**
+ * Phân vùng kho phụ trách (sharding đa máy).
+ * 'all' -> null (phụ trách tất cả). '1-15' -> Set{1..15}. '1-5,10,20-25' -> hỗ trợ nhiều đoạn.
+ */
+export function parseWarehouseShards(spec) {
+  if (!spec || /^all$/i.test(spec.trim())) return null;
+  const set = new Set();
+  for (const partRaw of spec.split(",")) {
+    const part = partRaw.trim();
+    if (!part) continue;
+    const range = part.match(/^(\d+)\s*-\s*(\d+)$/);
+    if (range) {
+      const a = parseInt(range[1], 10);
+      const b = parseInt(range[2], 10);
+      for (let i = Math.min(a, b); i <= Math.max(a, b); i++) set.add(i);
+      continue;
+    }
+    if (/^\d+$/.test(part)) {
+      set.add(parseInt(part, 10));
+      continue;
+    }
+    throw new Error(`BOT_WAREHOUSES không hợp lệ: "${part}" (VD: '1-15', '16-30', '1-5,10' hoặc 'all')`);
+  }
+  if (set.size === 0) throw new Error("BOT_WAREHOUSES rỗng — dùng 'all' hoặc khoảng VD '1-15'");
+  return set;
+}
+
+/** Bot này có phụ trách kho này không? */
+export function isWarehouseOwned(shards, warehouse) {
+  if (!shards) return true;
+  return shards.has(warehouse);
+}
+
 function saveMapping(mapping) {
   try {
     fs.writeFileSync(MAPPING_FILE, JSON.stringify(mapping, null, 2), "utf8");
@@ -83,10 +130,15 @@ function saveMapping(mapping) {
 // ============================================================
 // Chuyển tiếp webhook (retry khi mạng chập chờn)
 // ============================================================
-export async function forward(groupId, message, url = WEBHOOK_URL, attempts = 3) {
+export async function forward(groupId, message, sourceId, url = WEBHOOK_URL, attempts = 3) {
   for (let i = 1; i <= attempts; i++) {
     try {
-      const res = await sendSignedWebhook(url, { groupId, message });
+      const res = await sendSignedWebhook(url, {
+        groupId,
+        message,
+        botName: BOT_NAME,
+        sourceId: sourceId || undefined,
+      });
       const data = await res.json().catch(() => ({}));
       if (res.ok) return data;
       console.error(`[webhook] HTTP ${res.status} cho "${message}":`, data.error ?? data.detail ?? "");
@@ -219,8 +271,15 @@ async function handleGroupMessage(api, message) {
     console.log(`[mapping] Nhận diện nhóm: ${groupId} ("${name}") -> Kho ${warehouse}`);
   }
 
+  // SHARDING ĐA MÁY: bỏ qua kho không thuộc phân vùng của bot này (tránh xung đột 2 bot)
+  if (!isWarehouseOwned(BOT_SHARDS, warehouse)) {
+    console.log(`[shard] Bỏ qua Kho ${warehouse} — không thuộc phân vùng "${BOT_WAREHOUSES_SPEC}" của bot "${BOT_NAME}"`);
+    return;
+  }
+
+  const sourceId = String(message.data?.msgId || message.msgId || "");
   const label = `KHO_${pad(warehouse)}`;
-  const res = await forward(label, text);
+  const res = await forward(label, text, sourceId);
   console.log(
     `[msg] "${text}" từ "${name || groupId}" -> ${label}: ${res.ok ? "OK" : "LỖI"}${res.message?.detail ? " - " + res.message.detail : ""}`
   );
@@ -373,7 +432,8 @@ async function handleDirectMessage(api, message) {
 
   if (isTransfer) {
     console.log(`[my-docs] Nhận lệnh chuyển kho: "${text}"`);
-    const res = await forward("MY_DOCS", text);
+    const sourceId = String(message.data?.msgId || message.msgId || "");
+    const res = await forward("MY_DOCS", text, sourceId);
 
     if (res.isTransfer && res.message?.detail) {
       const replyMsg = res.ok
@@ -442,6 +502,20 @@ function selftest() {
   assert(resolveWarehouse(mapping, "gid-2", "Kho 9") === 9, "suy ra từ tên nhóm");
   assert(resolveWarehouse(mapping, "gid-3", "") === null, "không có dữ liệu -> null");
 
+  // ĐA MÁY: parse phân vùng kho
+  assert(parseWarehouseShards("all") === null, "'all' -> phụ trách tất cả");
+  const s1 = parseWarehouseShards("1-15");
+  assert(s1.size === 15 && s1.has(1) && s1.has(15) && !s1.has(16), "'1-15' -> Set 1..15");
+  const s2 = parseWarehouseShards("16-30");
+  assert(s2.has(16) && s2.has(30) && !s2.has(15), "'16-30' -> Set 16..30");
+  const s3 = parseWarehouseShards("1-5,10,20-22");
+  assert(s3.size === 9 && s3.has(10) && s3.has(21) && !s3.has(6), "nhiều đoạn cách nhau dấu phẩy");
+  assert(isWarehouseOwned(s1, 7) === true && isWarehouseOwned(s1, 20) === false, "isWarehouseOwned theo shard");
+  assert(isWarehouseOwned(null, 99) === true, "shard null -> sở hữu tất cả");
+  let threw = false;
+  try { parseWarehouseShards("abc"); } catch { threw = true; }
+  assert(threw, "spec sai -> ném lỗi");
+
   console.log("\nSelftest PASSED");
 }
 
@@ -463,7 +537,9 @@ async function main() {
   } catch {
     /* bỏ qua */
   }
-  console.log(`[login] Thành công${uid ? ` (uid ${uid})` : ""}. Webhook: ${WEBHOOK_URL}`);
+  console.log(
+    `[login] Thành công${uid ? ` (uid ${uid})` : ""}. Bot "${BOT_NAME}" | Phân vùng kho: ${BOT_WAREHOUSES_SPEC} | Webhook: ${WEBHOOK_URL}`
+  );
 
   // 1. Tự động đồng bộ tin nhắn đã gửi trong lúc tắt máy (Catch-up)
   console.log("[catch-up] Bắt đầu tự động quét các tin nhắn trong lúc tắt máy...");
@@ -476,10 +552,10 @@ async function main() {
   // 2. Bắt đầu lắng nghe tin nhắn trực tiếp
   startListener(api);
 
-  // 3. Heartbeat định kỳ 20 giây gửi tín hiệu ping để web hiển thị bot đang chạy
+  // 3. Heartbeat định kỳ 20 giây gửi tín hiệu ping (kèm botName) để web hiển thị bot đang chạy
   const sendHeartbeat = async () => {
     try {
-      await sendSignedWebhook(WEBHOOK_URL, { action: "heartbeat" });
+      await sendSignedWebhook(WEBHOOK_URL, { action: "heartbeat", botName: BOT_NAME });
     } catch {}
   };
   // Gửi ngay 1 lần đầu

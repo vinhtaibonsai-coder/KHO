@@ -32,6 +32,13 @@ export interface ZaloMessage {
   detail: string;
   createdAt: string;
   read?: boolean;
+  botName?: string;
+}
+
+export interface BotStatusEntry {
+  name: string;
+  online: boolean;
+  lastPing: string | null;
 }
 
 export interface WarehouseLayoutNode {
@@ -68,6 +75,7 @@ export interface ItemsResponse {
   botStatus?: {
     online: boolean;
     lastPing: string | null;
+    bots: BotStatusEntry[];
   };
   dbStatus?: {
     connected: boolean;

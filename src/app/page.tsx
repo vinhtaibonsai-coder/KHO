@@ -80,7 +80,7 @@ export default function Home() {
   const [messages, setMessages] = useState<ZaloMessage[]>([]);
   const [history, setHistory] = useState<ItemHistory[]>([]);
   const [totalWarehouses, setTotalWarehouses] = useState<number>(30);
-  const [botStatus, setBotStatus] = useState<{ online: boolean; lastPing: string | null } | undefined>(undefined);
+  const [botStatus, setBotStatus] = useState<{ online: boolean; lastPing: string | null; bots: { name: string; online: boolean; lastPing: string | null }[] } | undefined>(undefined);
   const [dbStatus, setDbStatus] = useState<{ connected: boolean; type: "supabase" | "local"; latencyMs?: number; itemCount?: number } | undefined>(undefined);
   const [query, setQuery] = useState("");
   const [openWarehouse, setOpenWarehouse] = useState<number | null>(null);
@@ -492,7 +492,16 @@ export default function Home() {
                   : "bg-slate-100 border-slate-200 text-slate-400"
               }`}
               title={
-                botStatus?.online
+                botStatus && botStatus.bots?.length
+                  ? botStatus.bots
+                      .map(
+                        (b) =>
+                          `Bot ${b.name}: ${b.online ? "ONLINE" : "OFFLINE"}${
+                            b.lastPing ? ` (ping ${new Date(b.lastPing).toLocaleTimeString("vi-VN")})` : ""
+                          }`
+                      )
+                      .join("\n")
+                  : botStatus?.online
                   ? `Bot Zalo trên máy tính: ĐANG CHẠY\n(Phát tín hiệu lúc ${
                       botStatus.lastPing ? new Date(botStatus.lastPing).toLocaleTimeString("vi-VN") : "mới đây"
                     })`

@@ -138,6 +138,7 @@ type MessageRow = {
   detail: string;
   created_at: string;
   read?: boolean;
+  bot_name?: string | null;
 };
 
 type HistoryRow = {
@@ -170,6 +171,7 @@ const rowToMessage = (r: MessageRow): ZaloMessage => ({
   detail: r.detail,
   createdAt: r.created_at,
   read: typeof r.read === "boolean" ? r.read : false,
+  botName: r.bot_name || undefined,
 });
 
 const rowToHistory = (r: HistoryRow): ItemHistory => ({
@@ -221,40 +223,102 @@ export async function getMessages(): Promise<ZaloMessage[]> {
     const { data, error } = await sb!
       .from("zalo_messages")
       .select("*")
-      .neq("id", "bot_heartbeat")
+      .not("id", "like", "bot_heartbeat%")
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) throw new Error(`Supabase getMessages: ${error.message}`);
     return (data ?? []).map(rowToMessage);
   }
   db = loadDB();
-  return db.messages.filter((m) => m.id !== "bot_heartbeat");
+  return db.messages.filter((m) => !m.id.startsWith("bot_heartbeat"));
 }
 
 export async function pushMessage(msg: ZaloMessage) {
   const isRead = typeof msg.read === "boolean" ? msg.read : false;
   if (supabaseEnabled) {
     const sb = getSupabase();
-    const { error } = await sb!.from("zalo_messages").upsert(
-      {
-        id: msg.id,
-        group_id: msg.groupId,
-        warehouse: msg.warehouse,
-        message: msg.message,
-        status: msg.status,
-        detail: msg.detail,
-        created_at: msg.createdAt,
-        read: isRead,
-      },
-      { onConflict: "id" }
-    );
+    const row = {
+      id: msg.id,
+      group_id: msg.groupId,
+      warehouse: msg.warehouse,
+      message: msg.message,
+      status: msg.status,
+      detail: msg.detail,
+      created_at: msg.createdAt,
+      read: isRead,
+      ...(msg.botName ? { bot_name: msg.botName } : {}),
+    };
+    let { error } = await sb!.from("zalo_messages").upsert(row, { onConflict: "id" });
+    // Cột bot_name chưa được thêm vào bảng (chạy migration multi-bot) -> retry không bot_name
+    if (error && msg.botName && /bot_name/i.test(error.message || "")) {
+      delete (row as Record<string, unknown>).bot_name;
+      ({ error } = await sb!.from("zalo_messages").upsert(row, { onConflict: "id" }));
+    }
     if (error) throw new Error(`Supabase pushMessage: ${error.message}`);
     return;
   }
   db = loadDB();
+  db.messages = db.messages.filter((m) => m.id !== msg.id);
   db.messages.unshift({ ...msg, read: isRead });
   if (db.messages.length > 50) db.messages.length = 50;
   saveDB(db);
+}
+
+/**
+ * Claim-First de-duplication: 2 bot cùng forward 1 tin nhắn trong nhóm
+ * thì chỉ bot đầu tiên "claim" được id (= sourceId Zalo) mới chạy effect.
+ * Trả về false nếu tin đã được claim trước đó.
+ */
+export async function claimMessage(
+  id: string,
+  groupId: string,
+  message: string,
+  botName?: string
+): Promise<boolean> {
+  const now = new Date().toISOString();
+  if (supabaseEnabled) {
+    const sb = getSupabase();
+    const row = {
+      id,
+      group_id: groupId,
+      warehouse: null,
+      message,
+      status: "ok",
+      detail: "Đang xử lý...",
+      created_at: now,
+      read: true,
+      ...(botName ? { bot_name: botName } : {}),
+    };
+    let { data, error } = await sb!
+      .from("zalo_messages")
+      .upsert(row, { onConflict: "id", ignoreDuplicates: true })
+      .select("id");
+    if (error && botName && /bot_name/i.test(error.message || "")) {
+      delete (row as Record<string, unknown>).bot_name;
+      ({ data, error } = await sb!
+        .from("zalo_messages")
+        .upsert(row, { onConflict: "id", ignoreDuplicates: true })
+        .select("id"));
+    }
+    if (error) throw new Error(`Supabase claimMessage: ${error.message}`);
+    return !!data?.length;
+  }
+  db = loadDB();
+  if (db.messages.some((m) => m.id === id)) return false;
+  db.messages.unshift({
+    id,
+    groupId,
+    warehouse: null,
+    message,
+    status: "ok",
+    detail: "Đang xử lý...",
+    createdAt: now,
+    read: true,
+    botName,
+  });
+  if (db.messages.length > 50) db.messages.length = 50;
+  saveDB(db);
+  return true;
 }
 
 export async function findItem(sku: string): Promise<Item | undefined> {
@@ -903,74 +967,111 @@ export async function markAllMessagesRead(): Promise<boolean> {
   return true;
 }
 
-export async function recordBotPing(): Promise<string> {
+const BOT_ONLINE_WINDOW_MS = 60_000;
+
+export async function recordBotPing(botName: string = "Bot"): Promise<string> {
   const now = new Date().toISOString();
+  const name = (botName || "Bot").trim().slice(0, 40) || "Bot";
   if (supabaseEnabled) {
     try {
       const sb = getSupabase();
-      await sb!.from("zalo_messages").upsert(
-        {
-          id: "bot_heartbeat",
-          group_id: "SYSTEM",
-          warehouse: null,
-          message: "PING",
-          status: "ok",
-          detail: "Bot Zalo đang chạy trên máy",
-          created_at: now,
-          read: true,
-        },
-        { onConflict: "id" }
-      );
+      const row = {
+        id: `bot_heartbeat_${name}`,
+        group_id: "SYSTEM",
+        warehouse: null,
+        message: "PING",
+        status: "ok",
+        detail: `Bot Zalo "${name}" đang chạy`,
+        created_at: now,
+        read: true,
+        bot_name: name,
+      };
+      let { error } = await sb!.from("zalo_messages").upsert(row, { onConflict: "id" });
+      if (error && /bot_name/i.test(error.message || "")) {
+        delete (row as Record<string, unknown>).bot_name;
+        ({ error } = await sb!.from("zalo_messages").upsert(row, { onConflict: "id" }));
+      }
+      if (error) console.warn("recordBotPing supabase error:", error.message);
     } catch (err) {
       console.warn("recordBotPing supabase error:", err);
     }
   }
 
-  // Luôn lưu local làm dự phòng
+  // Luôn lưu local làm dự phòng (map theo tên bot)
   try {
     const pingFile = path.join(DATA_DIR, ".bot-ping.json");
-    fs.writeFileSync(pingFile, JSON.stringify({ lastPing: now }), "utf8");
+    let parsed: { lastPing?: string; bots?: Record<string, string> } = {};
+    if (fs.existsSync(pingFile)) {
+      parsed = JSON.parse(fs.readFileSync(pingFile, "utf8"));
+    }
+    const bots = { ...(parsed.bots || {}) };
+    // Dòng legacy { lastPing } cũ -> chuyển vào map nếu chưa có bot nào
+    if (parsed.lastPing && Object.keys(bots).length === 0) bots["Bot"] = parsed.lastPing;
+    bots[name] = now;
+    fs.writeFileSync(pingFile, JSON.stringify({ bots }), "utf8");
   } catch {}
 
   return now;
 }
 
-export async function getBotStatus(): Promise<{ online: boolean; lastPing: string | null }> {
-  let lastPingIso: string | null = null;
+export async function getBotStatus(): Promise<{
+  online: boolean;
+  lastPing: string | null;
+  bots: { name: string; online: boolean; lastPing: string | null }[];
+}> {
+  const entries = new Map<string, string | null>();
 
   if (supabaseEnabled) {
     try {
       const sb = getSupabase();
       const { data } = await sb!
         .from("zalo_messages")
-        .select("created_at")
-        .eq("id", "bot_heartbeat")
-        .maybeSingle();
-      if (data?.created_at) {
-        lastPingIso = data.created_at;
+        .select("id, created_at")
+        .like("id", "bot_heartbeat%");
+      for (const r of data ?? []) {
+        const name = r.id.replace(/^bot_heartbeat_?/, "") || "Bot";
+        const prev = entries.get(name);
+        if (!prev || (r.created_at && r.created_at > prev)) {
+          entries.set(name, r.created_at || null);
+        }
       }
     } catch {}
   }
 
-  if (!lastPingIso) {
-    try {
-      const pingFile = path.join(DATA_DIR, ".bot-ping.json");
-      if (fs.existsSync(pingFile)) {
-        const parsed = JSON.parse(fs.readFileSync(pingFile, "utf8"));
-        lastPingIso = parsed.lastPing || null;
+  // Local fallback / bổ sung
+  try {
+    const pingFile = path.join(DATA_DIR, ".bot-ping.json");
+    if (fs.existsSync(pingFile)) {
+      const parsed = JSON.parse(fs.readFileSync(pingFile, "utf8")) as {
+        lastPing?: string;
+        bots?: Record<string, string>;
+      };
+      if (parsed.bots) {
+        for (const [name, ts] of Object.entries(parsed.bots)) {
+          if (!entries.get(name)) entries.set(name, ts || null);
+        }
       }
-    } catch {}
-  }
+      if (parsed.lastPing && entries.size === 0) entries.set("Bot", parsed.lastPing);
+    }
+  } catch {}
 
-  if (!lastPingIso) {
-    return { online: false, lastPing: null };
-  }
+  const now = Date.now();
+  const bots = Array.from(entries.entries())
+    .map(([name, lastPing]) => {
+      const diffMs = lastPing ? now - new Date(lastPing).getTime() : Number.NaN;
+      const online = Number.isFinite(diffMs) && diffMs >= 0 && diffMs <= BOT_ONLINE_WINDOW_MS;
+      return { name, online, lastPing: lastPing ?? null };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-  const diffMs = Date.now() - new Date(lastPingIso).getTime();
-  // Nếu bot gửi tín hiệu trong vòng 60 giây qua -> Đang chạy Online
-  const online = diffMs >= 0 && diffMs <= 60000;
+  const lastPings = bots.map((b) => b.lastPing).filter(Boolean) as string[];
+  const latest = lastPings.sort().at(-1) ?? null;
 
-  return { online, lastPing: lastPingIso };
+  return {
+    online: bots.some((b) => b.online),
+    lastPing: latest,
+    bots,
+  };
 }
 
 export async function getDatabaseStatus(): Promise<{

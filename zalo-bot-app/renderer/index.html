@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'" />
+<title>Zalo Bot Desktop</title>
+<style>
+  :root {
+    --bg: #0f172a; --panel: #1e293b; --panel2: #273449; --line: #334155;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #22c55e; --danger: #ef4444; --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  header { display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+  header .dot.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  header h1 { font-size: 16px; font-weight: 700; flex: 1; }
+  header .bot-label { font-size: 12px; color: var(--muted); }
+  nav { display: flex; gap: 4px; padding: 10px 16px 0; background: var(--panel); }
+  nav button { flex: 1; padding: 10px; border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; }
+  nav button.active { color: var(--text); border-bottom-color: var(--accent); }
+  main { flex: 1; overflow: auto; padding: 20px; }
+  .tab { display: none; }
+  .tab.active { display: block; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+  .card h2 { font-size: 14px; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  label { font-size: 13px; color: var(--muted); min-width: 130px; }
+  input[type=text], input[type=password], select { flex: 1; min-width: 200px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); font-size: 13px; outline: none; }
+  input:focus, select:focus { border-color: var(--accent); }
+  .btn { padding: 10px 18px; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; background: var(--accent); color: #052e16; }
+  .btn.red { background: var(--danger); color: #fff; }
+  .btn.ghost { background: var(--panel2); color: var(--text); border: 1px solid var(--line); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .badge.on { background: rgba(34,197,94,.15); color: var(--accent); border: 1px solid rgba(34,197,94,.4); }
+  .badge.off { background: rgba(239,68,68,.12); color: var(--danger); border: 1px solid rgba(239,68,68,.35); }
+  #qrBox { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 24px; }
+  #qrImg { width: 320px; height: 320px; background: #fff; border-radius: 14px; padding: 12px; image-rendering: pixelated; }
+  #qrHint { font-size: 13px; color: var(--muted); text-align: center; line-height: 1.6; }
+  #logView { font-family: Consolas, monospace; font-size: 12px; line-height: 1.55; background: #0b1220; border: 1px solid var(--line); border-radius: 12px; padding: 12px; height: calc(100vh - 220px); overflow: auto; white-space: pre-wrap; word-break: break-all; }
+  .lv-err { color: #f87171; } .lv-warn { color: #fbbf24; } .lv-info { color: #cbd5e1; }
+  .kv { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .kv:last-child { border-bottom: none; }
+  .kv b { color: var(--text); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="dot" id="statusDot"></div>
+    <h1>Zalo Bot Desktop</h1>
+    <span class="bot-label" id="botLabel">—</span>
+    <span class="badge off" id="statusBadge">Offline</span>
+  </header>
+
+  <nav>
+    <button class="active" data-tab="qr">Đăng nhập QR</button>
+    <button data-tab="manage">Quản lý</button>
+    <button data-tab="config">Cấu hình</button>
+    <button data-tab="log">Log</button>
+  </nav>
+
+  <main>
+    <!-- TAB QR -->
+    <section class="tab active" id="tab-qr">
+      <div class="card">
+        <h2>Quét mã QR bằng Zalo</h2>
+        <div id="qrBox">
+          <img id="qrImg" alt="Mã QR đăng nhập Zalo" hidden />
+          <div id="qrPlaceholder" style="width:320px;height:320px;display:flex;align-items:center;justify-content:center;background:var(--panel2);border-radius:14px;color:var(--muted);font-size:13px;text-align:center;padding:20px;">
+            Bật Bot ở tab Quản lý để hiển thị mã QR.<br/>Mã QR tự biến mất sau khi đăng nhập thành công.
+          </div>
+          <div id="qrHint">Mở Zalo trên điện thoại → <b>Quét mã</b> → quét ảnh trên.<br/>Session được lưu lại, lần sau khỏi quét (trừ khi hết hạn).</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB QUẢN LÝ -->
+    <section class="tab" id="tab-manage">
+      <div class="card">
+        <h2>Trạng thái bot</h2>
+        <div class="kv"><span>Tên bot (máy)</span><b id="mBotName">—</b></div>
+        <div class="kv"><span>UID tài khoản Zalo</span><b id="mUid">đang lấy từ log...</b></div>
+        <div class="kv"><span>Kết nối</span><b id="mConn">Offline</b></div>
+        <div class="kv"><span>Phân vùng kho</span><b id="mShards">—</b></div>
+        <div class="row" style="margin-top:16px">
+          <button class="btn" id="btnStart">▶ Bật Bot</button>
+          <button class="btn red" id="btnStop" disabled>■ Tắt Bot</button>
+          <button class="btn ghost" id="btnShowQr">Xem lại QR</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB CẤU HÌNH -->
+    <section class="tab" id="tab-config">
+      <div class="card">
+        <h2>Cấu hình kết nối</h2>
+        <div class="row"><label>Webhook URL</label><input type="text" id="cWebhook" placeholder="http://localhost:3000/api/webhook/zalo" /></div>
+        <div class="row"><label>Webhook Secret</label><input type="password" id="cSecret" placeholder="ZALO_WEBHOOK_SECRET (bỏ trống nếu bot tự đọc .env)" /></div>
+        <div class="row"><label>Bot Name (Máy)</label><input type="text" id="cName" placeholder="May 1 / May 2" /></div>
+        <div class="row">
+          <label>Kho phụ trách</label>
+          <select id="cShards">
+            <option value="all">All (tất cả kho)</option>
+            <option value="1-15">1-15</option>
+            <option value="16-30">16-30</option>
+            <option value="custom">Tùy chỉnh...</option>
+          </select>
+        </div>
+        <div class="row" id="customShardRow" hidden><label>Thủ công</label><input type="text" id="cShardsCustom" placeholder="VD: 1-5,10,20-25" /></div>
+        <div class="row">
+          <label class="switch"><input type="checkbox" id="cAutoStart" /> Tự động bật Bot khi mở app</label>
+          <label class="switch"><input type="checkbox" id="cWinBoot" /> Khởi động cùng Windows</label>
+        </div>
+        <div class="row"><button class="btn" id="btnSave">💾 Lưu cấu hình</button><span class="hint" id="saveHint"></span></div>
+      </div>
+    </section>
+
+    <!-- TAB LOG -->
+    <section class="tab" id="tab-log">
+      <div class="row" style="margin-bottom:10px">
+        <button class="btn ghost" id="btnClearLog">Xóa log</button>
+        <span class="hint">Nhật ký xử lý trực tiếp từ bot worker</span>
+      </div>
+      <div id="logView"></div>
+    </section>
+  </main>
+
+<script>
+  const api = window.zaloBot;
+  let online = false;
+  let showQrTab = false;
+
+  const $ = (id) => document.getElementById(id);
+
+  // ---- Tabs ----
+  document.querySelectorAll("nav button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("nav button").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      btn.classList.add("active");
+      $("tab-" + btn.dataset.tab).classList.add("active");
+    });
+  });
+  function gotoTab(name) {
+    document.querySelector(`nav button[data-tab="${name}"]`)?.click();
+  }
+
+  // ---- Status ----
+  function renderStatus(s) {
+    online = !!s.online;
+    $("statusDot").classList.toggle("on", online);
+    $("statusBadge").className = "badge " + (online ? "on" : "off");
+    $("statusBadge").textContent = online ? "Online" : "Offline";
+    $("botLabel").textContent = s.botName || "";
+    $("mBotName").textContent = s.botName || "—";
+    $("mConn").textContent = online ? "Đang kết nối Zalo" : "Offline";
+    $("btnStart").disabled = online;
+    $("btnStop").disabled = !online;
+  }
+  api.onStatus(renderStatus);
+  api.botStatus().then(renderStatus);
+
+  // ---- QR ----
+  api.onQr((dataUrl) => {
+    if (dataUrl) {
+      $("qrImg").src = dataUrl;
+      $("qrImg").hidden = false;
+      $("qrPlaceholder").hidden = true;
+      if (showQrTab) gotoTab("qr");
+    } else {
+      $("qrImg").hidden = true;
+      $("qrPlaceholder").hidden = false;
+      $("qrPlaceholder").innerHTML = "Đăng nhập thành công — QR đã ẩn.<br/>Bot đang chạy, xem tab Log để theo dõi.";
+    }
+  });
+  api.onShowQr(() => gotoTab("qr"));
+  $("btnShowQr").addEventListener("click", () => gotoTab("qr"));
+
+  // ---- Log ----
+  const logView = $("logView");
+  api.onLog((entry) => {
+    const div = document.createElement("div");
+    div.className = "lv-" + (entry.level || "info");
+    const t = new Date(entry.ts).toLocaleTimeString("vi-VN");
+    div.textContent = `[${t}] ${entry.line}`;
+    logView.appendChild(div);
+    while (logView.childNodes.length > 800) logView.removeChild(logView.firstChild);
+    logView.scrollTop = logView.scrollHeight;
+    const uid = entry.line.match(/uid\s+(\d+)/i);
+    if (uid) $("mUid").textContent = uid[1];
+  });
+  $("btnClearLog").addEventListener("click", () => { logView.innerHTML = ""; });
+
+  // ---- Manage ----
+  $("btnStart").addEventListener("click", () => { showQrTab = true; api.start(); gotoTab("qr"); });
+  $("btnStop").addEventListener("click", () => api.stop());
+
+  // ---- Config ----
+  async function loadConfig() {
+    const cfg = await api.getConfig();
+    $("cWebhook").value = cfg.webhookUrl || "";
+    $("cSecret").value = cfg.webhookSecret || "";
+    $("cName").value = cfg.botName || "";
+    $("mShards").textContent = cfg.warehouses || "all";
+    const known = ["all", "1-15", "16-30"];
+    if (known.includes(cfg.warehouses)) {
+      $("cShards").value = cfg.warehouses;
+      $("customShardRow").hidden = true;
+    } else {
+      $("cShards").value = "custom";
+      $("cShardsCustom").value = cfg.warehouses || "";
+      $("customShardRow").hidden = false;
+    }
+    $("cAutoStart").checked = !!cfg.autoStartBot;
+    $("cWinBoot").checked = !!cfg.startWithWindows;
+  }
+  $("cShards").addEventListener("change", () => {
+    $("customShardRow").hidden = $("cShards").value !== "custom";
+  });
+  $("btnSave").addEventListener("click", async () => {
+    const warehouses = $("cShards").value === "custom" ? ($("cShardsCustom").value.trim() || "all") : $("cShards").value;
+    const cfg = await api.setConfig({
+      webhookUrl: $("cWebhook").value.trim(),
+      webhookSecret: $("cSecret").value.trim(),
+      botName: $("cName").value.trim() || "Bot",
+      warehouses,
+      autoStartBot: $("cAutoStart").checked,
+      startWithWindows: $("cWinBoot").checked,
+    });
+    $("mShards").textContent = cfg.warehouses;
+    $("saveHint").textContent = "Đã lưu! Bật/Tắt lại bot để áp dụng.";
+    setTimeout(() => { $("saveHint").textContent = ""; }, 3000);
+  });
+  loadConfig();
+</script>
+</body>
+</html>

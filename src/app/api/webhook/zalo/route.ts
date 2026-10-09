@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addQty, pushMessage, removeItem, upsertItem, findItem, transferItem, ensureWarehouseExists, recordBotPing } from "@/lib/store";
+import { addQty, claimMessage, pushMessage, removeItem, upsertItem, findItem, transferItem, ensureWarehouseExists, recordBotPing } from "@/lib/store";
 import { validateSku, extractValidSkusFromText } from "@/lib/sku-rules";
 import type { ZaloMessage } from "@/types";
 import { verifyWebhookSignature } from "@/lib/webhook-signature";
@@ -89,10 +89,16 @@ export async function POST(req: Request) {
   }
   const body = (() => { try { return JSON.parse(rawBody); } catch { return null; } })();
 
-  // Nhận tín hiệu heartbeat giữ trạng thái bot online
+  // Nhận diện nguồn tin: botName (máy nào gửi) + sourceId (id tin nhắn Zalo gốc)
+  const botName =
+    typeof body?.botName === "string" && body.botName.trim() ? body.botName.trim().slice(0, 40) : undefined;
+  const rawSourceId = typeof body?.sourceId === "string" ? body.sourceId.trim() : "";
+  const sourceId = /^[\w.-]{1,64}$/.test(rawSourceId) ? rawSourceId : undefined;
+
+  // Nhận tín hiệu heartbeat giữ trạng thái bot online (đa máy: theo botName)
   if (body?.action === "heartbeat" || body?.message === "__PING__") {
-    const pingTime = await recordBotPing();
-    return NextResponse.json({ ok: true, heartbeat: true, timestamp: pingTime });
+    const pingTime = await recordBotPing(botName);
+    return NextResponse.json({ ok: true, heartbeat: true, botName: botName ?? "Bot", timestamp: pingTime });
   }
 
   if (!body?.groupId || !body?.message) {
@@ -100,6 +106,21 @@ export async function POST(req: Request) {
   }
 
   try {
+    // CLAIM-FIRST DE-DUPLICATION: id = sourceId Zalo (fallback sinh id mới).
+    // 2 bot trong cùng nhóm đều forward 1 tin -> chỉ bot đầu claim được mới chạy effect,
+    // bot thứ hai nhận deduped=true và bỏ qua (tránh double hàng / sai vị trí).
+    const msgId = sourceId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const claimed = await claimMessage(msgId, body.groupId, body.message, botName);
+    if (!claimed) {
+      return NextResponse.json({
+        ok: true,
+        deduped: true,
+        sourceId: msgId,
+        botName,
+        message: "Tin nhắn này đã được xử lý bởi bot khác (bỏ qua)",
+      });
+    }
+
     // 0. XỬ LÝ LỆNH CHUYỂN KHO (Có thể gửi từ My Documents hoặc bất kỳ đâu)
     const transferCmd = parseTransferCommand(body.message);
     if (transferCmd) {
@@ -107,7 +128,7 @@ export async function POST(req: Request) {
       const result = await transferItem(sku, toWarehouse, "Chuyển kho qua tin nhắn Zalo");
 
       const msg: ZaloMessage = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: msgId,
         groupId: body.groupId,
         warehouse: toWarehouse,
         message: body.message,
@@ -116,6 +137,7 @@ export async function POST(req: Request) {
           ? `Đã chuyển mã [${sku}] từ Kho ${result.fromWarehouse} sang Kho ${toWarehouse} thành công!`
           : (result.error || "Không thể chuyển kho"),
         createdAt: new Date().toISOString(),
+        botName,
       };
       await pushMessage(msg);
 
@@ -132,13 +154,14 @@ export async function POST(req: Request) {
     const warehouse = parseWarehouse(body.groupId);
     if (!warehouse) {
       const msg: ZaloMessage = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: msgId,
         groupId: body.groupId,
         warehouse: null,
         message: body.message,
         status: "error",
         detail: "Không nhận diện được số kho từ tên nhóm",
         createdAt: new Date().toISOString(),
+        botName,
       };
       await pushMessage(msg);
       return NextResponse.json({ ok: false, message: msg }, { status: 400 });
@@ -186,13 +209,14 @@ export async function POST(req: Request) {
       }
 
       const msg: ZaloMessage = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: msgId,
         groupId: body.groupId,
         warehouse,
         message: body.message,
         status: added.length > 0 ? "ok" : "error",
         detail,
         createdAt: new Date().toISOString(),
+        botName,
       };
       await pushMessage(msg);
 
@@ -210,13 +234,14 @@ export async function POST(req: Request) {
     const parsed = parseMessage(body.message);
     if (!parsed || parsed.error) {
       const msg: ZaloMessage = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: msgId,
         groupId: body.groupId,
         warehouse,
         message: body.message,
         status: "error",
         detail: parsed?.error || "Cú pháp mã không hợp lệ",
         createdAt: new Date().toISOString(),
+        botName,
       };
       await pushMessage(msg);
       return NextResponse.json({ 
@@ -234,25 +259,27 @@ export async function POST(req: Request) {
       if (existing && existing.status !== "sold") {
         if (existing.warehouse !== warehouse) {
           const msg: ZaloMessage = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            id: msgId,
             groupId: body.groupId,
             warehouse,
             message: body.message,
             status: "error",
             detail: `CẢNH BÁO TRÙNG MÃ: [${parsed.sku}] hiện đang nằm ở Kho ${existing.warehouse}. Không thể nạp trùng vào Kho ${warehouse}!`,
             createdAt: new Date().toISOString(),
+            botName,
           };
           await pushMessage(msg);
           return NextResponse.json({ ok: false, message: msg, duplicate: true }, { status: 409 });
         } else {
           const msg: ZaloMessage = {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            id: msgId,
             groupId: body.groupId,
             warehouse,
             message: body.message,
             status: "error",
             detail: `CẢNH BÁO TRÙNG MÃ: [${parsed.sku}] đã có sẵn trong Kho ${warehouse} rồi!`,
             createdAt: new Date().toISOString(),
+            botName,
           };
           await pushMessage(msg);
           return NextResponse.json({ ok: false, message: msg, duplicate: true }, { status: 409 });
@@ -274,13 +301,14 @@ export async function POST(req: Request) {
     }
 
     const msg: ZaloMessage = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: msgId,
       groupId: body.groupId,
       warehouse,
       message: body.message,
       status: "ok",
       detail,
       createdAt: new Date().toISOString(),
+      botName,
     };
     await pushMessage(msg);
 

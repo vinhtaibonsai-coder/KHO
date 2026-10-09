@@ -49,6 +49,10 @@ zalo-bot/qr.png
 data/.bot-ping.json
 *.log
 
+# zalo-bot-desktop (Electron)
+zalo-bot-app/node_modules/
+zalo-bot-app/dist/
+
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
