@@ -17,15 +17,14 @@
     document.querySelector(`nav button[data-tab="${name}"]`)?.click();
   }
 
-  // ---- Status ----
+  // ---- Trạng thái ----
   function renderStatus(s) {
     online = !!s.online;
-    $("statusDot").classList.toggle("on", online);
     $("statusBadge").className = "badge " + (online ? "on" : "off");
-    $("statusBadge").textContent = online ? "Online" : "Offline";
+    $("statusText").textContent = online ? "Online" : "Offline";
     $("botLabel").textContent = s.botName || "";
-    $("mBotName").textContent = s.botName || "â€”";
-    $("mConn").textContent = online ? "Äang káº¿t ná»‘i Zalo" : "Offline";
+    $("mBotName").textContent = s.botName || "—";
+    $("mConn").textContent = online ? "Đang kết nối Zalo" : "Offline";
     $("btnStart").disabled = online;
     $("btnStop").disabled = !online;
   }
@@ -42,7 +41,7 @@
     } else {
       $("qrImg").hidden = true;
       $("qrPlaceholder").hidden = false;
-      $("qrPlaceholder").innerHTML = "ÄÄƒng nháº­p thÃ nh cÃ´ng â€” QR Ä‘Ã£ áº©n.<br/>Bot Ä‘ang cháº¡y, xem tab Log Ä‘á»ƒ theo dÃµi.";
+      $("qrPlaceholder").innerHTML = "Đăng nhập thành công — QR đã ẩn.<br/>Bot đang chạy, xem tab Log để theo dõi.";
     }
   });
   api.onShowQr(() => gotoTab("qr"));
@@ -63,11 +62,11 @@
   });
   $("btnClearLog").addEventListener("click", () => { logView.innerHTML = ""; });
 
-  // ---- Manage ----
+  // ---- Quản lý ----
   $("btnStart").addEventListener("click", () => { showQrTab = true; api.start(); gotoTab("qr"); });
   $("btnStop").addEventListener("click", () => api.stop());
 
-  // ---- Config ----
+  // ---- Cấu hình ----
   async function loadConfig() {
     const cfg = await api.getConfig();
     $("cWebhook").value = cfg.webhookUrl || "";
@@ -100,8 +99,7 @@
       startWithWindows: $("cWinBoot").checked,
     });
     $("mShards").textContent = cfg.warehouses;
-    $("saveHint").textContent = "ÄÃ£ lÆ°u! Báº­t/Táº¯t láº¡i bot Ä‘á»ƒ Ã¡p dá»¥ng.";
+    $("saveHint").textContent = "Đã lưu! Bật/Tắt lại bot để áp dụng.";
     setTimeout(() => { $("saveHint").textContent = ""; }, 3000);
   });
   loadConfig();
-

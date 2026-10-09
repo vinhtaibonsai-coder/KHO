@@ -238,7 +238,7 @@ function createWindow() {
     minWidth: 860,
     minHeight: 600,
     title: "Zalo Bot Desktop",
-    backgroundColor: "#0f172a",
+    backgroundColor: "#f8fafc",
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
