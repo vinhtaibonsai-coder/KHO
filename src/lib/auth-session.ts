@@ -36,13 +36,52 @@ export function getActiveSessionSecret(): string {
   return DEFAULT_SESSION_SECRET;
 }
 
-export async function createSessionToken(secret: string = getActiveSessionSecret(), now = Date.now()): Promise<string> {
+export type SessionRole = "admin" | "staff";
+
+export async function createSessionToken(
+  secret: string = getActiveSessionSecret(),
+  role: SessionRole = "admin",
+  now = Date.now()
+): Promise<string> {
   const activeSecret = secret?.length >= 32 ? secret : getActiveSessionSecret();
   const payload = bytesToBase64Url(
-    encoder.encode(JSON.stringify({ iat: now, exp: now + SESSION_TTL_SECONDS * 1000 }))
+    encoder.encode(JSON.stringify({ iat: now, exp: now + SESSION_TTL_SECONDS * 1000, role }))
   );
   const signature = bytesToBase64Url(await hmac(activeSecret, payload));
   return `${payload}.${signature}`;
+}
+
+/**
+ * Trích role từ token hợp lệ. Trả về null nếu token sai/hết hạn.
+ * Token cũ (không có role) -> "admin" để tương thích phiên bản trước.
+ */
+export async function getSessionRole(
+  token: string | undefined,
+  secret: string | undefined = getActiveSessionSecret(),
+  now = Date.now()
+): Promise<SessionRole | null> {
+  const activeSecret = secret && secret.length >= 32 ? secret : getActiveSessionSecret();
+  if (!token || !activeSecret) return null;
+  const [payload, signature, extra] = token.split(".");
+  if (!payload || !signature || extra) return null;
+  try {
+    const actual = base64UrlToBytes(signature);
+    const expected = await hmac(activeSecret, payload);
+    if (actual.length !== expected.length) return null;
+    let difference = 0;
+    for (let i = 0; i < expected.length; i++) difference |= actual[i] ^ expected[i];
+    if (difference !== 0) return null;
+    const parsed = JSON.parse(new TextDecoder().decode(base64UrlToBytes(payload))) as {
+      iat?: number;
+      exp?: number;
+      role?: string;
+    };
+    if (!Number.isFinite(parsed.iat) || !Number.isFinite(parsed.exp)) return null;
+    if (!(parsed.iat! <= now && parsed.exp! > now)) return null;
+    return parsed.role === "staff" ? "staff" : "admin";
+  } catch {
+    return null;
+  }
 }
 
 export async function verifySessionToken(

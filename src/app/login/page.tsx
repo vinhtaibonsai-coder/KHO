@@ -11,6 +11,23 @@ export default function LoginPage() {
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [shake, setShake] = useState<boolean>(false);
+  const [lockRemaining, setLockRemaining] = useState<number>(0);
+
+  // Đếm ngược khóa đăng nhập (429)
+  useEffect(() => {
+    if (lockRemaining <= 0) return;
+    const t = window.setInterval(() => {
+      setLockRemaining((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(t);
+          setError("");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [lockRemaining > 0]);
 
   // Auto redirect nếu đã có session hợp lệ
   useEffect(() => {
@@ -33,7 +50,7 @@ export default function LoginPage() {
   };
 
   const handleKeyPress = (digit: string) => {
-    if (loading) return;
+    if (loading || lockRemaining > 0) return;
     triggerHaptic(12);
     setError("");
     if (pin.length < 4) {
@@ -46,14 +63,14 @@ export default function LoginPage() {
   };
 
   const handleDelete = () => {
-    if (loading) return;
+    if (loading || lockRemaining > 0) return;
     triggerHaptic(15);
     setError("");
     setPin((prev) => prev.slice(0, -1));
   };
 
   const handleClear = () => {
-    if (loading) return;
+    if (loading || lockRemaining > 0) return;
     triggerHaptic(20);
     setError("");
     setPin("");
@@ -69,6 +86,14 @@ export default function LoginPage() {
         body: JSON.stringify({ pin: codeToVerify }),
       });
       const data = await response.json().catch(() => ({}));
+
+      if (response.status === 429) {
+        const sec = Number(data.retryAfterSec) || 300;
+        setLockRemaining(sec);
+        const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+        const ss = String(sec % 60).padStart(2, "0");
+        throw new Error(`Khóa đăng nhập — thử lại sau ${mm}:${ss}`);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || "Mã PIN không chính xác");
@@ -108,7 +133,7 @@ export default function LoginPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [pin, loading]);
+  }, [pin, loading, lockRemaining]);
 
   const keypadNumbers = [
     ["1", "2", "3"],
@@ -186,6 +211,11 @@ export default function LoginPage() {
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
               Đang xác thực thông tin...
             </p>
+          ) : lockRemaining > 0 ? (
+            <p className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-0.5 rounded-full shadow-sm">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+              Khóa đăng nhập — thử lại sau {String(Math.floor(lockRemaining / 60)).padStart(2, "0")}:{String(lockRemaining % 60).padStart(2, "0")}
+            </p>
           ) : error ? (
             <p className="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-3 py-0.5 rounded-full shadow-sm">
               <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-600" />
@@ -208,7 +238,7 @@ export default function LoginPage() {
                 key={num}
                 type="button"
                 onClick={() => handleKeyPress(num)}
-                disabled={loading}
+                disabled={loading || lockRemaining > 0}
                 className="w-15 h-15 sm:w-18 sm:h-18 rounded-full bg-white hover:bg-slate-50 border border-slate-200/90 active:border-emerald-500 text-2xl font-bold text-slate-800 hover:text-emerald-700 flex flex-col items-center justify-center active:scale-90 active:bg-emerald-50 transition-all duration-100 shadow-sm shadow-slate-200 active:shadow-inner cursor-pointer touch-manipulation"
               >
                 <span>{num}</span>
@@ -220,7 +250,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={handleClear}
-            disabled={loading || pin.length === 0}
+            disabled={loading || lockRemaining > 0 || pin.length === 0}
             className="w-15 h-15 sm:w-18 sm:h-18 rounded-full bg-slate-100 hover:bg-slate-200/80 active:bg-slate-200 text-[10px] font-bold text-slate-600 hover:text-slate-800 flex items-center justify-center active:scale-90 transition-all duration-100 disabled:opacity-25 disabled:pointer-events-none cursor-pointer touch-manipulation"
           >
             XÓA HẾT
@@ -229,7 +259,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => handleKeyPress("0")}
-            disabled={loading}
+            disabled={loading || lockRemaining > 0}
             className="w-15 h-15 sm:w-18 sm:h-18 rounded-full bg-white hover:bg-slate-50 border border-slate-200/90 active:border-emerald-500 text-2xl font-bold text-slate-800 hover:text-emerald-700 flex items-center justify-center active:scale-90 active:bg-emerald-50 transition-all duration-100 shadow-sm shadow-slate-200 active:shadow-inner cursor-pointer touch-manipulation"
           >
             0
@@ -238,7 +268,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={handleDelete}
-            disabled={loading || pin.length === 0}
+            disabled={loading || lockRemaining > 0 || pin.length === 0}
             className="w-15 h-15 sm:w-18 sm:h-18 rounded-full bg-slate-100 hover:bg-rose-50 active:bg-rose-100 text-slate-600 hover:text-rose-600 flex items-center justify-center active:scale-90 transition-all duration-100 disabled:opacity-25 disabled:pointer-events-none cursor-pointer touch-manipulation"
           >
             <Delete className="w-5 h-5 sm:w-6 sm:h-6" />

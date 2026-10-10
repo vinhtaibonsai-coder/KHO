@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { upsertItem, pushMessage, TOTAL_WAREHOUSES, findItem } from "@/lib/store";
 import { extractValidSkusFromText } from "@/lib/sku-rules";
+import { requireAdmin } from "@/lib/auth-role";
 import type { ZaloMessage } from "@/types";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
+  if (gate) return gate;
   try {
     const body = await req.json().catch(() => null);
     const warehouse = Number(body?.warehouse);

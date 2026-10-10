@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth-session";
+import { SESSION_COOKIE, getSessionRole } from "@/lib/auth-session";
 
 export async function GET(request: NextRequest) {
-  const authenticated = await verifySessionToken(
-    request.cookies.get(SESSION_COOKIE)?.value
-  );
-  return NextResponse.json({ authenticated }, { status: authenticated ? 200 : 401 });
+  const role = await getSessionRole(request.cookies.get(SESSION_COOKIE)?.value);
+  const authenticated = role !== null;
+  return NextResponse.json({ authenticated, role }, { status: authenticated ? 200 : 401 });
 }

@@ -48,6 +48,9 @@ export async function processSyncQueue(
         if (res.ok) {
           await removeMutation(item.id);
           processed++;
+        } else if (res.status === 403) {
+          // Server chặn quyền (staff) -> bỏ mutation, không retry
+          await removeMutation(item.id);
         } else {
           errors++;
           await updateMutationStatus(item.id, "failed", item.retryCount + 1);

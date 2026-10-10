@@ -17,5 +17,6 @@ export const config = {
     "/",
     "/api/items/:path*",
     "/api/simulator/:path*",
+    "/api/backup/:path*",
   ],
 };

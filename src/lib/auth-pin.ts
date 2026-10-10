@@ -112,6 +112,89 @@ export async function updatePinInDatabase(newPin: string): Promise<string> {
 }
 
 /**
+ * Đọc mã PIN hash của Nhân viên (staff):
+ * 1. Supabase warehouse_settings.staff_pin_hash
+ * 2. File local data/system_settings.json (staffPinHash)
+ * Trả về null nếu chưa cấu hình (an toàn mặc định: không cho đăng nhập staff).
+ */
+export async function getStaffPinHash(): Promise<string | null> {
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      if (sb) {
+        const { data, error } = await sb
+          .from("warehouse_settings")
+          .select("staff_pin_hash")
+          .eq("id", "default")
+          .maybeSingle();
+        if (!error && data?.staff_pin_hash) {
+          return String(data.staff_pin_hash).trim();
+        }
+      }
+    } catch {
+      // Ignored, fallback to local file
+    }
+  }
+
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
+      if (parsed?.staffPinHash) {
+        return String(parsed.staffPinHash).trim();
+      }
+    }
+  } catch {
+    // Ignored
+  }
+
+  return null;
+}
+
+/**
+ * Cập nhật mã PIN Nhân viên mới (hash rồi ghi cả 2 nơi, mirror updatePinInDatabase)
+ */
+export async function setStaffPinHash(pin: string): Promise<string> {
+  const newHash = await hashPin(pin);
+
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      if (sb) {
+        const { data: updated } = await sb
+          .from("warehouse_settings")
+          .update({ staff_pin_hash: newHash })
+          .eq("id", "default")
+          .select();
+        if (!updated || updated.length === 0) {
+          await sb.from("warehouse_settings").upsert(
+            { id: "default", staff_pin_hash: newHash },
+            { onConflict: "id" }
+          );
+        }
+      }
+    } catch (err) {
+      console.warn("Lỗi lưu PIN staff vào Supabase:", err);
+    }
+  }
+
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    const current = fs.existsSync(SETTINGS_FILE)
+      ? JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"))
+      : {};
+    current.staffPinHash = newHash;
+    current.updatedAt = new Date().toISOString();
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(current, null, 2), "utf-8");
+  } catch (err) {
+    console.warn("Lỗi lưu PIN staff vào system_settings.json:", err);
+  }
+
+  return newHash;
+}
+
+/**
  * Kiểm tra mã PIN người dùng nhập
  */
 export async function verifyPin(pin: string, encodedHash: string | undefined): Promise<boolean> {
