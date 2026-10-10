@@ -9,7 +9,8 @@ import {
   AlertCircle, 
   Warehouse as WarehouseIcon, 
   ArrowRight,
-  ListChecks
+  ListChecks,
+  FileSpreadsheet
 } from "lucide-react";
 
 import type { Item } from "@/types";
@@ -36,6 +37,8 @@ export default function PasteImportModal({
   const [rawText, setRawText] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  const [importingFile, setImportingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Chặn double-click trong cùng 1 tick (state `loading` chỉ cập nhật sau tick)
   const isSubmittingRef = useRef(false);
 
@@ -135,6 +138,56 @@ export default function PasteImportModal({
   }, [rawText, existingItems, warehouse]);
 
   if (!isOpen) return null;
+
+  // Đọc file Excel/CSV -> gộp cột Ma/Kho thành text để chạy đúng pipeline dán mã hiện có
+  async function handleFileSelect(file: File) {
+    setImportingFile(true);
+    setStatus(null);
+    try {
+      const XLSX = await import("xlsx");
+      const wb = XLSX.read(await file.arrayBuffer());
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+      if (!rows.length) {
+        throw new Error("File trống hoặc không đọc được dữ liệu");
+      }
+
+      // Tìm dòng header chứa cột Ma (Ma SKU / ma / sku)
+      const headerKeys = Object.keys(rows[0]);
+      const skuKey = headerKeys.find((k) => /^(mã?\s*sku|mã|ma|sku)/i.test(k.trim()));
+      const whKey = headerKeys.find((k) => /^(kho|warehouse)/i.test(k.trim()));
+
+      const lines: string[] = [];
+      let detectedWh: number | null = null;
+      for (const row of rows) {
+        const sku = String(skuKey ? row[skuKey] ?? "" : Object.values(row)[0] ?? "").trim();
+        if (!sku) continue;
+        lines.push(sku);
+        if (detectedWh === null && whKey) {
+          const whNum = Number(String(row[whKey]).match(/\d+/)?.[0]);
+          if (Number.isInteger(whNum) && whNum >= 1 && whNum <= totalWarehouses) detectedWh = whNum;
+        }
+      }
+      if (!lines.length) {
+        throw new Error("Không tìm thấy cột Mã SKU trong file");
+      }
+
+      setRawText(lines.join("\n"));
+      if (detectedWh !== null) setWarehouse(detectedWh);
+      setStatus({
+        type: "success",
+        msg: `Đã đọc ${lines.length} mã từ file ${file.name}${detectedWh !== null ? ` (phát hiện Kho ${pad(detectedWh)})` : ""}. Kiểm tra rồi bấm Nạp vào kho.`,
+      });
+    } catch (err) {
+      setStatus({
+        type: "error",
+        msg: err instanceof Error ? `Không đọc được file: ${err.message}` : "Không đọc được file",
+      });
+    } finally {
+      setImportingFile(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   async function handleImport() {
     if (isSubmittingRef.current) return;
@@ -272,6 +325,32 @@ export default function PasteImportModal({
               className="w-full rounded-xl border border-slate-300 bg-slate-50/50 p-3.5 font-mono text-xs text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-3 focus:ring-emerald-500/10 placeholder:text-slate-400"
             />
           </div>
+
+          {/* HOẶC CHỌN FILE EXCEL / CSV */}
+          <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400">
+            <span className="h-px flex-1 bg-slate-200" />
+            HOẶC
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) void handleFileSelect(f);
+            }}
+          />
+          <button
+            type="button"
+            disabled={importingFile}
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-3.5 py-3 text-xs font-bold text-slate-600 hover:border-teal-400 hover:text-teal-700 hover:bg-teal-50/50 transition cursor-pointer disabled:opacity-60"
+          >
+            <FileSpreadsheet className="h-4 w-4" />
+            {importingFile ? "Đang đọc file..." : "Chọn file Excel (.xlsx / .csv) — cột Ma, Kho"}
+          </button>
 
           {/* BẢNG QUY TẮC SIZE & TIỀN TỐ THEO CHUẨN */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs space-y-2">

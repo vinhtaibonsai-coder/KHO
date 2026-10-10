@@ -1,7 +1,7 @@
 "use client";
 
 import React, { forwardRef } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, Camera } from "lucide-react";
 
 const QUICK_FILTERS = [
   { label: "Tất cả", value: "" },
@@ -20,10 +20,11 @@ export interface SearchBarProps {
   inputRef?: React.Ref<HTMLInputElement>;
   autoFocus?: boolean;
   availableSkus?: string[];
+  onScan?: () => void;
 }
 
 const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBar(
-  { value, onChange, inputRef, autoFocus = false },
+  { value, onChange, inputRef, autoFocus = false, onScan },
   ref
 ) {
   // Kết hợp ref từ cả forwardRef lẫn prop inputRef
@@ -57,6 +58,20 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
           autoCapitalize="characters"
           className="w-full rounded-full border border-slate-200/90 bg-slate-100/80 hover:bg-slate-100 py-3 pr-10 pl-9 font-mono text-sm sm:text-base font-bold tracking-wide text-slate-900 uppercase transition placeholder:font-sans placeholder:text-xs sm:placeholder:text-sm placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/15 shadow-inner"
         />
+
+        {/* NÚT CAMERA QUÉT MÃ VẠCH (CHỈ MOBILE + KHI Ô TÌM KIẾM TRỐNG) */}
+        {onScan && !value && (
+          <button
+            type="button"
+            onClick={onScan}
+            className="absolute inset-y-0 right-0 flex items-center pr-3 text-emerald-600 hover:text-emerald-700 cursor-pointer z-10 sm:hidden"
+            title="Quét mã vạch bằng camera"
+          >
+            <div className="rounded-full bg-emerald-100 hover:bg-emerald-200 p-1.5 flex items-center justify-center transition">
+              <Camera className="h-4 w-4 text-emerald-700" />
+            </div>
+          </button>
+        )}
 
         {value && (
           <button

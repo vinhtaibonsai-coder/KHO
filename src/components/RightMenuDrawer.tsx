@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { 
   X, 
@@ -27,15 +27,26 @@ import {
   Wifi,
   WifiOff,
   ClipboardPaste,
-  Boxes
+  Boxes,
+  History,
+  Volume2,
+  VolumeX,
+  Vibrate,
+  Eye
 } from "lucide-react";
 import { APP_VERSION, APP_BUILD_TIME } from "@/lib/version";
+import type { SessionRole } from "@/lib/auth-session";
+import { getSettings, setSettings, SETTINGS_EVENT, type AppSettings } from "@/lib/app-settings";
+import { tingFound } from "@/lib/audio";
+import { vibrate } from "@/lib/haptics";
 import type { Item, ItemHistory, ZaloMessage } from "@/types";
 import ZaloLiveFeed from "@/components/ZaloLiveFeed";
 import ZaloSimulator from "@/components/ZaloSimulator";
 import ConfirmModal from "@/components/ConfirmModal";
 
 const pad = (n: number) => String(n).padStart(2, "0");
+
+type BackupMeta = { id: string; snapshotDate: string; itemCount: number; createdAt: string };
 
 export default function RightMenuDrawer({
   isOpen,
@@ -52,6 +63,7 @@ export default function RightMenuDrawer({
   onOpenWarehouse,
   onSendWebhook,
   onFilterSkuType,
+  role = "admin",
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -62,12 +74,14 @@ export default function RightMenuDrawer({
   messages: ZaloMessage[];
   botStatus?: { online: boolean; lastPing: string | null; bots?: { name: string; online: boolean; lastPing: string | null }[] };
   dbStatus?: { connected: boolean; type: "supabase" | "local"; latencyMs?: number; itemCount?: number };
+  role?: SessionRole;
   onAddWarehouse: () => Promise<void>;
   onOpenPaste: () => void;
   onOpenWarehouse?: (warehouse: number) => void;
   onSendWebhook?: (payload: { groupId: string; message: string }) => Promise<{ ok: boolean; message: ZaloMessage }>;
   onFilterSkuType?: (prefix: string) => void;
 }) {
+  const isAdmin = role !== "staff";
   const [addingWh, setAddingWh] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
@@ -75,13 +89,40 @@ export default function RightMenuDrawer({
   const [showChangePinModal, setShowChangePinModal] = useState(false);
   const [currentPinInput, setCurrentPinInput] = useState("");
   const [newPinInput, setNewPinInput] = useState("");
+  const [newStaffPinInput, setNewStaffPinInput] = useState("");
   const [pinChangeError, setPinChangeError] = useState("");
   const [pinChangeLoading, setPinChangeLoading] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [settings, setSettingsState] = useState<AppSettings>({ sound: true, haptic: true });
+  const [backups, setBackups] = useState<BackupMeta[]>([]);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<BackupMeta | null>(null);
+  const [showAddWhConfirm, setShowAddWhConfirm] = useState(false);
 
-  const [mounted, setMounted] = useState(false);
+  // Đồng bộ toggle âm thanh/rung
+  useEffect(() => {
+    const sync = () => setSettingsState(getSettings());
+    sync();
+    window.addEventListener(SETTINGS_EVENT, sync as EventListener);
+    return () => window.removeEventListener(SETTINGS_EVENT, sync as EventListener);
+  }, []);
+
+  const loadBackups = useCallback(async () => {
+    try {
+      const res = await fetch("/api/backup", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.backups)) setBackups(data.backups);
+    } catch {}
+  }, []);
 
   useEffect(() => {
-    setMounted(true);
+    fetch("/api/backup", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (Array.isArray(data?.backups)) setBackups(data.backups);
+      })
+      .catch(() => undefined);
   }, []);
 
   // Khóa cuộn trang nền an toàn chuẩn Mobile PWA (iOS Safari & Android Chrome)
@@ -128,41 +169,120 @@ export default function RightMenuDrawer({
     return map;
   })();
 
-  // Xuất file CSV / Excel danh sách mã kho
-  const handleExportCSV = () => {
+  // Chuẩn bị dữ liệu xuất chung cho CSV + Excel (7 cột)
+  const buildRows = () => {
+    const headers = ["STT", "Mã SKU", "Kho Vị Trí", "Trạng Thái", "Tên Mặt Hàng", "Số Lượng", "Ngày Nhập (Cập Nhật)"];
+    const rows = items.map((it, idx) => [
+      idx + 1,
+      it.sku,
+      `Kho ${pad(it.warehouse)}`,
+      it.status === "sold" ? "Đã bán" : "Còn trong kho",
+      it.name,
+      it.qty,
+      new Date(it.updatedAt).toLocaleString("vi-VN"),
+    ]);
+    return { headers, rows };
+  };
+
+  // Xuất file CSV / Excel danh sách mã kho (1 click, dynamic import xlsx)
+  const handleExport = async (format: "csv" | "xlsx") => {
+    setExportMenuOpen(false);
     setExporting(true);
     try {
-      // Header CSV với BOM để Excel tiếng Việt không bị lỗi font
-      const BOM = "\uFEFF";
-      const headers = ["STT", "Mã SKU", "Kho Vị Trí", "Trạng Thái", "Tên Mặt Hàng", "Số Lượng", "Thời Gian Cập Nhật"];
-      const rows = items.map((it, idx) => [
-        idx + 1,
-        `"${it.sku}"`,
-        `"Kho ${pad(it.warehouse)}"`,
-        `"${it.status === "sold" ? "Đã bán" : "Còn trong kho"}"`,
-        `"${it.name}"`,
-        it.qty,
-        `"${new Date(it.updatedAt).toLocaleString("vi-VN")}"`,
-      ]);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const base = `Bao_Cao_Kho_Xuong_Lua_Nhut_${stamp}`;
+      const { headers, rows } = buildRows();
 
-      const csvContent = BOM + [headers.join(","), ...rows.map((r) => r.join(","))].join("\r\n");
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `Bao_Cao_Kho_Xuong_Lua_Nhut_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (format === "xlsx") {
+        const XLSX = await import("xlsx");
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "TonKho");
+        XLSX.writeFile(wb, `${base}.xlsx`);
+      } else {
+        // Header CSV với BOM để Excel tiếng Việt không bị lỗi font
+        const BOM = "\uFEFF";
+        const csvRows = rows.map((r) =>
+          r.map((c, i) => (typeof c === "string" && (i === 1 || i === 2 || i === 3 || i === 4 || i === 6) ? `"${c}"` : String(c))).join(",")
+        );
+        const csvContent = BOM + [headers.join(","), ...csvRows].join("\r\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", `${base}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } catch (e) {
-      console.error("Lỗi xuất file CSV:", e);
+      console.error("Lỗi xuất file:", e);
       alert("Không thể xuất file lúc này");
     } finally {
       setExporting(false);
     }
   };
 
-  const [showAddWhConfirm, setShowAddWhConfirm] = useState(false);
+  // Sao lưu ngay / phục hồi / tải snapshot
+  const handleCreateBackup = async () => {
+    setBackupBusy(true);
+    try {
+      const res = await fetch("/api/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "create" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Sao lưu thất bại");
+      setAddSuccess(`Đã sao lưu ${data.backup?.itemCount ?? items.length} mã thành công!`);
+      setTimeout(() => setAddSuccess(null), 4000);
+      await loadBackups();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Không sao lưu được");
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleDownloadBackup = async (id: string) => {
+    try {
+      const res = await fetch(`/api/backup?id=${encodeURIComponent(id)}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Không tải được snapshot");
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `backup_${id}.json`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Không tải được file");
+    }
+  };
+
+  const executeRestore = async () => {
+    if (!restoreTarget) return;
+    setBackupBusy(true);
+    try {
+      const res = await fetch("/api/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restore", id: restoreTarget.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Phục hồi thất bại");
+      setAddSuccess(`Đã phục hồi ${data.itemCount} mã từ snapshot ${restoreTarget.snapshotDate}!`);
+      setTimeout(() => setAddSuccess(null), 5000);
+      setRestoreTarget(null);
+      window.location.reload();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Không phục hồi được");
+      setBackupBusy(false);
+    }
+  };
 
   const handleCreateWarehouse = () => {
     setShowAddWhConfirm(true);
@@ -191,8 +311,17 @@ export default function RightMenuDrawer({
   const handleChangePin = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinChangeError("");
-    if (!/^\d{4}$/.test(newPinInput)) {
+    const hasStaffPin = newStaffPinInput.length > 0;
+    if (newPinInput.length === 0 && !hasStaffPin) {
+      setPinChangeError("Nhập PIN mới hoặc PIN Nhân viên mới");
+      return;
+    }
+    if (newPinInput && !/^\d{4}$/.test(newPinInput)) {
       setPinChangeError("Mã PIN mới phải gồm đúng 4 chữ số");
+      return;
+    }
+    if (hasStaffPin && !/^\d{4}$/.test(newStaffPinInput)) {
+      setPinChangeError("Mã PIN Nhân viên phải gồm đúng 4 chữ số");
       return;
     }
 
@@ -201,17 +330,22 @@ export default function RightMenuDrawer({
       const res = await fetch("/api/auth/change-pin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPin: currentPinInput, newPin: newPinInput }),
+        body: JSON.stringify(
+          hasStaffPin
+            ? { currentPin: currentPinInput, newStaffPin: newStaffPinInput }
+            : { currentPin: currentPinInput, newPin: newPinInput }
+        ),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data.error || "Không thể đổi mã PIN");
       }
-      setAddSuccess("Đã cập nhật mã PIN mới vào hệ thống thành công!");
+      setAddSuccess(data.message || "Đã cập nhật mã PIN mới vào hệ thống thành công!");
       setTimeout(() => setAddSuccess(null), 5000);
       setShowChangePinModal(false);
       setCurrentPinInput("");
       setNewPinInput("");
+      setNewStaffPinInput("");
     } catch (err) {
       setPinChangeError(err instanceof Error ? err.message : "Lỗi đổi mã PIN");
     } finally {
@@ -239,6 +373,11 @@ export default function RightMenuDrawer({
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
                     v{APP_VERSION}
                   </span>
+                  {!isAdmin && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0">
+                      <Eye className="h-2.5 w-2.5" /> Chỉ xem
+                    </span>
+                  )}
                 </div>
                 <p className="text-[11px] text-slate-500 font-medium">Menu Quản Lý & Tiện Ích Kho</p>
               </div>
@@ -281,7 +420,8 @@ export default function RightMenuDrawer({
               </div>
 
               <div className="rounded-2xl bg-white border border-slate-200/90 divide-y divide-slate-100 shadow-xs overflow-hidden">
-                {/* Mục 1: Thêm ô kho */}
+                {/* Mục 1: Thêm ô kho (CHỈ ADMIN) */}
+                {isAdmin && (
                 <button
                   type="button"
                   disabled={addingWh}
@@ -308,8 +448,10 @@ export default function RightMenuDrawer({
                     <ChevronRight className="h-4 w-4 text-slate-300" />
                   </div>
                 </button>
+                )}
 
-                {/* Mục 2: Dán đoạn chat Zalo */}
+                {/* Mục 2: Dán đoạn chat Zalo (CHỈ ADMIN) */}
+                {isAdmin && (
                 <button
                   type="button"
                   onClick={() => {
@@ -338,36 +480,118 @@ export default function RightMenuDrawer({
                     <ChevronRight className="h-4 w-4 text-slate-300" />
                   </div>
                 </button>
+                )}
 
                 {/* Mục 3: Xuất file Excel / CSV */}
-                <button
-                  type="button"
-                  disabled={exporting || items.length === 0}
-                  onClick={handleExportCSV}
-                  className="w-full flex items-center justify-between p-3.5 hover:bg-slate-50 transition cursor-pointer text-left disabled:opacity-50"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                      <FileSpreadsheet className="h-4 w-4" />
+                <div className="p-3.5 hover:bg-slate-50 transition">
+                  <button
+                    type="button"
+                    disabled={exporting || items.length === 0}
+                    onClick={() => setExportMenuOpen((v) => !v)}
+                    className="w-full flex items-center justify-between text-left disabled:opacity-50 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <FileSpreadsheet className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs sm:text-sm font-bold text-slate-900 block">
+                          Xuất File Báo Cáo
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          Tải bảng Excel / CSV {items.length} mã sản phẩm
+                        </span>
+                      </div>
                     </div>
-                    <div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className="text-[11px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-lg border border-teal-200">
+                        {exporting ? "Đang tải..." : "Chọn định dạng"}
+                      </span>
+                      {exportMenuOpen ? <ChevronUp className="h-4 w-4 text-slate-300" /> : <ChevronDown className="h-4 w-4 text-slate-300" />}
+                    </div>
+                  </button>
+                  {exportMenuOpen && (
+                    <div className="mt-2 grid grid-cols-2 gap-2 animate-in fade-in">
+                      <button
+                        type="button"
+                        onClick={() => handleExport("xlsx")}
+                        className="rounded-xl border border-teal-300 bg-teal-50 px-3 py-2 text-xs font-bold text-teal-800 hover:bg-teal-100 transition cursor-pointer"
+                      >
+                        Excel (.xlsx)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExport("csv")}
+                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                      >
+                        CSV (.csv)
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mục: Sao lưu & Phục hồi kho */}
+                <div className="p-3.5 hover:bg-slate-50 transition space-y-2.5">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                      <History className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1">
                       <span className="text-xs sm:text-sm font-bold text-slate-900 block">
-                        Xuất File Báo Cáo
+                        Sao Lưu & Phục Hồi Kho
                       </span>
                       <span className="text-[11px] text-slate-400 font-medium">
-                        Tải bảng Excel / CSV {items.length} mã sản phẩm
+                        {backups.length > 0 ? `${backups.length} bản đã lưu · mới nhất ${backups[0]?.snapshotDate}` : "Chưa có bản sao lưu nào"}
                       </span>
                     </div>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        disabled={backupBusy}
+                        onClick={handleCreateBackup}
+                        className="shrink-0 rounded-xl bg-indigo-600 px-2.5 py-1.5 text-[11px] font-bold text-white hover:bg-indigo-700 transition cursor-pointer disabled:opacity-50"
+                      >
+                        {backupBusy ? "Đang lưu..." : "Sao lưu ngay"}
+                      </button>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-[11px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-lg border border-teal-200">
-                      {exporting ? "Đang tải..." : "Tải Excel"}
-                    </span>
-                    <ChevronRight className="h-4 w-4 text-slate-300" />
-                  </div>
-                </button>
 
-                {/* Mục 4: Đổi mã PIN hệ thống */}
+                  {backups.length > 0 && (
+                    <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100 bg-white">
+                      {backups.slice(0, 10).map((b) => (
+                        <div key={b.id} className="flex items-center justify-between gap-2 px-2.5 py-2 text-[11px]">
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-800 block truncate">
+                              {b.snapshotDate} · {new Date(b.createdAt).toLocaleTimeString("vi-VN")}
+                            </span>
+                            <span className="text-slate-400">{b.itemCount} mã</span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadBackup(b.id)}
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                            >
+                              Tải về
+                            </button>
+                            {isAdmin && (
+                              <button
+                                type="button"
+                                onClick={() => setRestoreTarget(b)}
+                                className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-700 hover:bg-rose-100 transition cursor-pointer"
+                              >
+                                Phục hồi
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Mục 4: Đổi mã PIN hệ thống (CHỈ ADMIN) */}
+                {isAdmin && (
                 <button
                   type="button"
                   onClick={() => setShowChangePinModal(true)}
@@ -382,7 +606,7 @@ export default function RightMenuDrawer({
                         Mã PIN Bảo Mật
                       </span>
                       <span className="text-[11px] text-slate-400 font-medium">
-                        Đổi 4 số PIN đăng nhập vào kho
+                        Đổi PIN Admin · Đặt PIN Nhân viên (chỉ xem)
                       </span>
                     </div>
                   </div>
@@ -393,6 +617,46 @@ export default function RightMenuDrawer({
                     <ChevronRight className="h-4 w-4 text-slate-300" />
                   </div>
                 </button>
+                )}
+
+                {/* Mục: Âm thanh & Rung */}
+                <div className="p-3.5 space-y-2">
+                  <span className="text-xs sm:text-sm font-bold text-slate-900 block">Âm Thanh & Rung</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = setSettings({ sound: !settings.sound });
+                        setSettingsState(next);
+                        if (next.sound) tingFound();
+                      }}
+                      className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition cursor-pointer ${
+                        settings.sound
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                          : "border-slate-200 bg-slate-50 text-slate-500"
+                      }`}
+                    >
+                      {settings.sound ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                      {settings.sound ? "Bật tiếng" : "Tắt tiếng"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = setSettings({ haptic: !settings.haptic });
+                        setSettingsState(next);
+                        if (next.haptic) vibrate(40);
+                      }}
+                      className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition cursor-pointer ${
+                        settings.haptic
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                          : "border-slate-200 bg-slate-50 text-slate-500"
+                      }`}
+                    >
+                      <Vibrate className="h-4 w-4" />
+                      {settings.haptic ? "Bật rung" : "Tắt rung"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -659,14 +923,14 @@ export default function RightMenuDrawer({
 
             <form onSubmit={handleChangePin} className="mt-4 space-y-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Mã PIN hiện tại</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Mã PIN Admin hiện tại</label>
                 <input
                   type="password"
                   inputMode="numeric"
                   maxLength={4}
                   value={currentPinInput}
                   onChange={(e) => setCurrentPinInput(e.target.value.replace(/\D/g, ""))}
-                  placeholder="Nhập 4 số PIN cũ"
+                  placeholder="Nhập 4 số PIN Admin"
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-center text-lg tracking-[0.3em] font-mono outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                   required
                   autoFocus
@@ -674,16 +938,28 @@ export default function RightMenuDrawer({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Mã PIN mới (4 số)</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Mã PIN Admin mới (để trống nếu không đổi)</label>
                 <input
                   type="password"
                   inputMode="numeric"
                   maxLength={4}
                   value={newPinInput}
                   onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ""))}
-                  placeholder="Nhập 4 số PIN mới"
+                  placeholder="Nhập 4 số PIN Admin mới"
                   className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-center text-lg tracking-[0.3em] font-mono outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Mã PIN Nhân viên mới (chỉ xem, để trống nếu không đổi)</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={newStaffPinInput}
+                  onChange={(e) => setNewStaffPinInput(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Nhập 4 số PIN Nhân viên"
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-center text-lg tracking-[0.3em] font-mono outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
                 />
               </div>
 
@@ -703,7 +979,7 @@ export default function RightMenuDrawer({
                 </button>
                 <button
                   type="submit"
-                  disabled={pinChangeLoading || currentPinInput.length !== 4 || newPinInput.length !== 4}
+                  disabled={pinChangeLoading || currentPinInput.length !== 4 || (newPinInput.length === 0 && newStaffPinInput.length === 0)}
                   className="flex-1 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50 cursor-pointer shadow-sm shadow-emerald-500/30"
                 >
                   {pinChangeLoading ? "Đang lưu..." : "Lưu mã PIN"}
@@ -726,6 +1002,21 @@ export default function RightMenuDrawer({
           cancelLabel="Hủy bỏ"
           onConfirm={executeAddWarehouse}
           onCancel={() => setShowAddWhConfirm(false)}
+        />
+      )}
+
+      {/* HỘP THOẠI XÁC NHẬN PHỤC HỒI SNAPSHOT (NGUY HIỂM) */}
+      {restoreTarget && (
+        <ConfirmModal
+          isOpen={!!restoreTarget}
+          variant="danger"
+          title="Phục Hồi Kho Từ Snapshot"
+          message={`Toàn bộ danh sách hàng trong kho sẽ được thay bằng dữ liệu backup ngày ${restoreTarget.snapshotDate} (${restoreTarget.itemCount} mã)?`}
+          subMessage="Một snapshot an toàn sẽ được chụp trước khi ghi. Lịch sử bán/nhập vẫn được giữ nguyên."
+          confirmLabel="Phục hồi ngay"
+          cancelLabel="Hủy bỏ"
+          onConfirm={executeRestore}
+          onCancel={() => setRestoreTarget(null)}
         />
       )}
     </>

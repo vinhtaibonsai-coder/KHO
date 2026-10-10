@@ -43,11 +43,13 @@ export default function WarehouseDetailModal({
   onMarkSold,
   onRestock,
   onOpenPaste,
+  canEdit = true,
 }: {
   warehouse: number;
   items: Item[];
   history?: ItemHistory[];
   totalWarehouses?: number;
+  canEdit?: boolean;
   onClose: () => void;
   onRemove: (sku: string) => void | Promise<void>;
   onTransfer: (sku: string, toWarehouse: number) => Promise<boolean | void>;
@@ -392,8 +394,8 @@ export default function WarehouseDetailModal({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* NÚT DÁN ĐOẠN CHAT VÀO KHO NÀY */}
-            {onOpenPaste && (
+            {/* NÚT DÁN ĐOẠN CHAT VÀO KHO NÀY (CHỈ ADMIN) */}
+            {onOpenPaste && canEdit && (
               <button
                 type="button"
                 onClick={() => onOpenPaste(warehouse)}
@@ -624,7 +626,8 @@ export default function WarehouseDetailModal({
                     </p>
                   </div>
 
-                  {/* CÁC NÚT THAO TÁC RÕ RÀNG */}
+                  {/* CÁC NÚT THAO TÁC RÕ RÀNG (CHỈ ADMIN) */}
+                  {canEdit && (
                   <div className="flex items-center gap-2 flex-wrap">
                     {selectedItem.status === "sold" ? (
                       /* NẾU ĐÃ BÁN: CHO PHÉP NHẬP LẠI KHO KHI KHÁCH TRẢ */
@@ -676,10 +679,11 @@ export default function WarehouseDetailModal({
                       </>
                     )}
                   </div>
+                  )}
                 </div>
 
                 {/* KHUNG CHỌN KHO ĐÍCH NẾU BẤM CHUYỂN KHO */}
-                {transferringSku === selectedItem.sku && (
+                {canEdit && transferringSku === selectedItem.sku && (
                   <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
                     <div className="flex items-center gap-2 text-xs font-semibold text-indigo-950">
                       <span>Chuyển sang:</span>
@@ -910,6 +914,8 @@ export default function WarehouseDetailModal({
                     <span className="text-[11px] text-emerald-700 font-bold">
                       {sortOrder === "num_desc" ? "Số giảm dần ↓" : sortOrder === "num_asc" ? "Số tăng dần ↑" : "Theo thời gian"}
                     </span>
+                    {canEdit && (
+                    <>
                     <button
                       type="button"
                       onClick={selectAllVisible}
@@ -926,6 +932,8 @@ export default function WarehouseDetailModal({
                     >
                       Bỏ chọn
                     </button>
+                    </>
+                    )}
                   </div>
                 </div>
 
@@ -944,7 +952,8 @@ export default function WarehouseDetailModal({
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        {/* CHECKBOX CHỌN NHIỀU MÃ (BULK SELECT) */}
+                        {/* CHECKBOX CHỌN NHIỀU MÃ (BULK SELECT, CHỈ ADMIN) */}
+                        {canEdit && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -961,6 +970,7 @@ export default function WarehouseDetailModal({
                         >
                           <Check className="h-3.5 w-3.5" strokeWidth={3} />
                         </button>
+                        )}
 
                         {/* THÔNG TIN MÃ: Bấm vào xem lịch sử */}
                         <div 
@@ -1092,8 +1102,8 @@ export default function WarehouseDetailModal({
           )}
         </div>
 
-        {/* THANH CÔNG CỤ NỔI PHÍA DƯỚI (FLOATING ACTION BAR) ĐIỀU CHUYỂN HÀNG LOẠT */}
-        {activeTab === "items" && !selectedItem && (onBulkTransfer || onBulkMarkSold) && selectedSkus.size > 0 && (
+        {/* THANH CÔNG CỤ NỔI PHÍA DƯỚI (FLOATING ACTION BAR) ĐIỀU CHUYỂN HÀNG LOẠT (CHỈ ADMIN) */}
+        {canEdit && activeTab === "items" && !selectedItem && (onBulkTransfer || onBulkMarkSold) && selectedSkus.size > 0 && (
           <div className="shrink-0 border-t-2 border-emerald-300 bg-emerald-50/95 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 animate-in fade-in slide-in-from-bottom duration-200">
             <div className="flex items-center gap-2 text-xs font-bold text-emerald-950">
               <span className="rounded-lg bg-emerald-600 px-2 py-0.5 text-[11px] font-extrabold text-white">

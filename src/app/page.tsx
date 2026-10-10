@@ -25,7 +25,12 @@ import NotificationBell from "@/components/NotificationBell";
 import RightMenuDrawer from "@/components/RightMenuDrawer";
 import BottomTabBar, { type BottomTabType } from "@/components/BottomTabBar";
 import ConfirmModal, { type ConfirmVariant } from "@/components/ConfirmModal";
+import UndoToast from "@/components/UndoToast";
+import BarcodeScanner from "@/components/BarcodeScanner";
 import { APP_VERSION } from "@/lib/version";
+import type { SessionRole } from "@/lib/auth-session";
+import { tingNewMessage, tingFound } from "@/lib/audio";
+import { vibrate } from "@/lib/haptics";
 import type { Item, ItemsResponse, ZaloMessage, ItemHistory } from "@/types";
 import { 
   saveLocalItems, 
@@ -34,7 +39,8 @@ import {
   getLocalMessages, 
   saveLocalHistory, 
   getLocalHistory,
-  enqueueMutation
+  enqueueMutation,
+  removeMutation
 } from "@/pwa/db";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -97,6 +103,79 @@ export default function Home() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const fetchingRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  // Phân quyền Admin/Staff (mặc định admin để không nhảy nút khi vừa tải)
+  const [role, setRole] = useState<SessionRole>("admin");
+  const canEdit = role === "admin";
+
+  // Trạng thái quét mã vạch bằng camera
+  const [isScanning, setIsScanning] = useState(false);
+
+  // Toast hoàn tác 10 giây
+  const [undoToast, setUndoToast] = useState<{
+    message: string;
+    onUndo: () => Promise<void> | void;
+    deadline: number;
+  } | null>(null);
+  const [undoSecondsLeft, setUndoSecondsLeft] = useState(10);
+  const [undoProgress, setUndoProgress] = useState(1);
+  const undoTimerRef = useRef<number | null>(null);
+
+  const clearUndoTimer = () => {
+    if (undoTimerRef.current !== null) {
+      window.clearInterval(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+  };
+
+  const dismissUndoToast = useCallback(() => {
+    clearUndoTimer();
+    setUndoToast(null);
+  }, []);
+
+  const showUndoToast = useCallback(
+    (message: string, onUndo: () => Promise<void> | void) => {
+      clearUndoTimer();
+      const durationMs = 10000;
+      const deadline = Date.now() + durationMs;
+      setUndoToast({ message, onUndo, deadline });
+      setUndoSecondsLeft(Math.ceil(durationMs / 1000));
+      setUndoProgress(1);
+      undoTimerRef.current = window.setInterval(() => {
+        const leftMs = deadline - Date.now();
+        if (leftMs <= 0) {
+          clearUndoTimer();
+          setUndoToast(null);
+          return;
+        }
+        setUndoSecondsLeft(Math.ceil(leftMs / 1000));
+        setUndoProgress(leftMs / durationMs);
+      }, 100);
+    },
+    []
+  );
+
+  const handleUndo = async () => {
+    if (!undoToast) return;
+    const fn = undoToast.onUndo;
+    dismissUndoToast();
+    try {
+      await fn();
+      fetchData();
+    } catch {
+      setError("Không hoàn tác được thao tác");
+    }
+  };
+
+  // Lấy role 1 lần khi mount
+  useEffect(() => {
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.role === "staff" || data?.role === "admin") setRole(data.role);
+      })
+      .catch(() => undefined);
+  }, []);
 
   const fetchData = useCallback(() => {
     if (fetchingRef.current) return;
@@ -243,19 +322,40 @@ export default function Home() {
     sku: string,
     payload: Record<string, unknown>,
     applyRequest: () => Promise<Response>,
-    mutateLocal: () => void
+    mutateLocal: () => void,
+    undoMessage?: string,
+    buildUndo?: (before: Item | null, queueId: string | null) => (() => Promise<void>) | null
   ) {
-    const key = `${action}:${sku.trim().toUpperCase()}`;
+    const code = sku.trim().toUpperCase();
+    const key = `${action}:${code}`;
     if (inFlightOperations.current.has(key)) return;
     inFlightOperations.current.add(key);
+
+    // Chụp trạng thái TRƯỚC khi đổi để hoàn tác
+    const before = items.find((i) => i.sku.toUpperCase() === code) ?? null;
     mutateLocal();
+    let queueId: string | null = null;
     try {
       const res = await applyRequest();
-      if (res.ok) fetchData();
-      // Server đã trả lời -> không enqueue (kể cả lỗi nghiệp vụ 4xx)
+      if (res.ok) {
+        fetchData();
+        if (action === "sold" || action === "transfer") {
+          tingFound();
+          vibrate(40);
+        }
+        if (undoMessage && buildUndo) {
+          const undoFn = buildUndo(before, null);
+          if (undoFn) showUndoToast(undoMessage, undoFn);
+        }
+      }
     } catch (err) {
       if (isNetworkError(err)) {
-        await enqueueMutation(action, payload);
+        const q = await enqueueMutation(action, payload);
+        queueId = q.id;
+        if (undoMessage && buildUndo) {
+          const undoFn = buildUndo(before, queueId);
+          if (undoFn) showUndoToast(undoMessage, undoFn);
+        }
       }
     } finally {
       inFlightOperations.current.delete(key);
@@ -273,7 +373,23 @@ export default function Home() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "remove", sku, note: "Xuất kho từ modal chi tiết" }),
         }),
-      () => setItems((list) => list.filter((i) => i.sku !== sku))
+      () => setItems((list) => list.filter((i) => i.sku !== sku)),
+      `Đã xuất ${sku}`,
+      (before, queueId) => {
+        if (!before) return null;
+        return async () => {
+          if (queueId) {
+            await removeMutation(queueId);
+            setItems((list) => (list.some((i) => i.sku === before.sku) ? list : [before, ...list]));
+            return;
+          }
+          await fetch("/api/items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "restore", item: before }),
+          });
+        };
+      }
     );
   }
 
@@ -298,7 +414,25 @@ export default function Home() {
               ? { ...it, status: "sold", soldAt: new Date().toISOString() }
               : it
           )
-        )
+        ),
+      `Đã bán ${code}`,
+      (before, queueId) => {
+        if (!before || before.status === "sold") return null;
+        return async () => {
+          if (queueId) {
+            await removeMutation(queueId);
+            setItems((list) =>
+              list.map((it) => (it.sku === before.sku ? { ...before } : it))
+            );
+            return;
+          }
+          await fetch("/api/items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "restock", sku: before.sku, warehouse: before.warehouse }),
+          });
+        };
+      }
     );
   }
 
@@ -318,7 +452,23 @@ export default function Home() {
           list.map((it) =>
             it.sku === sku ? { ...it, status: "active", warehouse: warehouse || it.warehouse } : it
           )
-        )
+        ),
+      `Đã nhập lại ${sku}`,
+      (before, queueId) => {
+        if (!before) return null;
+        return async () => {
+          if (queueId) {
+            await removeMutation(queueId);
+            setItems((list) => list.map((it) => (it.sku === before.sku ? { ...before } : it)));
+            return;
+          }
+          await fetch("/api/items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "restore", item: before }),
+          });
+        };
+      }
     );
   }
 
@@ -336,7 +486,23 @@ export default function Home() {
       () =>
         setItems((list) =>
           list.map((it) => (it.sku === sku ? { ...it, warehouse: toWarehouse } : it))
-        )
+        ),
+      `Đã chuyển ${sku} sang Kho ${pad(toWarehouse)}`,
+      (before, queueId) => {
+        if (!before) return null;
+        return async () => {
+          if (queueId) {
+            await removeMutation(queueId);
+            setItems((list) => list.map((it) => (it.sku === before.sku ? { ...before } : it)));
+            return;
+          }
+          await fetch("/api/items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "transfer", sku: before.sku, toWarehouse: before.warehouse }),
+          });
+        };
+      }
     );
   }
 
@@ -344,12 +510,34 @@ export default function Home() {
     for (const sku of skus) {
       await transferSku(sku, toWarehouse);
     }
+    showUndoToast(`Đã chuyển ${skus.length} mã sang Kho ${pad(toWarehouse)}`, async () => {
+      for (const sku of skus) {
+        const before = items.find((i) => i.sku === sku);
+        if (!before) continue;
+        await fetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "transfer", sku, toWarehouse: before.warehouse }),
+        });
+      }
+    });
   }
 
   async function bulkMarkSoldSkus(skus: string[], note?: string) {
     for (const sku of skus) {
       await markSoldSku(sku, note || "Đã bán");
     }
+    showUndoToast(`Đã bán ${skus.length} mã`, async () => {
+      for (const sku of skus) {
+        const before = items.find((i) => i.sku === sku);
+        if (!before) continue;
+        await fetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "restock", sku, warehouse: before.warehouse }),
+        });
+      }
+    });
   }
 
   async function addWarehouseHandler() {
@@ -419,9 +607,44 @@ export default function Home() {
     return messages.filter((m) => !m.read && m.id !== "bot_heartbeat" && (m.message || "").trim().toUpperCase() !== "PING").length;
   }, [messages]);
 
+  // Ting khi có tin Zalo mới (bỏ qua lần đầu mount để không kêu khi vừa mở app)
+  const seenMessageIdsRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (seenMessageIdsRef.current === null) {
+      seenMessageIdsRef.current = new Set(messages.map((m) => m.id));
+      return;
+    }
+    for (const m of messages) {
+      if (m.id.startsWith("bot_heartbeat")) continue;
+      if (!seenMessageIdsRef.current.has(m.id)) {
+        seenMessageIdsRef.current.add(m.id);
+        tingNewMessage();
+        vibrate(20);
+      }
+    }
+  }, [messages]);
+
+  // Ting khi tìm thấy mã khớp chính xác tuyệt đối
+  const lastFoundSkuRef = useRef<string | null>(null);
+  useEffect(() => {
+    const code = query.trim().toUpperCase();
+    if (code.length < 3 || !activeFoundItem || activeFoundItem.sku !== code) return;
+    if (lastFoundSkuRef.current === code) return;
+    lastFoundSkuRef.current = code;
+    tingFound();
+    vibrate([0, 30]);
+  }, [activeFoundItem, query]);
+  useEffect(() => {
+    if (query.trim().length < 3) lastFoundSkuRef.current = null;
+  }, [query]);
+
   // Xử lý chuyển tab điều hướng dưới đáy (GitHub iOS Bottom Bar)
   const handleTabSelect = (tab: BottomTabType) => {
     if (tab === "paste") {
+      if (!canEdit) {
+        setError("Chế độ chỉ xem — liên hệ Admin để được cấp quyền nhập kho");
+        return;
+      }
       setDefaultPasteWarehouse(1);
       setIsPasteOpen(true);
       return;
@@ -607,6 +830,7 @@ export default function Home() {
               inputRef={searchInputRef}
               autoFocus={true}
               availableSkus={items.map((i) => i.sku)}
+              onScan={() => setIsScanning(true)}
             />
 
             {/* MÀN HÌNH CHỜ TRA CỨU PHONG CÁCH GITHUB IOS (KHI CHƯA NHẬP MÃ) */}
@@ -724,6 +948,7 @@ export default function Home() {
                     {/* CỤM NÚT THAO TÁC CÙNG HÀNG, ĐỀU NHAU, KHÔNG LỆCH */}
                     <div className="flex items-center gap-1.5 sm:gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-emerald-200/60 shrink-0 flex-wrap">
                       {activeFoundItem.status === "sold" ? (
+                        canEdit && (
                         <button
                           type="button"
                           onClick={() => {
@@ -747,8 +972,11 @@ export default function Home() {
                           <RotateCcw className="h-3.5 w-3.5 text-emerald-600" />
                           <span>Nhập lại</span>
                         </button>
+                        )
                       ) : (
                         <>
+                          {canEdit && (
+                          <>
                           {/* NÚT ĐÁNH DẤU ĐÃ BÁN */}
                           <button
                             type="button"
@@ -792,6 +1020,8 @@ export default function Home() {
                             <ArrowRightLeft className="h-3.5 w-3.5" />
                             <span>{isSearchTransferring ? "Đóng" : "Chuyển kho"}</span>
                           </button>
+                          </>
+                        )}
                         </>
                       )}
 
@@ -869,6 +1099,7 @@ export default function Home() {
                       query={query}
                       totalWarehouses={totalWarehouses}
                       onSelect={setOpenWarehouse}
+                      canEdit={canEdit}
                     />
                   </div>
                 </div>
@@ -950,6 +1181,7 @@ export default function Home() {
                 query={query}
                 totalWarehouses={totalWarehouses}
                 onSelect={setOpenWarehouse}
+                canEdit={canEdit}
               />
             )}
           </section>
@@ -1001,6 +1233,7 @@ export default function Home() {
               messages={messages}
               botStatus={botStatus}
               dbStatus={dbStatus}
+              role={role}
               onAddWarehouse={addWarehouseHandler}
               onOpenPaste={() => setIsPasteOpen(true)}
               onOpenWarehouse={setOpenWarehouse}
@@ -1030,6 +1263,7 @@ export default function Home() {
           items={items}
           history={history}
           totalWarehouses={totalWarehouses}
+          canEdit={canEdit}
           onClose={() => setOpenWarehouse(null)}
           onRemove={removeSku}
           onTransfer={transferSku}
@@ -1067,6 +1301,7 @@ export default function Home() {
           messages={messages}
           botStatus={botStatus}
           dbStatus={dbStatus}
+          role={role}
           onAddWarehouse={addWarehouseHandler}
           onOpenPaste={() => setIsPasteOpen(true)}
           onOpenWarehouse={setOpenWarehouse}
@@ -1097,6 +1332,28 @@ export default function Home() {
         cancelLabel={confirmConfig.cancelLabel}
         onConfirm={confirmConfig.onConfirm}
         onCancel={() => setConfirmConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
+
+      {/* TOAST HOÀN TÁC 10 GIÂY */}
+      {undoToast && (
+        <UndoToast
+          message={undoToast.message}
+          secondsLeft={undoSecondsLeft}
+          progress={undoProgress}
+          onUndo={handleUndo}
+          onDismiss={dismissUndoToast}
+        />
+      )}
+
+      {/* CAMERA QUÉT MÃ VẠCH / QR */}
+      <BarcodeScanner
+        isOpen={isScanning}
+        onClose={() => setIsScanning(false)}
+        onDetect={(code) => {
+          setQuery(code.toUpperCase());
+          setIsScanning(false);
+          searchInputRef.current?.focus();
+        }}
       />
     </div>
   );

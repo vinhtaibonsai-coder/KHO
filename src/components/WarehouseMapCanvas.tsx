@@ -245,6 +245,7 @@ export default function WarehouseMapCanvas({
   query = "",
   totalWarehouses = 30,
   onSelect,
+  canEdit = true,
 }: {
   items: Item[];
   highlight: number | null;
@@ -252,6 +253,7 @@ export default function WarehouseMapCanvas({
   query?: string;
   totalWarehouses?: number;
   onSelect: (warehouse: number) => void;
+  canEdit?: boolean;
 }) {
   const [raw, setRaw] = useState<MapLayout | null>(null);
   const [edit, setEdit] = useState(false);
@@ -998,6 +1000,7 @@ export default function WarehouseMapCanvas({
           >
             {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
+          {canEdit && (
           <button
             type="button"
             onClick={() => {
@@ -1015,6 +1018,7 @@ export default function WarehouseMapCanvas({
             <span className="hidden sm:inline">{edit ? "Xong chỉnh sửa" : "Chỉnh sửa bố cục"}</span>
             <span className="sm:hidden">{edit ? "Xong" : "Chỉnh sửa"}</span>
           </button>
+          )}
         </div>
       </div>
 
