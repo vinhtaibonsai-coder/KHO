@@ -200,6 +200,30 @@ async function seedIfEmpty() {
 }
 
 // ============================================================
+// IN-FLIGHT LOCK THEO SKU (server): 2 request song song cùng 1 SKU
+// phải xếp hàng nhau xử lý lần lượt.
+// ponytail: lock trong 1 process — deploy đa instance vẫn nhờ
+// update/delete có điều kiện (.neq / 0 row affected) ở dưới.
+// ============================================================
+const skuLocks = new Map<string, Promise<unknown>>();
+
+export async function withSkuLock<T>(sku: string, fn: () => Promise<T>): Promise<T> {
+  const key = sku.trim().toUpperCase();
+  const prev = skuLocks.get(key) ?? Promise.resolve();
+  const run = prev.catch(() => undefined).then(fn);
+  const tail = run.then(
+    () => undefined,
+    () => undefined
+  );
+  skuLocks.set(key, tail);
+  try {
+    return await run;
+  } finally {
+    if (skuLocks.get(key) === tail) skuLocks.delete(key);
+  }
+}
+
+// ============================================================
 // PUBLIC API (async — Supabase) / (đồng bộ nội bộ — local)
 // ============================================================
 export async function getItems(): Promise<Item[]> {
@@ -481,7 +505,9 @@ export async function pushHistory(entry: Omit<ItemHistory, "id" | "createdAt"> &
   return fullEntry;
 }
 
-export async function markItemSold(sku: string, note: string = "Đã bán"): Promise<Item | undefined> {
+export type ItemOpResult = Item & { alreadyDone?: boolean };
+
+export async function markItemSold(sku: string, note: string = "Đã bán"): Promise<ItemOpResult | undefined> {
   const code = sku.trim().toUpperCase();
   const now = new Date().toISOString();
 
@@ -490,7 +516,11 @@ export async function markItemSold(sku: string, note: string = "Đã bán"): Pro
     const existing = await findItem(code);
     if (!existing) return undefined;
 
-    const { error } = await sb!
+    // Idempotent: đã bán rồi thì return ngay, KHÔNG push history/message mới
+    if (existing.status === "sold") return { ...existing, alreadyDone: true };
+
+    // Atomic: chỉ update khi chưa sold (thua race -> không có row nào được update)
+    const { data: updatedRows, error } = await sb!
       .from("warehouse_items")
       .update({
         status: "sold",
@@ -498,11 +528,19 @@ export async function markItemSold(sku: string, note: string = "Đã bán"): Pro
         sold_note: note,
         updated_at: now,
       })
-      .eq("sku", code);
+      .eq("sku", code)
+      .neq("status", "sold")
+      .select("sku");
 
     if (error) {
       console.error("Supabase markItemSold error:", error.message);
       throw new Error(`Supabase markItemSold: ${error.message}`);
+    }
+
+    // Thua race condition: request khác đã sold trước -> không tạo thông báo trùng
+    if (!updatedRows || updatedRows.length === 0) {
+      const refreshed = await findItem(code);
+      return { ...(refreshed ?? existing), alreadyDone: true };
     }
 
     const updated: Item = {
@@ -522,9 +560,9 @@ export async function markItemSold(sku: string, note: string = "Đã bán"): Pro
       createdAt: now,
     });
 
-    // Tạo thông báo vào bảng zalo_messages để hiện chuông báo đỏ
+    // Id message xác định theo soldAt -> upsert không thể tạo bản sao
     await pushMessage({
-      id: `sold_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      id: `sold_${code}_${existing.soldAt || now}`,
       groupId: `KHO_${String(existing.warehouse).padStart(2, "0")}`,
       warehouse: existing.warehouse,
       message: `ĐÃ BÁN ${code}`,
@@ -540,6 +578,7 @@ export async function markItemSold(sku: string, note: string = "Đã bán"): Pro
   db = loadDB();
   const item = db.items.find((i) => i.sku === code);
   if (!item) return undefined;
+  if (item.status === "sold") return { ...item, alreadyDone: true };
 
   item.status = "sold";
   item.soldAt = now;
@@ -557,7 +596,7 @@ export async function markItemSold(sku: string, note: string = "Đã bán"): Pro
   });
 
   await pushMessage({
-    id: `sold_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    id: `sold_${code}_${item.soldAt || now}`,
     groupId: `KHO_${String(item.warehouse).padStart(2, "0")}`,
     warehouse: item.warehouse,
     message: `ĐÃ BÁN ${code}`,
@@ -570,7 +609,7 @@ export async function markItemSold(sku: string, note: string = "Đã bán"): Pro
   return item;
 }
 
-export async function restockItem(sku: string, warehouse?: number, note: string = "Khách trả / Nhập lại kho"): Promise<Item | undefined> {
+export async function restockItem(sku: string, warehouse?: number, note: string = "Khách trả / Nhập lại kho"): Promise<ItemOpResult | undefined> {
   const code = sku.trim().toUpperCase();
   const now = new Date().toISOString();
 
@@ -581,6 +620,11 @@ export async function restockItem(sku: string, warehouse?: number, note: string 
 
     const targetWh = warehouse || existing.warehouse;
     const oldWh = existing.warehouse;
+
+    // Idempotent: đang active & không đổi kho -> no-op, không push thông báo trùng
+    if (existing.status === "active" && targetWh === oldWh) {
+      return { ...existing, alreadyDone: true };
+    }
 
     const { error } = await sb!
       .from("warehouse_items")
@@ -636,6 +680,10 @@ export async function restockItem(sku: string, warehouse?: number, note: string 
 
   const targetWh = warehouse || item.warehouse;
   const oldWh = item.warehouse;
+  // Idempotent: đang active & không đổi kho -> no-op
+  if (item.status !== "sold" && targetWh === oldWh) {
+    return { ...item, alreadyDone: true };
+  }
   item.status = "active";
   item.warehouse = targetWh;
   item.updatedAt = now;
@@ -666,14 +714,23 @@ export async function restockItem(sku: string, warehouse?: number, note: string 
   return item;
 }
 
-export async function removeItem(sku: string, note: string = "Xuất kho thủ công"): Promise<Item | undefined> {
+export type RemoveResult = Item | { alreadyRemoved: true };
+
+export async function removeItem(sku: string, note: string = "Xuất kho thủ công"): Promise<RemoveResult> {
   const code = sku.trim().toUpperCase();
   if (supabaseEnabled) {
     const sb = getSupabase();
-    const existing = await findItem(code);
-    if (!existing) return undefined;
-    const { error } = await sb!.from("warehouse_items").delete().eq("sku", code);
+    // Atomic delete: 0 row bị xoá = đã bị xoá trước đó / không tồn tại
+    // -> alreadyRemoved (200) thay vì 404 để client không enqueue retry bất tận
+    const { data: deleted, error } = await sb!
+      .from("warehouse_items")
+      .delete()
+      .eq("sku", code)
+      .select("*");
     if (error) throw new Error(`Supabase removeItem: ${error.message}`);
+    if (!deleted || deleted.length === 0) return { alreadyRemoved: true };
+
+    const existing = rowToItem(deleted[0] as ItemRow);
     await pushHistory({
       sku: code,
       action: "out",
@@ -682,7 +739,7 @@ export async function removeItem(sku: string, note: string = "Xuất kho thủ c
       note,
     });
     await pushMessage({
-      id: `out_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      id: `out_${code}_${Date.now()}`,
       groupId: `KHO_${String(existing.warehouse).padStart(2, "0")}`,
       warehouse: existing.warehouse,
       message: `XUẤT KHO ${code}`,
@@ -695,7 +752,7 @@ export async function removeItem(sku: string, note: string = "Xuất kho thủ c
   }
   db = loadDB();
   const idx = db.items.findIndex((i) => i.sku === code);
-  if (idx < 0) return undefined;
+  if (idx < 0) return { alreadyRemoved: true };
   const removed = db.items.splice(idx, 1)[0];
   saveDB(db);
   await pushHistory({
@@ -706,7 +763,7 @@ export async function removeItem(sku: string, note: string = "Xuất kho thủ c
     note,
   });
   await pushMessage({
-    id: `out_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    id: `out_${code}_${Date.now()}`,
     groupId: `KHO_${String(removed.warehouse).padStart(2, "0")}`,
     warehouse: removed.warehouse,
     message: `XUẤT KHO ${code}`,
@@ -722,7 +779,7 @@ export async function transferItem(
   sku: string,
   toWarehouse: number,
   note: string = ""
-): Promise<{ success: boolean; item?: Item; fromWarehouse?: number; error?: string }> {
+): Promise<{ success: boolean; item?: Item; fromWarehouse?: number; error?: string; alreadyThere?: boolean }> {
   const code = sku.trim().toUpperCase();
   const maxWh = await getWarehouseCount();
   if (toWarehouse < 1 || toWarehouse > maxWh) {
@@ -736,7 +793,8 @@ export async function transferItem(
 
   const fromWh = existing.warehouse;
   if (fromWh === toWarehouse) {
-    return { success: false, error: `Mã ${code} hiện đã ở sẵn Kho ${toWarehouse}` };
+    // Đã ở đúng kho đích rồi -> thành công (idempotent), không ghi history trùng
+    return { success: true, alreadyThere: true, item: existing, fromWarehouse: fromWh };
   }
 
   const updated = await upsertItem(code, toWarehouse, existing.name);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { 
   ShoppingBag, 
@@ -40,6 +40,11 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  // Chống double-click: ref chặn đồng bộ trong cùng 1 tick, state để render UI.
+  // Tự reset trong finally của handleConfirm khi onConfirm chạy xong/đóng modal.
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+
   // Khóa cuộn trang khi mở modal (chuẩn iOS PWA)
   useEffect(() => {
     if (!isOpen) return;
@@ -122,10 +127,29 @@ export default function ConfirmModal({
   const currentTheme = getVariantStyles();
   const Icon = currentTheme.icon;
 
+  const handleConfirm = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      await onConfirm();
+    } catch {
+      // Lỗi đã được nơi gọi xử lý — mở lại nút để người dùng thử lại
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (busyRef.current) return;
+    onCancel();
+  };
+
   return createPortal(
     <div 
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200 touch-none overscroll-none"
-      onClick={onCancel}
+      onClick={handleCancel}
     >
       <div 
         className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden animate-in zoom-in-95 duration-200 p-5 sm:p-6"
@@ -134,8 +158,9 @@ export default function ConfirmModal({
         {/* Nút đóng góc phải */}
         <button
           type="button"
-          onClick={onCancel}
-          className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer"
+          disabled={busy}
+          onClick={handleCancel}
+          className="absolute top-4 right-4 h-8 w-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           title="Đóng"
         >
           <X className="h-4 w-4" />
@@ -179,21 +204,23 @@ export default function ConfirmModal({
         <div className="flex items-center gap-2.5 sm:gap-3 mt-6 pt-2 border-t border-slate-100">
           <button
             type="button"
-            onClick={onCancel}
-            className="flex-1 py-3 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold transition active:scale-95 cursor-pointer shadow-2xs"
+            disabled={busy}
+            onClick={handleCancel}
+            className="flex-1 py-3 px-4 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold transition active:scale-95 cursor-pointer shadow-2xs disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {cancelLabel}
           </button>
 
           <button
             type="button"
-            disabled={confirmDisabled}
-            onClick={async () => {
-              await onConfirm();
-            }}
-            className={`flex-1 py-3 px-4 rounded-xl font-black text-xs sm:text-sm transition active:scale-95 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed ${currentTheme.confirmBtn}`}
+            disabled={confirmDisabled || busy}
+            onClick={handleConfirm}
+            className={`flex-1 py-3 px-4 rounded-xl font-black text-xs sm:text-sm transition active:scale-95 cursor-pointer shadow-md disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 ${currentTheme.confirmBtn}`}
           >
-            {confirmLabel}
+            {busy && (
+              <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            )}
+            {busy ? "Đang xử lý..." : confirmLabel}
           </button>
         </div>
       </div>

@@ -227,82 +227,117 @@ export default function Home() {
     onConfirm: () => {},
   });
 
-  async function removeSku(sku: string) {
-    setItems((list) => list.filter((i) => i.sku !== sku));
+  // Khóa in-flight theo `action:sku` — chặn double-click / click 2 nơi
+  // cùng lúc trên cùng 1 mã.
+  const inFlightOperations = useRef<Set<string>>(new Set());
+
+  // Chỉ enqueue khi THẬT SỰ mất mạng. Server đã trả lời (4xx/5xx/đã xử lý)
+  // mà vẫn enqueue sẽ sinh retry vô hạn + thông báo trùng.
+  const isNetworkError = (err: unknown) =>
+    err instanceof TypeError ||
+    (err instanceof DOMException &&
+      (err.name === "NetworkError" || err.name === "FetchFailed"));
+
+  async function runSkuMutation(
+    action: "remove" | "sold" | "restock" | "transfer",
+    sku: string,
+    payload: Record<string, unknown>,
+    applyRequest: () => Promise<Response>,
+    mutateLocal: () => void
+  ) {
+    const key = `${action}:${sku.trim().toUpperCase()}`;
+    if (inFlightOperations.current.has(key)) return;
+    inFlightOperations.current.add(key);
+    mutateLocal();
     try {
-      const res = await fetch("/api/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "remove", sku, note: "Xuất kho từ modal chi tiết" }),
-      });
-      if (res.ok) {
-        fetchData();
-      } else {
-        await enqueueMutation("remove", { sku, note: "Xuất kho từ modal chi tiết" });
+      const res = await applyRequest();
+      if (res.ok) fetchData();
+      // Server đã trả lời -> không enqueue (kể cả lỗi nghiệp vụ 4xx)
+    } catch (err) {
+      if (isNetworkError(err)) {
+        await enqueueMutation(action, payload);
       }
-    } catch {
-      await enqueueMutation("remove", { sku, note: "Xuất kho từ modal chi tiết" });
+    } finally {
+      inFlightOperations.current.delete(key);
     }
+  }
+
+  async function removeSku(sku: string) {
+    await runSkuMutation(
+      "remove",
+      sku,
+      { sku, note: "Xuất kho từ modal chi tiết" },
+      () =>
+        fetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "remove", sku, note: "Xuất kho từ modal chi tiết" }),
+        }),
+      () => setItems((list) => list.filter((i) => i.sku !== sku))
+    );
   }
 
   async function markSoldSku(sku: string, note: string = "Đã bán") {
-    setItems((list) =>
-      list.map((it) => (it.sku === sku ? { ...it, status: "sold", soldAt: new Date().toISOString() } : it))
+    const code = sku.trim().toUpperCase();
+    // Đánh dấu bán rồi thì khỏi gọi API — tránh tạo thông báo/lịch sử trùng
+    if (items.some((i) => i.sku.toUpperCase() === code && i.status === "sold")) return;
+    await runSkuMutation(
+      "sold",
+      code,
+      { sku: code, note },
+      () =>
+        fetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "mark_sold", sku: code, note }),
+        }),
+      () =>
+        setItems((list) =>
+          list.map((it) =>
+            it.sku.toUpperCase() === code
+              ? { ...it, status: "sold", soldAt: new Date().toISOString() }
+              : it
+          )
+        )
     );
-    try {
-      const res = await fetch("/api/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "mark_sold", sku, note }),
-      });
-      if (res.ok) {
-        fetchData();
-      } else {
-        await enqueueMutation("sold", { sku, note });
-      }
-    } catch {
-      await enqueueMutation("sold", { sku, note });
-    }
   }
 
   async function restockSku(sku: string, warehouse?: number, note: string = "Khách trả / Nhập lại kho") {
-    setItems((list) =>
-      list.map((it) => (it.sku === sku ? { ...it, status: "active", warehouse: warehouse || it.warehouse } : it))
+    await runSkuMutation(
+      "restock",
+      sku,
+      { sku, warehouse, note },
+      () =>
+        fetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "restock", sku, warehouse, note }),
+        }),
+      () =>
+        setItems((list) =>
+          list.map((it) =>
+            it.sku === sku ? { ...it, status: "active", warehouse: warehouse || it.warehouse } : it
+          )
+        )
     );
-    try {
-      const res = await fetch("/api/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "restock", sku, warehouse, note }),
-      });
-      if (res.ok) {
-        fetchData();
-      } else {
-        await enqueueMutation("restock", { sku, warehouse, note });
-      }
-    } catch {
-      await enqueueMutation("restock", { sku, warehouse, note });
-    }
   }
 
   async function transferSku(sku: string, toWarehouse: number) {
-    setItems((list) =>
-      list.map((it) => (it.sku === sku ? { ...it, warehouse: toWarehouse } : it))
+    await runSkuMutation(
+      "transfer",
+      sku,
+      { sku, toWarehouse },
+      () =>
+        fetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "transfer", sku, toWarehouse }),
+        }),
+      () =>
+        setItems((list) =>
+          list.map((it) => (it.sku === sku ? { ...it, warehouse: toWarehouse } : it))
+        )
     );
-    try {
-      const res = await fetch("/api/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "transfer", sku, toWarehouse }),
-      });
-      if (res.ok) {
-        fetchData();
-      } else {
-        await enqueueMutation("transfer", { sku, toWarehouse });
-      }
-    } catch {
-      await enqueueMutation("transfer", { sku, toWarehouse });
-    }
   }
 
   async function bulkTransferSkus(skus: string[], toWarehouse: number) {

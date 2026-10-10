@@ -49,7 +49,7 @@ export default function WarehouseDetailModal({
   history?: ItemHistory[];
   totalWarehouses?: number;
   onClose: () => void;
-  onRemove: (sku: string) => void;
+  onRemove: (sku: string) => void | Promise<void>;
   onTransfer: (sku: string, toWarehouse: number) => Promise<boolean | void>;
   onBulkTransfer?: (skus: string[], toWarehouse: number) => Promise<void> | void;
   onBulkMarkSold?: (skus: string[], note?: string) => Promise<void> | void;
@@ -303,8 +303,9 @@ export default function WarehouseDetailModal({
       subMessage: `Mã sẽ bị xoá khỏi danh sách ô kho hiện tại. Nếu sản phẩm đã bán cho khách, bạn nên dùng nút "Đã Bán" để lưu lịch sử chi tiết.`,
       confirmLabel: "Xác nhận xuất mã",
       cancelLabel: "Giữ lại",
-      onConfirm: () => {
-        onRemove(sku);
+      onConfirm: async () => {
+        // Phải await xong mới đóng modal — tránh đóng khi thao tác còn dang dở
+        await onRemove(sku);
         showNotice(`Đã xuất mã [${sku}] khỏi kho thành công!`, "info");
         if (selectedSku === sku) {
           setSelectedSku(null);

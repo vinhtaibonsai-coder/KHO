@@ -19,6 +19,7 @@ import {
   setWarehouseCount,
   transferItem,
   upsertItem,
+  withSkuLock,
 } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
 
     if (body.action === "mark_sold") {
       const note = typeof body.note === "string" ? body.note : "Đã bán";
-      const sold = await markItemSold(body.sku, note);
+      const sold = await withSkuLock(body.sku, () => markItemSold(body.sku, note));
       if (!sold) {
         return NextResponse.json({ error: `Không tìm thấy ${body.sku}` }, { status: 404 });
       }
@@ -104,7 +105,7 @@ export async function POST(req: Request) {
     if (body.action === "restock") {
       const warehouse = body.warehouse ? Number(body.warehouse) : undefined;
       const note = typeof body.note === "string" ? body.note : "Khách trả / Nhập lại kho";
-      const restocked = await restockItem(body.sku, warehouse, note);
+      const restocked = await withSkuLock(body.sku, () => restockItem(body.sku, warehouse, note));
       if (!restocked) {
         return NextResponse.json({ error: `Không tìm thấy ${body.sku}` }, { status: 404 });
       }
@@ -113,9 +114,10 @@ export async function POST(req: Request) {
 
     if (body.action === "remove") {
       const note = typeof body.note === "string" ? body.note : "Xuất kho thủ công";
-      const removed = await removeItem(body.sku, note);
-      if (!removed) {
-        return NextResponse.json({ error: `Không tìm thấy ${body.sku}` }, { status: 404 });
+      const removed = await withSkuLock(body.sku, () => removeItem(body.sku, note));
+      if ("alreadyRemoved" in removed) {
+        // Đã xoá rồi / không tồn tại -> 200 để client không enqueue retry
+        return NextResponse.json({ ok: true, alreadyRemoved: true });
       }
       return NextResponse.json({ ok: true, removed });
     }
@@ -126,7 +128,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: `Kho đích không hợp lệ (1-${totalWarehouses})` }, { status: 400 });
       }
       const note = typeof body.note === "string" ? body.note : "";
-      const result = await transferItem(body.sku, toWarehouse, note);
+      const result = await withSkuLock(body.sku, () => transferItem(body.sku, toWarehouse, note));
       if (!result.success) {
         return NextResponse.json({ error: result.error }, { status: 400 });
       }

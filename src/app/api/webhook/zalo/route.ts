@@ -134,7 +134,9 @@ export async function POST(req: Request) {
         message: body.message,
         status: result.success ? "ok" : "error",
         detail: result.success
-          ? `Đã chuyển mã [${sku}] từ Kho ${result.fromWarehouse} sang Kho ${toWarehouse} thành công!`
+          ? result.alreadyThere
+            ? `Mã [${sku}] đã ở sẵn Kho ${toWarehouse}, không cần chuyển.`
+            : `Đã chuyển mã [${sku}] từ Kho ${result.fromWarehouse} sang Kho ${toWarehouse} thành công!`
           : (result.error || "Không thể chuyển kho"),
         createdAt: new Date().toISOString(),
         botName,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { 
   ClipboardPaste, 
@@ -36,6 +36,8 @@ export default function PasteImportModal({
   const [rawText, setRawText] = useState("");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
+  // Chặn double-click trong cùng 1 tick (state `loading` chỉ cập nhật sau tick)
+  const isSubmittingRef = useRef(false);
 
   // Luôn đồng bộ kho đích được chọn với kho mở modal (defaultWarehouse)
   const [wasOpen, setWasOpen] = useState(isOpen);
@@ -135,6 +137,7 @@ export default function PasteImportModal({
   if (!isOpen) return null;
 
   async function handleImport() {
+    if (isSubmittingRef.current) return;
     if (analysis.availableSkus.length === 0) {
       setStatus({
         type: "error",
@@ -143,6 +146,7 @@ export default function PasteImportModal({
       return;
     }
 
+    isSubmittingRef.current = true;
     setLoading(true);
     setStatus(null);
 
@@ -177,6 +181,7 @@ export default function PasteImportModal({
         msg: errorMsg,
       });
     } finally {
+      isSubmittingRef.current = false;
       setLoading(false);
     }
   }
