@@ -716,6 +716,60 @@ export async function restockItem(sku: string, warehouse?: number, note: string 
 
 export type RemoveResult = Item | { alreadyRemoved: true };
 
+/**
+ * Hoàn tác: khôi phục toàn bộ trạng thái 1 Item từ snapshot trước đó.
+ * Khác upsertItem: giữ nguyên qty/status/soldAt/soldNote từ snapshot.
+ */
+export async function restoreItem(snapshot: Item): Promise<Item> {
+  const code = snapshot.sku.trim().toUpperCase();
+  const now = new Date().toISOString();
+  const item: Item = {
+    sku: code,
+    name: snapshot.name || "Hàng độc bản",
+    warehouse: snapshot.warehouse,
+    qty: Math.max(1, snapshot.qty || 1),
+    updatedAt: now,
+    status: snapshot.status === "sold" ? "sold" : "active",
+    soldAt: snapshot.soldAt,
+    soldNote: snapshot.soldNote,
+  };
+
+  if (supabaseEnabled) {
+    const sb = getSupabase();
+    const { error } = await sb!.from("warehouse_items").upsert(
+      {
+        sku: item.sku,
+        name: item.name,
+        warehouse: item.warehouse,
+        qty: item.qty,
+        updated_at: now,
+        status: item.status,
+        sold_at: item.soldAt ?? null,
+        sold_note: item.soldNote ?? null,
+      },
+      { onConflict: "sku" }
+    );
+    if (error) throw new Error(`Supabase restoreItem: ${error.message}`);
+  } else {
+    db = loadDB();
+    const idx = db.items.findIndex((i) => i.sku === code);
+    if (idx >= 0) db.items[idx] = { ...item };
+    else db.items.push({ ...item });
+    saveDB(db);
+  }
+
+  await pushHistory({
+    sku: code,
+    action: "in",
+    fromWarehouse: null,
+    toWarehouse: item.warehouse,
+    note: `Hoàn tác: khôi phục mã về Kho ${item.warehouse}`,
+  });
+
+  return item;
+}
+
+
 export async function removeItem(sku: string, note: string = "Xuất kho thủ công"): Promise<RemoveResult> {
   const code = sku.trim().toUpperCase();
   if (supabaseEnabled) {
@@ -1160,4 +1214,17 @@ export async function getDatabaseStatus(): Promise<{
     }
   }
   return { connected: true, type: "local" };
+}
+
+// Ghi d� to�n b? d? li?u local t? snapshot backup (ch? d�ng khi kh�i ph?c ? ch? d? local)
+export function writeLocalSnapshot(snap: {
+  items: Item[];
+  totalWarehouses: number;
+  mapLayout: MapLayout | null;
+}) {
+  db = loadDB();
+  db.items = snap.items;
+  db.totalWarehouses = snap.totalWarehouses || DEFAULT_TOTAL_WAREHOUSES;
+  db.mapLayout = snap.mapLayout;
+  saveDB(db);
 }

@@ -16,16 +16,21 @@ import {
   markMessageRead,
   removeItem,
   restockItem,
+  restoreItem,
   setWarehouseCount,
   transferItem,
   upsertItem,
   withSkuLock,
 } from "@/lib/store";
+import { requireAdmin } from "@/lib/auth-role";
+import { ensureDailySnapshot } from "@/lib/backup";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    // Snapshot backup tự động 1 lần/ngày (best-effort, không bao giờ làm hỏng GET)
+    await ensureDailySnapshot().catch(() => undefined);
     const [items, messages, history, totalWarehouses, mapLayout, botStatus, dbStatus] = await Promise.all([
       getItems(),
       getMessages(),
@@ -57,6 +62,24 @@ export async function POST(req: Request) {
   }
 
   try {
+    // Phân quyền server: mọi hành động ghi (trừ mark_read/mark_all_read) bắt buộc Admin
+    const ADMIN_ACTIONS = new Set([
+      "save_map_layout",
+      "set_warehouse_count",
+      "add_warehouse",
+      "mark_sold",
+      "restock",
+      "remove",
+      "transfer",
+      "add",
+      "restore",
+    ]);
+    const action: string = typeof body.action === "string" ? body.action : "upsert";
+    if (ADMIN_ACTIONS.has(action) || !body.action) {
+      const gate = await requireAdmin(req);
+      if (gate) return gate;
+    }
+
     // 0. Lưu bố cục sơ đồ kho
     if (body.action === "save_map_layout" && body.layout) {
       const saved = await saveWarehouseMapLayout(body.layout);
@@ -91,6 +114,31 @@ export async function POST(req: Request) {
 
     if (!body.sku || typeof body.sku !== "string") {
       return NextResponse.json({ error: "Thiếu sku" }, { status: 400 });
+    }
+
+    if (body.action === "restore") {
+      const snapshot = body.item;
+      if (
+        !snapshot ||
+        typeof snapshot.sku !== "string" ||
+        !Number.isInteger(Number(snapshot.warehouse)) ||
+        !Number.isFinite(Number(snapshot.qty))
+      ) {
+        return NextResponse.json({ error: "Snapshot item không hợp lệ" }, { status: 400 });
+      }
+      const restored = await withSkuLock(snapshot.sku, () =>
+        restoreItem({
+          sku: String(snapshot.sku),
+          name: typeof snapshot.name === "string" ? snapshot.name : "Hàng độc bản",
+          warehouse: Number(snapshot.warehouse),
+          qty: Number(snapshot.qty),
+          updatedAt: typeof snapshot.updatedAt === "string" ? snapshot.updatedAt : new Date().toISOString(),
+          status: snapshot.status === "sold" ? "sold" : "active",
+          soldAt: typeof snapshot.soldAt === "string" ? snapshot.soldAt : undefined,
+          soldNote: typeof snapshot.soldNote === "string" ? snapshot.soldNote : undefined,
+        })
+      );
+      return NextResponse.json({ ok: true, item: restored });
     }
 
     if (body.action === "mark_sold") {
