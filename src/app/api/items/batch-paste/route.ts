@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { upsertItem, pushMessage, TOTAL_WAREHOUSES, findItem } from "@/lib/store";
+import { upsertItem, pushMessage, getWarehouseCount, ensureWarehouseExists, findItem } from "@/lib/store";
 import { extractValidSkusFromText } from "@/lib/sku-rules";
 import { requireAdmin } from "@/lib/auth-role";
 import type { ZaloMessage } from "@/types";
@@ -14,9 +14,12 @@ export async function POST(req: Request) {
     const warehouse = Number(body?.warehouse);
     const rawText = String(body?.text || "").trim();
 
-    if (!Number.isInteger(warehouse) || warehouse < 1 || warehouse > TOTAL_WAREHOUSES) {
-      return NextResponse.json({ error: "warehouse không hợp lệ (1-30)" }, { status: 400 });
+    if (!Number.isInteger(warehouse) || warehouse < 1 || warehouse > 100) {
+      return NextResponse.json({ error: "warehouse không hợp lệ (1-100)" }, { status: 400 });
     }
+
+    // Tự động đảm bảo kho đích tồn tại trên hệ thống
+    await ensureWarehouseExists(warehouse);
 
     if (!rawText) {
       return NextResponse.json({ error: "Nội dung đoạn chat trống" }, { status: 400 });

@@ -251,6 +251,22 @@ export default function Home() {
     };
   }, [fetchData]);
 
+  // CẢNH BÁO ZALO BOT: offline hoặc heartbeat cũ hơn 60 giây (máy chạy bot tắt / mất mạng / session hết hạn)
+  const [botOfflineReason, setBotOfflineReason] = useState<string | null>(null);
+  useEffect(() => {
+    const check = () => {
+      if (!botStatus) return setBotOfflineReason(null);
+      if (!botStatus.online) return setBotOfflineReason("Bot Zalo đang tắt hoặc chưa hoạt động");
+      const last = botStatus.lastPing ? new Date(botStatus.lastPing).getTime() : NaN;
+      setBotOfflineReason(
+        !Number.isFinite(last) || Date.now() - last > 60_000 ? "Mất kết nối quá 60 giây" : null
+      );
+    };
+    check();
+    const id = window.setInterval(check, 10000);
+    return () => window.clearInterval(id);
+  }, [botStatus]);
+
   // Tự động trỏ con trỏ vào ô tra cứu khi vừa vào trang (đặt con trỏ ở cuối chuỗi, không bôi đen text)
   useEffect(() => {
     const focusTimer = setTimeout(() => {
@@ -808,6 +824,45 @@ export default function Home() {
           <div className="flex items-center gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
             <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
             <p className="font-medium">{error}</p>
+          </div>
+        )}
+
+        {/* BANNER CẢNH BÁO ZALO BOT NGOẠI TUYẾN (offline hoặc mất heartbeat quá 60 giây) */}
+        {botStatus && botOfflineReason && (
+          <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-xs">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
+                <AlertCircle className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1 space-y-2">
+                <div>
+                  <p className="text-sm font-black uppercase tracking-wide text-amber-900">
+                    Cảnh báo: Zalo Bot đang ngoại tuyến
+                  </p>
+                  <p className="mt-0.5 text-xs font-medium text-amber-800">
+                    {botOfflineReason}
+                    {botStatus.lastPing
+                      ? ` · Lần tín hiệu gần nhất: ${new Date(botStatus.lastPing).toLocaleTimeString("vi-VN")}`
+                      : " · Chưa nhận được tín hiệu nào"}
+                    . Hệ thống không tự đọc tin nhắn nhóm Zalo cho tới khi bot hoạt động trở lại.
+                  </p>
+                </div>
+                <ul className="list-disc space-y-1 pl-4 text-xs leading-relaxed text-amber-800">
+                  <li>
+                    Mở app <strong>Zalo Bot Desktop</strong> trên máy đang chạy bot → khay (tray) góc phải màn hình phải hiện chấm <strong>xanh Online</strong>.
+                  </li>
+                  <li>
+                    Nếu app báo <strong>Session hết hạn</strong> hoặc <strong>Mất kết nối</strong> → quét lại mã QR bằng Zalo (App &gt; Quét mã) trong cửa sổ app vừa tự mở.
+                  </li>
+                  <li>
+                    Nhấn <strong>Bật Bot</strong> trong app (hoặc bật mục <strong>Khởi động cùng Windows</strong>) và kiểm tra máy đang bật, có mạng internet.
+                  </li>
+                  <li>
+                    Kiểm tra <strong>Cài đặt</strong> trong app: webhook phải trỏ đúng <span className="font-mono font-bold">/api/webhook/zalo</span> và trang web này đang chạy.
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
         )}
 
