@@ -44,26 +44,34 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
     } catch {}
   }, []);
 
-  // Tự động lưu mã vào lịch sử khi tìm kiếm mã hoàn chỉnh (ít nhất 3 ký tự)
+  // Hàm lưu tức thời một mã vào lịch sử
+  const saveToHistory = (sku: string) => {
+    const trimmed = sku.trim().toUpperCase();
+    if (trimmed.length < 2) return;
+    setHistory((prev) => {
+      const next = [trimmed, ...prev.filter((item) => item !== trimmed)].slice(0, MAX_HISTORY);
+      try {
+        localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // Tự động lưu mã vào lịch sử khi người dùng gõ tìm kiếm (giảm debounce xuống 500ms cho nhạy)
   useEffect(() => {
     const trimmed = value.trim().toUpperCase();
-    if (trimmed.length < 3) return;
+    if (trimmed.length < 2) return;
 
     const timer = setTimeout(() => {
-      setHistory((prev) => {
-        const next = [trimmed, ...prev.filter((item) => item !== trimmed)].slice(0, MAX_HISTORY);
-        try {
-          localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
-        } catch {}
-        return next;
-      });
-    }, 1200);
+      saveToHistory(trimmed);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [value]);
 
   const selectHistoryItem = (sku: string) => {
     onChange(sku);
+    saveToHistory(sku);
     setShowHistory(false);
   };
 
@@ -110,6 +118,11 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value.toUpperCase())}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && value.trim()) {
+              saveToHistory(value.trim());
+            }
+          }}
           placeholder="Tìm mã sản phẩm (E120.124, K100, PT395...)"
           aria-label="Tìm mã sản phẩm"
           autoComplete="off"
@@ -146,40 +159,51 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
         )}
       </div>
 
-      {/* DÒNG NÚT BẤM LỊCH SỬ TRA CỨU NGAY PHÍA DƯỚI Ô TÌM KIẾM */}
-      {history.length > 0 && (
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-2 sm:p-2.5 space-y-2 transition-all animate-in fade-in duration-150">
-          <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => setShowHistory((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 hover:text-emerald-950 transition cursor-pointer"
-            >
-              <History className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Lịch sử đã tra ({history.length} mã)</span>
-              <span className="text-[10px] text-emerald-600 underline ml-0.5">
-                {showHistory ? "Thu gọn" : "Xem tất cả"}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={clearAllHistory}
-              className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-rose-600 transition cursor-pointer"
-              title="Xóa toàn bộ lịch sử tra cứu"
-            >
-              <Trash2 className="h-3 w-3" />
-              <span>Xóa</span>
-            </button>
+      {/* KHỐI NHẬT KÝ / LỊCH SỬ TRA CỨU - LUÔN HIỂN THỊ RÕ RÀNG NGAY DƯỚI Ô TÌM KIẾM */}
+      <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5 space-y-2 transition-all">
+        <div className="flex items-center justify-between gap-2">
+          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-900">
+            <History className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+            <span>Nhật ký tìm kiếm</span>
+            {history.length > 0 && (
+              <span className="text-[11px] font-normal text-emerald-700">({history.length} mã gần nhất)</span>
+            )}
           </div>
 
-          {/* DANH SÁCH MÃ ĐÃ TRA CỨU */}
+          {history.length > 0 ? (
+            <div className="flex items-center gap-2">
+              {history.length > 5 && (
+                <button
+                  type="button"
+                  onClick={() => setShowHistory((prev) => !prev)}
+                  className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
+                >
+                  {showHistory ? "Thu gọn" : "Xem tất cả"}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={clearAllHistory}
+                className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                title="Xóa toàn bộ nhật ký tìm kiếm"
+              >
+                <Trash2 className="h-3 w-3" />
+                <span>Xóa hết</span>
+              </button>
+            </div>
+          ) : (
+            <span className="text-[11px] text-slate-400 italic">Chưa có mã lưu</span>
+          )}
+        </div>
+
+        {/* DANH SÁCH MÃ ĐÃ TRA CỨU HOẶC GỢI Ý MẪU NẾU CHƯA CÓ LỊCH SỬ */}
+        {history.length > 0 ? (
           <div
             className={`flex flex-wrap gap-1.5 transition-all ${
-              showHistory ? "max-h-48 overflow-y-auto" : "max-h-8 overflow-hidden"
+              showHistory ? "max-h-48 overflow-y-auto" : "max-h-20 overflow-hidden"
             }`}
           >
-            {(showHistory ? history : history.slice(0, 5)).map((sku) => (
+            {(showHistory ? history : history.slice(0, 8)).map((sku) => (
               <div
                 key={sku}
                 onClick={() => selectHistoryItem(sku)}
@@ -188,7 +212,7 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") selectHistoryItem(sku);
                 }}
-                className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-200/80 bg-white hover:bg-emerald-50 hover:border-emerald-300 px-2.5 py-1 text-xs font-mono font-bold text-slate-800 shadow-2xs transition active:scale-95 cursor-pointer"
+                className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-200/90 bg-white hover:bg-emerald-50 hover:border-emerald-400 px-2.5 py-1 text-xs font-mono font-bold text-slate-800 shadow-2xs transition active:scale-95 cursor-pointer"
               >
                 <span>{sku}</span>
                 <ArrowUpRight className="h-3 w-3 text-slate-400 group-hover:text-emerald-600 transition" />
@@ -203,8 +227,24 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="flex items-center justify-between text-xs text-slate-500 py-0.5">
+            <span>Gõ tìm mã hoặc bấm chọn mã gợi ý:</span>
+            <div className="flex items-center gap-1">
+              {["E120", "P150", "K100"].map((sample) => (
+                <button
+                  key={sample}
+                  type="button"
+                  onClick={() => selectHistoryItem(sample)}
+                  className="rounded bg-white px-2 py-0.5 text-[11px] font-mono font-semibold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
+                >
+                  {sample}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Quick Filter Pills (Tất cả, E-Size, P-Size...) - Chuẩn màu Emerald & Slate sáng */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-xs">
