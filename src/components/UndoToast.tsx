@@ -33,18 +33,18 @@ export default function UndoToast({
       role="status"
       aria-live="polite"
     >
-      <div className="rounded-2xl border border-slate-700 bg-slate-900 text-white shadow-2xl overflow-hidden">
+      <div className="rounded-2xl border border-emerald-200/90 bg-white text-slate-800 shadow-xl overflow-hidden ring-1 ring-slate-900/5">
         <div className="flex items-center gap-3 px-4 py-3">
           <div className="min-w-0 flex-1">
-            <p className="text-xs sm:text-sm font-bold truncate">{message}</p>
-            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+            <p className="text-xs sm:text-sm font-bold text-slate-900 truncate">{message}</p>
+            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
               Tự ẩn sau {secondsLeft}s
             </p>
           </div>
           <button
             type="button"
             onClick={onUndo}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-xs font-black text-white hover:bg-emerald-400 transition active:scale-95 cursor-pointer"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-black text-white hover:bg-emerald-500 shadow-xs transition active:scale-95 cursor-pointer"
           >
             <Undo2 className="h-3.5 w-3.5" />
             Hoàn tác
@@ -52,13 +52,13 @@ export default function UndoToast({
           <button
             type="button"
             onClick={onDismiss}
-            className="shrink-0 rounded-lg p-1 text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
             title="Đóng"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="h-1 bg-slate-800">
+        <div className="h-1.5 bg-slate-100">
           <div
             className="h-full bg-emerald-500 transition-none"
             style={{ width: `${Math.max(0, Math.min(100, progress * 100))}%` }}

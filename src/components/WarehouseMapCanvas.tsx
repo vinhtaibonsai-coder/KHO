@@ -934,7 +934,7 @@ export default function WarehouseMapCanvas({
                 onClick={() => setActiveFloorFilter("all")}
                 className={`rounded-md px-2 py-1 text-xs font-bold transition ${
                   activeFloorFilter === "all"
-                    ? "bg-slate-800 text-white shadow-2xs"
+                    ? "bg-emerald-600 text-white shadow-2xs"
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
               >
@@ -1011,7 +1011,7 @@ export default function WarehouseMapCanvas({
             className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold shadow-2xs transition ${
               edit
                 ? "border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700"
-                : "border-slate-700 bg-slate-800 text-white hover:bg-slate-900"
+                : "border-slate-300 bg-white text-slate-800 hover:bg-slate-50 hover:border-slate-400"
             }`}
           >
             {edit ? <Check className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
@@ -1637,7 +1637,7 @@ export default function WarehouseMapCanvas({
           >
             <ZoomIn className="h-5 w-5" />
           </button>
-          <span className="rounded-full bg-slate-800/85 px-2 py-0.5 text-[10px] font-black text-white shadow">
+          <span className="rounded-full bg-slate-700/90 px-2 py-0.5 text-[10px] font-black text-white shadow">
             {Math.round(scale * 100)}%
           </span>
           <button
