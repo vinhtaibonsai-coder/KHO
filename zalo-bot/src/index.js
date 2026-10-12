@@ -453,7 +453,7 @@ async function handleDirectMessage(api, message) {
 }
 
 function startListener(api) {
-  api.listener.on("connected", () => console.log("[ws] Đã kết nối, đang nghe tin nhắn 30 nhóm & Cloud của tôi..."));
+  api.listener.on("connected", () => console.log("[ws] Đã kết nối Zalo — đang tự động lắng nghe tất cả các nhóm Kho (Kho 01, Kho 31, ...) & Cloud của tôi..."));
   api.listener.on("disconnected", (code, reason) => console.error(`[ws] Mất kết nối (${code}): ${reason}`));
   api.listener.on("error", (err) => console.error("[ws] Lỗi:", err));
   api.listener.on("message", (message) => {

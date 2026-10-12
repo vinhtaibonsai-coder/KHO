@@ -157,11 +157,19 @@ export async function syncRecentGroupHistory(api, limit = 50) {
 
     let parsed = 0;
     let imported = 0;
+    let mappingChanged = false;
 
     for (const gid of groupIds) {
       const gName = groupNameMap.get(gid) || "";
       const wh = resolveWarehouse(mapping, gid, gName);
       if (!wh) continue;
+
+      if (mapping.groups[gid] !== wh) {
+        mapping.groups[gid] = wh;
+        mappingChanged = true;
+      }
+
+      console.log(`[catch-up] Quét nhóm: "${gName || gid}" -> Kho ${wh}`);
 
       try {
         const history = await api.getGroupChatHistory(gid, limit);
@@ -181,6 +189,7 @@ export async function syncRecentGroupHistory(api, limit = 50) {
               const res = await sendSignedWebhook(WEBHOOK_URL, {
                   groupId: `KHO_${String(wh).padStart(2, "0")}`,
                   message: text.trim(),
+                  botName: process.env.BOT_NAME || "Bot",
               });
               const data = await res.json();
               if (data.ok) imported++;
@@ -188,8 +197,17 @@ export async function syncRecentGroupHistory(api, limit = 50) {
             await sleep(100);
           }
         }
+      } catch (err) {
+        console.warn(`[catch-up] Lỗi đọc tin nhóm "${gName}": ${err.message}`);
+      }
+    }
+
+    if (mappingChanged) {
+      try {
+        fs.writeFileSync(MAPPING_FILE, JSON.stringify(mapping, null, 2), "utf8");
       } catch {}
     }
+
     console.log(`✅ [tự động] Đã đồng bộ xong lịch sử: nạp ${imported}/${parsed} mã từ các nhóm Kho.`);
     return { parsed, imported };
   } catch (err) {
