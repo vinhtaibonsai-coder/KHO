@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, Delete, KeyRound, AlertCircle, Sparkles } from "lucide-react";
+import { ShieldCheck, Delete, KeyRound, AlertCircle, Sparkles, ArrowRight } from "lucide-react";
 import { APP_VERSION } from "@/lib/version";
 
 export default function LoginPage() {
@@ -103,7 +103,7 @@ export default function LoginPage() {
       triggerHaptic([30, 50, 40]);
       // Dùng window.location.assign để đảm bảo cookie mới được load đầy đủ trên Mobile WebKit/Safari
       if (typeof window !== "undefined") {
-        window.location.assign("/");
+        window.location.replace("/");
       } else {
         router.replace("/");
       }
@@ -129,6 +129,10 @@ export default function LoginPage() {
         handleDelete();
       } else if (e.key === "Escape") {
         handleClear();
+      } else if (e.key === "Enter") {
+        if (pin.length === 4 && !loading && lockRemaining <= 0) {
+          verifyPinCode(pin);
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -272,6 +276,21 @@ export default function LoginPage() {
             className="w-15 h-15 sm:w-18 sm:h-18 rounded-full bg-slate-100 hover:bg-rose-50 active:bg-rose-100 text-slate-600 hover:text-rose-600 flex items-center justify-center active:scale-90 transition-all duration-100 disabled:opacity-25 disabled:pointer-events-none cursor-pointer touch-manipulation"
           >
             <Delete className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+        </div>
+
+        {/* Nut Xac Nhan Dang Nhap (Enter) */}
+        <div className="mt-3.5 w-full flex justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              if (pin.length === 4) verifyPinCode(pin);
+            }}
+            disabled={loading || lockRemaining > 0 || pin.length < 4}
+            className="w-full py-3 px-4 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-sm transition-all duration-150 touch-manipulation cursor-pointer disabled:opacity-35 disabled:cursor-not-allowed bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-emerald-500/25 active:scale-[0.98]"
+          >
+            <span>Xác nhận đăng nhập (Enter)</span>
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>

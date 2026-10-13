@@ -101,6 +101,23 @@ function notify(title, body) {
   new Notification({ title, body, silent: false }).show();
 }
 
+// Windows chỉ hiện Notification khi app có AppUserModelID (bản portable/chạy dev lấy executable làm ID)
+app.setAppUserModelId(app.isPackaged ? "com.warehouse.zalobotdesktop" : process.execPath);
+
+let lastWindowAlertAt = 0;
+
+// Báo lỗi nghiêm trọng (session hết hạn / mất kết nối): hiện thông báo Windows + tự bật cửa sổ app
+function alertWindow(title, body) {
+  notify(title, body);
+  if (!win) return;
+  // Không giật cửa sổ lặp lại khi bot chập chờn (tối thiểu 15 giây giữa 2 lần)
+  if (Date.now() - lastWindowAlertAt < 15000) return;
+  lastWindowAlertAt = Date.now();
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
 function rebuildTray() {
   if (!tray) return;
   tray.setImage(trayIcon(botOnline));
@@ -168,9 +185,9 @@ function handleBotOutput(text) {
     } else if (/Chờ quét mã QR|Mở file .*qr\.png/.test(line)) {
       win?.webContents.send("showQr");
     } else if (/Session hết hạn/.test(line)) {
-      notify("Zalo Bot", "Session hết hạn — cần quét lại mã QR");
+      alertWindow("Zalo Bot — Session hết hạn", "Phiên Zalo đã hết hạn — cần quét lại mã QR.\nCửa sổ app đã được mở, nhấn \"Bật Bot\" và quét QR để tiếp tục.");
     } else if (/Mất kết nối/.test(line)) {
-      notify("Zalo Bot", "Mất kết nối Zalo — đang thử lại...");
+      alertWindow("Zalo Bot — Mất kết nối", "Bot mất kết nối Zalo/webhook — đang thử lại.\nKiểm tra máy có đang bật và có mạng internet.");
     }
   }
 }
@@ -215,7 +232,7 @@ function startBot() {
     stopQrWatch();
     setStatus(false);
     pushLog(`Bot đã dừng (code=${code} signal=${signal || "-"})`, "warn");
-    if (!quitting) notify("Zalo Bot", "Bot đã ngắt kết nối / dừng chạy");
+    if (!quitting) alertWindow("Zalo Bot — Bot đã dừng", "Bot đã ngắt kết nối / dừng chạy.\nCửa sổ app đã được mở — nhấn \"Bật Bot\" để khởi động lại.");
   });
 }
 

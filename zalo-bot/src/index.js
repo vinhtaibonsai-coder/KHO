@@ -148,7 +148,25 @@ export async function forward(groupId, message, sourceId, url = WEBHOOK_URL, att
     }
     if (i < attempts) await sleep(500 * i);
   }
+  console.error(`[webhook] Mất kết nối webhook — bỏ qua sau ${attempts} lần thử: ${message}`);
   return { ok: false };
+}
+
+/** Gửi webhook kèm retry (dùng cho heartbeat / các gói không cần xử lý kết quả) */
+export async function sendWebhookWithRetry(url, payload, attempts = 3, label = "webhook") {
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      const res = await sendSignedWebhook(url, payload);
+      if (res.ok) return true;
+      console.error(`[webhook] ${label} HTTP ${res.status} (lần ${i}/${attempts})`);
+      if (res.status >= 400 && res.status < 500 && res.status !== 429) return false;
+    } catch (err) {
+      console.error(`[webhook] ${label} lỗi mạng lần ${i}/${attempts}: ${err.message}`);
+    }
+    if (i < attempts) await sleep(500 * i);
+  }
+  console.error(`[webhook] Mất kết nối webhook — ${label} thất bại sau ${attempts} lần thử, sẽ thử lại ở chu kỳ sau`);
+  return false;
 }
 
 // ============================================================
@@ -455,7 +473,14 @@ async function handleDirectMessage(api, message) {
 function startListener(api) {
   api.listener.on("connected", () => console.log("[ws] Đã kết nối Zalo — đang tự động lắng nghe tất cả các nhóm Kho (Kho 01, Kho 31, ...) & Cloud của tôi..."));
   api.listener.on("disconnected", (code, reason) => console.error(`[ws] Mất kết nối (${code}): ${reason}`));
-  api.listener.on("error", (err) => console.error("[ws] Lỗi:", err));
+  api.listener.on("error", (err) => {
+    const msg = err?.message || String(err);
+    console.error("[ws] Lỗi:", msg);
+    // Session cookie bị Zalo từ chối -> báo đúng câu chữ để app desktop mở cửa sổ + thông báo Windows
+    if (/(session|cookie|unauthorized|forbidden|401|login|not.?login)/i.test(msg)) {
+      console.error(`[ws] Session hết hạn: ${msg} — cần quét lại mã QR`);
+    }
+  });
   api.listener.on("message", (message) => {
     try {
       const rawContent = message?.data?.content;
@@ -553,11 +578,8 @@ async function main() {
   startListener(api);
 
   // 3. Heartbeat định kỳ 20 giây gửi tín hiệu ping (kèm botName) để web hiển thị bot đang chạy
-  const sendHeartbeat = async () => {
-    try {
-      await sendSignedWebhook(WEBHOOK_URL, { action: "heartbeat", botName: BOT_NAME });
-    } catch {}
-  };
+  //    Tự retry khi webhook lỗi mạng / server chưa sẵn sàng
+  const sendHeartbeat = () => sendWebhookWithRetry(WEBHOOK_URL, { action: "heartbeat", botName: BOT_NAME }, 3, "heartbeat");
   // Gửi ngay 1 lần đầu
   sendHeartbeat();
   setInterval(sendHeartbeat, 20000);
