@@ -1,7 +1,7 @@
 "use client";
 
 import React, { forwardRef, useState, useEffect } from "react";
-import { Search, X, Camera, History, Trash2, ArrowUpRight } from "lucide-react";
+import { Search, X, Camera, History, Trash2, ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
 
 const QUICK_FILTERS = [
   { label: "Tất cả", value: "" },
@@ -86,8 +86,8 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
     });
   };
 
-  const clearAllHistory = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const clearAllHistory = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setHistory([]);
     try {
       localStorage.removeItem(SEARCH_HISTORY_KEY);
@@ -159,89 +159,104 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
         )}
       </div>
 
-      {/* KHỐI NHẬT KÝ / LỊCH SỬ TRA CỨU - LUÔN HIỂN THỊ RÕ RÀNG NGAY DƯỚI Ô TÌM KIẾM */}
-      <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5 space-y-2 transition-all">
-        <div className="flex items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-900">
+      {/* KHỐI NHẬT KÝ / LỊCH SỬ TRA CỨU - THU GỌN THÀNH 1 DÒNG, BẤM VÀO MỚI SỔ RA */}
+      <div className="rounded-xl border border-emerald-100/90 bg-emerald-50/50 transition-all overflow-hidden">
+        {/* Thanh tiêu đề 1 dòng (Click để đóng / mở) */}
+        <div 
+          onClick={() => setShowHistory((prev) => !prev)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") setShowHistory((prev) => !prev);
+          }}
+          className="w-full flex items-center justify-between gap-2 px-3 py-2 cursor-pointer select-none hover:bg-emerald-100/40 transition active:bg-emerald-100/60"
+        >
+          <div className="inline-flex items-center gap-2 text-xs font-bold text-emerald-950">
             <History className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
             <span>Nhật ký tìm kiếm</span>
-            {history.length > 0 && (
-              <span className="text-[11px] font-normal text-emerald-700">({history.length} mã gần nhất)</span>
+            {history.length > 0 ? (
+              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200/80">
+                {history.length} mã
+              </span>
+            ) : (
+              <span className="text-[11px] font-normal text-slate-400 italic">(chưa có mã)</span>
             )}
           </div>
 
-          {history.length > 0 ? (
-            <div className="flex items-center gap-2">
-              {history.length > 5 && (
-                <button
-                  type="button"
-                  onClick={() => setShowHistory((prev) => !prev)}
-                  className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
-                >
-                  {showHistory ? "Thu gọn" : "Xem tất cả"}
-                </button>
-              )}
+          <div className="flex items-center gap-2">
+            {history.length > 0 && showHistory && (
               <button
                 type="button"
-                onClick={clearAllHistory}
-                className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                onClick={(e) => clearAllHistory(e)}
+                className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-rose-600 transition px-1 py-0.5 rounded cursor-pointer hover:bg-white/80"
                 title="Xóa toàn bộ nhật ký tìm kiếm"
               >
                 <Trash2 className="h-3 w-3" />
                 <span>Xóa hết</span>
               </button>
-            </div>
-          ) : (
-            <span className="text-[11px] text-slate-400 italic">Chưa có mã lưu</span>
-          )}
+            )}
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700">
+              {showHistory ? (
+                <>
+                  <span>Thu gọn</span>
+                  <ChevronUp className="h-3.5 w-3.5 text-emerald-600" />
+                </>
+              ) : (
+                <>
+                  <span>Mở xem</span>
+                  <ChevronDown className="h-3.5 w-3.5 text-emerald-600" />
+                </>
+              )}
+            </span>
+          </div>
         </div>
 
-        {/* DANH SÁCH MÃ ĐÃ TRA CỨU HOẶC GỢI Ý MẪU NẾU CHƯA CÓ LỊCH SỬ */}
-        {history.length > 0 ? (
-          <div
-            className={`flex flex-wrap gap-1.5 transition-all ${
-              showHistory ? "max-h-48 overflow-y-auto" : "max-h-20 overflow-hidden"
-            }`}
-          >
-            {(showHistory ? history : history.slice(0, 8)).map((sku) => (
-              <div
-                key={sku}
-                onClick={() => selectHistoryItem(sku)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") selectHistoryItem(sku);
-                }}
-                className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-200/90 bg-white hover:bg-emerald-50 hover:border-emerald-400 px-2.5 py-1 text-xs font-mono font-bold text-slate-800 shadow-2xs transition active:scale-95 cursor-pointer"
-              >
-                <span>{sku}</span>
-                <ArrowUpRight className="h-3 w-3 text-slate-400 group-hover:text-emerald-600 transition" />
-                <button
-                  type="button"
-                  onClick={(e) => removeHistoryItem(e, sku)}
-                  className="rounded p-0.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition -mr-1"
-                  title={`Xóa mã ${sku} khỏi lịch sử`}
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
+        {/* PHẦN SỔ RA KHI NGƯỜI DÙNG BẤM MỞ */}
+        {showHistory && (
+          <div className="px-3 pt-1 pb-2.5 border-t border-emerald-100/80 space-y-2 animate-in fade-in-50 duration-150">
+            {history.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pt-1">
+                {history.map((sku) => (
+                  <div
+                    key={sku}
+                    onClick={() => selectHistoryItem(sku)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") selectHistoryItem(sku);
+                    }}
+                    className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-200/90 bg-white hover:bg-emerald-50 hover:border-emerald-400 px-2.5 py-1 text-xs font-mono font-bold text-slate-800 shadow-2xs transition active:scale-95 cursor-pointer"
+                  >
+                    <span>{sku}</span>
+                    <ArrowUpRight className="h-3 w-3 text-slate-400 group-hover:text-emerald-600 transition" />
+                    <button
+                      type="button"
+                      onClick={(e) => removeHistoryItem(e, sku)}
+                      className="rounded p-0.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition -mr-1"
+                      title={`Xóa mã ${sku} khỏi lịch sử`}
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex items-center justify-between text-xs text-slate-500 py-0.5">
-            <span>Gõ tìm mã hoặc bấm chọn mã gợi ý:</span>
-            <div className="flex items-center gap-1">
-              {["E120", "P150", "K100"].map((sample) => (
-                <button
-                  key={sample}
-                  type="button"
-                  onClick={() => selectHistoryItem(sample)}
-                  className="rounded bg-white px-2 py-0.5 text-[11px] font-mono font-semibold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
-                >
-                  {sample}
-                </button>
-              ))}
-            </div>
+            ) : (
+              <div className="flex items-center justify-between text-xs text-slate-500 py-1">
+                <span>Gõ tìm mã hoặc bấm chọn mã gợi ý:</span>
+                <div className="flex items-center gap-1">
+                  {["E120", "P150", "K100"].map((sample) => (
+                    <button
+                      key={sample}
+                      type="button"
+                      onClick={() => selectHistoryItem(sample)}
+                      className="rounded bg-white px-2 py-0.5 text-[11px] font-mono font-semibold text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer"
+                    >
+                      {sample}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
