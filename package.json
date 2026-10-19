@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "auth:hash-pin": "node scripts/generate-pin-hash.mjs"
+    "auth:hash-pin": "node scripts/generate-pin-hash.mjs",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

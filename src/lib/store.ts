@@ -930,9 +930,9 @@ export async function setWarehouseCount(count: number): Promise<number> {
   return target;
 }
 
-export async function addWarehouse(): Promise<number> {
+export async function addWarehouse(targetNumber?: number): Promise<number> {
   const current = await getWarehouseCount();
-  const next = current + 1;
+  const next = targetNumber && targetNumber > 0 ? Math.max(current, targetNumber) : current + 1;
 
   if (supabaseEnabled) {
     try {
@@ -1124,6 +1124,27 @@ export async function recordBotPing(botName: string = "Bot"): Promise<string> {
   } catch {}
 
   return now;
+}
+
+
+export async function recordBotOffline(botName: string = "Bot"): Promise<void> {
+  const name = (botName || "Bot").trim().slice(0, 40) || "Bot";
+  if (supabaseEnabled) {
+    try {
+      const sb = getSupabase();
+      await sb!.from("zalo_messages").delete().eq("id", `bot_heartbeat_${name}`);
+    } catch {}
+  }
+  try {
+    const pingFile = path.join(DATA_DIR, ".bot-ping.json");
+    if (fs.existsSync(pingFile)) {
+      const parsed = JSON.parse(fs.readFileSync(pingFile, "utf8"));
+      if (parsed.bots && parsed.bots[name]) {
+        delete parsed.bots[name];
+        fs.writeFileSync(pingFile, JSON.stringify(parsed), "utf8");
+      }
+    }
+  } catch {}
 }
 
 export async function getBotStatus(): Promise<{

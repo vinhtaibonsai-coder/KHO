@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addQty, claimMessage, pushMessage, removeItem, upsertItem, findItem, transferItem, ensureWarehouseExists, recordBotPing } from "@/lib/store";
+import { addQty, claimMessage, pushMessage, removeItem, upsertItem, findItem, transferItem, ensureWarehouseExists, recordBotPing, recordBotOffline } from "@/lib/store";
 import { validateSku, extractValidSkusFromText } from "@/lib/sku-rules";
 import type { ZaloMessage } from "@/types";
 import { verifyWebhookSignature } from "@/lib/webhook-signature";
@@ -96,6 +96,12 @@ export async function POST(req: Request) {
   const sourceId = /^[\w.-]{1,64}$/.test(rawSourceId) ? rawSourceId : undefined;
 
   // Nhận tín hiệu heartbeat giữ trạng thái bot online (đa máy: theo botName)
+    // Xử lý khi bot báo ngắt kết nối WebSocket
+  if (body?.action === "bot_disconnected") {
+    await recordBotOffline(botName);
+    return NextResponse.json({ ok: true, disconnected: true, botName: botName ?? "Bot" });
+  }
+
   if (body?.action === "heartbeat" || body?.message === "__PING__") {
     const pingTime = await recordBotPing(botName);
     return NextResponse.json({ ok: true, heartbeat: true, botName: botName ?? "Bot", timestamp: pingTime });

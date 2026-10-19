@@ -3,6 +3,7 @@ import {
   addQty,
   addWarehouse,
   findItem,
+  pushMessage,
   getHistory,
   getItems,
   getMessages,
@@ -93,9 +94,30 @@ export async function POST(req: Request) {
     }
 
     // 1. Thêm kho mới
+    // 1. Thêm kho mới (hỗ trợ chỉ định số kho hoặc tăng dần)
     if (body.action === "add_warehouse") {
-      const newTotal = await addWarehouse();
-      return NextResponse.json({ ok: true, totalWarehouses: newTotal });
+      const current = await getWarehouseCount();
+      const targetWh = body.warehouse ? parseInt(String(body.warehouse), 10) : undefined;
+      if (targetWh !== undefined) {
+        if (isNaN(targetWh) || targetWh < 1 || targetWh > 100) {
+          return NextResponse.json({ error: "Số kho không hợp lệ (phải từ 1 đến 100)" }, { status: 400 });
+        }
+        if (targetWh <= current) {
+          return NextResponse.json({ error: `Kho ${targetWh} đã tồn tại trên hệ thống (hiện có ${current} kho)!` }, { status: 400 });
+        }
+      }
+      const newTotal = await addWarehouse(targetWh);
+      const createdNumber = targetWh !== undefined ? targetWh : newTotal;
+      await pushMessage({
+        id: `wh_create_${createdNumber}_${Date.now()}`,
+        groupId: "SYSTEM",
+        warehouse: createdNumber,
+        message: `[HỆ THỐNG] Đã mở thêm Kho ${createdNumber} thành công`,
+        status: "ok",
+        detail: `Quản trị viên đã tạo kho mới: KHO ${String(createdNumber).padStart(2, "0")}. Tổng số kho: ${newTotal}.`,
+        createdAt: new Date().toISOString(),
+      }).catch(() => undefined);
+      return NextResponse.json({ ok: true, totalWarehouses: newTotal, createdWarehouse: createdNumber });
     }
 
     // 2. Đánh dấu tất cả thông báo đã đọc

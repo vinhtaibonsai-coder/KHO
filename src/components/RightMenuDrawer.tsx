@@ -75,7 +75,7 @@ export default function RightMenuDrawer({
   botStatus?: { online: boolean; lastPing: string | null; bots?: { name: string; online: boolean; lastPing: string | null }[] };
   dbStatus?: { connected: boolean; type: "supabase" | "local"; latencyMs?: number; itemCount?: number };
   role?: SessionRole;
-  onAddWarehouse: () => Promise<void>;
+  onAddWarehouse: (targetWarehouse?: number) => Promise<any>;
   onOpenPaste: () => void;
   onOpenWarehouse?: (warehouse: number) => void;
   onSendWebhook?: (payload: { groupId: string; message: string }) => Promise<{ ok: boolean; message: ZaloMessage }>;
@@ -98,6 +98,8 @@ export default function RightMenuDrawer({
   const [backupBusy, setBackupBusy] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<BackupMeta | null>(null);
   const [showAddWhConfirm, setShowAddWhConfirm] = useState(false);
+  const [targetWhInput, setTargetWhInput] = useState<string>("");
+  const [whCreateError, setWhCreateError] = useState<string | null>(null);
 
   // Đồng bộ toggle âm thanh/rung
   useEffect(() => {
@@ -284,20 +286,33 @@ export default function RightMenuDrawer({
     }
   };
 
-  const handleCreateWarehouse = () => {
+    const handleCreateWarehouse = () => {
+    setWhCreateError(null);
+    setTargetWhInput(String(totalWarehouses + 1));
     setShowAddWhConfirm(true);
   };
 
   const executeAddWarehouse = async () => {
-    setShowAddWhConfirm(false);
+    const num = targetWhInput.trim() ? parseInt(targetWhInput.trim(), 10) : totalWarehouses + 1;
+    if (isNaN(num) || num < 1 || num > 100) {
+      setWhCreateError("Vui lòng nhập số kho hợp lệ từ 1 đến 100");
+      return;
+    }
+    if (num <= totalWarehouses) {
+      setWhCreateError(`Kho ${num} đã tồn tại trên hệ thống (hiện có ${totalWarehouses} kho)!`);
+      return;
+    }
+
+    setWhCreateError(null);
     setAddingWh(true);
     try {
-      await onAddWarehouse();
-      setAddSuccess(`Đã tạo thành công KHO ${pad(totalWarehouses + 1)}!`);
+      await onAddWarehouse(num);
+      setShowAddWhConfirm(false);
+      setAddSuccess(`Đã tạo thành công KHO ${pad(num)}!`);
       setTimeout(() => setAddSuccess(null), 4000);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Lỗi khi thêm kho mới");
+      setWhCreateError(e.message || "Lỗi khi thêm kho mới");
     } finally {
       setAddingWh(false);
     }

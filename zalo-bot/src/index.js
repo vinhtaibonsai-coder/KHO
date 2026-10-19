@@ -68,14 +68,17 @@ export function parseWarehouseFromName(name) {
 
 /** Chỉ nhận nếu tên nhóm có chữ KHO hoặc đã được map hợp lệ */
 export function resolveWarehouse(mapping, groupId, groupName) {
-  // Nếu có tên nhóm, bắt buộc tên nhóm phải có từ KHO
-  if (groupName && !/\bkho\b/i.test(groupName)) {
-    return null;
+  // Ưu tiên 1: Đọc số kho trực tiếp từ tên nhóm Zalo mới nhất (đáp ứng khi đổi tên nhóm thành Kho 40, Kho 50...)
+  if (groupName && /\bkho\b/i.test(groupName)) {
+    const fromName = parseWarehouseFromName(groupName);
+    if (fromName) return fromName;
   }
 
+  // Ưu tiên 2: Dùng mapping đã lưu trước đó nếu có
   const mapped = mapping?.groups?.[groupId];
   if (Number.isInteger(mapped) && mapped >= 1) return mapped;
-  return parseWarehouseFromName(groupName);
+
+  return null;
 }
 
 function loadMapping() {
@@ -245,18 +248,99 @@ async function login(zalo) {
 // ============================================================
 // Xử lý tin nhắn từ nhóm Zalo
 // ============================================================
+
+let isWsConnected = false;
+let isReconnecting = false;
+let reconnectTimer = null;
+let heartbeatTimer = null;
+
+// Gửi báo cáo ngắt kết nối WebSocket về Web
+async function notifyWsDisconnected(code, reason) {
+  isWsConnected = false;
+  console.error(`[ws-alert] WebSocket ngắt kết nối (${code}): ${reason}. Báo trạng thái offline về webhook...`);
+  try {
+    await sendSignedWebhook(WEBHOOK_URL, {
+      action: "bot_disconnected",
+      botName: BOT_NAME,
+      reason: `Mất kết nối Zalo WebSocket (${code})`,
+    });
+  } catch {}
+}
+
+
+/**
+ * Gửi thông báo cập nhật / tạo kho mới vào "Cloud của tôi" (send2me)
+ */
+async function notifyWarehouseChangeToMyDocs(api, warehouseNumber, groupName, isNew = false) {
+  try {
+    const ctx = api.getContext ? api.getContext() : null;
+    const send2meId = ctx?.loginInfo?.send2me_id || (api.getOwnId ? api.getOwnId() : null);
+    if (!send2meId) return;
+
+    const title = isNew 
+      ? `✨ [HỆ THỐNG KHO] PHÁT HIỆN KHO MỚI: KHO ${pad(warehouseNumber)}`
+      : `🔄 [HỆ THỐNG KHO] ĐÃ ĐỔI TÊN NHÓM ZALO: KHO ${pad(warehouseNumber)}`;
+
+    const lines = [
+      title,
+      "",
+      `📍 Kho nhận diện: KHO ${pad(warehouseNumber)}`,
+      `👥 Tên nhóm Zalo: "${groupName || "Kho " + warehouseNumber}"`,
+      `⏰ Thời gian: ${new Date().toLocaleTimeString("vi-VN")} ${new Date().toLocaleDateString("vi-VN")}`,
+      "",
+      `🛡️ Trạng thái: Hệ thống & Bot đã tự động cập nhật, sẵn sàng nhận hàng vào Kho ${pad(warehouseNumber)}!`
+    ];
+
+    await api.sendMessage(
+      {
+        msg: lines.join("\n"),
+        styles: [
+          { start: 0, len: title.length, st: TextStyle.Bold },
+          { start: 0, len: title.length, st: isNew ? TextStyle.Green : TextStyle.Orange },
+        ],
+      },
+      send2meId,
+      ThreadType.User
+    );
+    console.log(`[bot-reply] Đã báo cập nhật Kho ${warehouseNumber} vào "Cloud của tôi"`);
+  } catch (err) {
+    console.warn(`[bot-reply] Không gửi được thông báo kho vào My Documents:`, err.message);
+  }
+}
+
 const nameCache = new Map();
 
-async function groupName(api, groupId) {
-  if (nameCache.has(groupId)) return nameCache.get(groupId);
+async function groupName(api, groupId, msgData = null) {
+  if (nameCache.has(groupId) && nameCache.get(groupId)) return nameCache.get(groupId);
+
+  // Thử 1: Lấy từ chính data của message Zalo nếu có
+  if (msgData?.groupName && typeof msgData.groupName === "string") {
+    nameCache.set(groupId, msgData.groupName);
+    return msgData.groupName;
+  }
+
+  // Thử 2: Gọi api.getGroupInfo
   try {
     const res = await api.getGroupInfo(groupId);
-    const name = res?.gridInfoMap?.[groupId]?.name ?? "";
-    nameCache.set(groupId, name);
-    return name;
-  } catch {
-    return "";
-  }
+    const name = res?.gridInfoMap?.[groupId]?.name;
+    if (name) {
+      nameCache.set(groupId, name);
+      return name;
+    }
+  } catch {}
+
+  // Thử 3: Fallback gọi api.getAllGroups nếu getGroupInfo bị lỗi Zalo
+  try {
+    const all = await api.getAllGroups();
+    const map = all?.gridInfoMap || {};
+    if (map[groupId]?.name) {
+      const name = map[groupId].name;
+      nameCache.set(groupId, name);
+      return name;
+    }
+  } catch {}
+
+  return "";
 }
 
 async function handleGroupMessage(api, message) {
@@ -275,18 +359,21 @@ async function handleGroupMessage(api, message) {
 
   const groupId = message.threadId;
   const mapping = loadMapping();
-  const name = await groupName(api, groupId);
+  const name = await groupName(api, groupId, message.data);
   const warehouse = resolveWarehouse(mapping, groupId, name);
   // CHỈ NHẬN TIN NHẮN TỪ CÁC NHÓM KHO (Kho 1, Kho 2, ..., Kho 31, ...)
   if (!warehouse) {
-    // Không phải nhóm có chữ Kho -> Bỏ qua, không xử lý
+    console.warn(`⚠️ [bỏ qua] Nhận mã SKU "${text}" từ nhóm ID ${groupId} ("${name || "Không rõ tên"}") nhưng không xác định được số Kho! (Gợi ý: Đặt tên nhóm có chữ "Kho XX" hoặc thêm vào zalo-mapping.json)`);
     return;
   }
 
   if (mapping.groups[groupId] !== warehouse) {
+    const oldWh = mapping.groups[groupId];
     mapping.groups[groupId] = warehouse; // tự lưu map cho lần sau
     saveMapping(mapping);
-    console.log(`[mapping] Nhận diện nhóm: ${groupId} ("${name}") -> Kho ${warehouse}`);
+    console.log(`[mapping] Cập nhật nhận diện nhóm: ${groupId} ("${name}") -> Kho ${warehouse} (cũ: ${oldWh || "chưa có"})`);
+    // Báo vào Cloud của tôi (My Documents)
+    notifyWarehouseChangeToMyDocs(api, warehouse, name, !oldWh);
   }
 
   // SHARDING ĐA MÁY: bỏ qua kho không thuộc phân vùng của bot này (tránh xung đột 2 bot)
@@ -471,14 +558,43 @@ async function handleDirectMessage(api, message) {
 }
 
 function startListener(api) {
-  api.listener.on("connected", () => console.log("[ws] Đã kết nối Zalo — đang tự động lắng nghe tất cả các nhóm Kho (Kho 01, Kho 31, ...) & Cloud của tôi..."));
-  api.listener.on("disconnected", (code, reason) => console.error(`[ws] Mất kết nối (${code}): ${reason}`));
+  api.listener.on("connected", () => {
+    isWsConnected = true;
+    isReconnecting = false;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    console.log("[ws] ĐÃ KẾT NỐI ZALO THÀNH CÔNG — đang tự động lắng nghe tất cả các nhóm Kho (Kho 01, Kho 31, ...) & Cloud của tôi...");
+  });
+
+  api.listener.on("disconnected", (code, reason) => {
+    console.error(`[ws] MẤT KẾT NỐI (${code}): ${reason}`);
+    notifyWsDisconnected(code, reason);
+
+    // Tự động kết nối lại (Auto-reconnect) sau 5 giây nếu không phải cố tình tắt
+    if (!isReconnecting && code !== 1000) {
+      isReconnecting = true;
+      console.log("[ws-reconnect] Sẽ tự động kết nối lại Zalo sau 5 giây...");
+      reconnectTimer = setTimeout(async () => {
+        try {
+          console.log("[ws-reconnect] Đang khởi động lại WebSocket listener...");
+          api.listener.start();
+        } catch (rErr) {
+          console.error("[ws-reconnect] Lỗi khởi động lại:", rErr.message);
+          isReconnecting = false;
+        }
+      }, 5000);
+    }
+  });
+
   api.listener.on("error", (err) => {
     const msg = err?.message || String(err);
     console.error("[ws] Lỗi:", msg);
     // Session cookie bị Zalo từ chối -> báo đúng câu chữ để app desktop mở cửa sổ + thông báo Windows
     if (/(session|cookie|unauthorized|forbidden|401|login|not.?login)/i.test(msg)) {
       console.error(`[ws] Session hết hạn: ${msg} — cần quét lại mã QR`);
+      notifyWsDisconnected("SESSION_EXPIRED", msg);
     }
   });
   api.listener.on("message", (message) => {
@@ -577,12 +693,18 @@ async function main() {
   // 2. Bắt đầu lắng nghe tin nhắn trực tiếp
   startListener(api);
 
-  // 3. Heartbeat định kỳ 20 giây gửi tín hiệu ping (kèm botName) để web hiển thị bot đang chạy
-  //    Tự retry khi webhook lỗi mạng / server chưa sẵn sàng
-  const sendHeartbeat = () => sendWebhookWithRetry(WEBHOOK_URL, { action: "heartbeat", botName: BOT_NAME }, 3, "heartbeat");
+  // 3. Heartbeat định kỳ 20 giây: CHỈ PING ONLINE KHI WEBSOCKET THỰC SỰ ĐANG SỐNG
+  const sendHeartbeat = () => {
+    if (isWsConnected) {
+      sendWebhookWithRetry(WEBHOOK_URL, { action: "heartbeat", botName: BOT_NAME }, 2, "heartbeat");
+    } else {
+      console.warn("[heartbeat] Tạm dừng ping vì WebSocket Zalo đang mất kết nối!");
+    }
+  };
   // Gửi ngay 1 lần đầu
   sendHeartbeat();
-  setInterval(sendHeartbeat, 20000);
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(sendHeartbeat, 20000);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

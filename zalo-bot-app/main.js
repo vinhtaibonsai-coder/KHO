@@ -186,7 +186,8 @@ function handleBotOutput(text) {
       win?.webContents.send("showQr");
     } else if (/Session hết hạn/.test(line)) {
       alertWindow("Zalo Bot — Session hết hạn", "Phiên Zalo đã hết hạn — cần quét lại mã QR.\nCửa sổ app đã được mở, nhấn \"Bật Bot\" và quét QR để tiếp tục.");
-    } else if (/Mất kết nối/.test(line)) {
+    } else if (/Mất kết nối|\[ws\] Mất kết nối|MẤT KẾT NỐI/.test(line)) {
+        setStatus(false);
       alertWindow("Zalo Bot — Mất kết nối", "Bot mất kết nối Zalo/webhook — đang thử lại.\nKiểm tra máy có đang bật và có mạng internet.");
     }
   }

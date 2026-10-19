@@ -556,16 +556,17 @@ export default function Home() {
     });
   }
 
-  async function addWarehouseHandler() {
+    async function addWarehouseHandler(targetWarehouse?: number) {
     const res = await fetch("/api/items", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add_warehouse" }),
+      body: JSON.stringify({ action: "add_warehouse", warehouse: targetWarehouse }),
     });
     const data = await res.json();
     if (res.ok && data.ok) {
       setTotalWarehouses(data.totalWarehouses);
       fetchData();
+      return data;
     } else {
       throw new Error(data.error || "Không thể tạo thêm kho");
     }
