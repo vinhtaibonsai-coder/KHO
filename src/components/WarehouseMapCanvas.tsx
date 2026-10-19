@@ -54,11 +54,11 @@ const STORAGE_KEY = "xuong_lua_nhut_warehouse_map_layout_v2";
 const ORIGIN = 40;
 const NODE_W = 126;
 const NODE_H = 88;
-// Mở rộng đáng kể vùng di chuyển của tòa nhà và các kho (1600 x 1100 px)
-const WORLD_W = 1600;
-const WORLD_H = 1100;
+// Mở rộng vùng di chuyển của tòa nhà và các kho (2800 x 1800 px)
+const WORLD_W = 2800;
+const WORLD_H = 1800;
 const GRID_SIZE = 20;
-const MIN_SCALE = 0.2;
+const MIN_SCALE = 0.15;
 const MAX_SCALE = 3;
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -731,13 +731,26 @@ export default function WarehouseMapCanvas({
   const addBuilding = () => {
     const name = newBuildingName.trim() || `Tòa ${layout.buildings.length + 1}`;
     const id = `b-${Date.now().toString(36)}`;
+    const w = 360;
+    const h = 260;
+    // Ưu tiên vùng trống bên phải các tòa hiện có (vd: x:1200, y:100); nếu bị trùng -> xếp ngay dưới tòa thấp nhất
+    const overlaps = (x: number, y: number) =>
+      layout.buildings.some(
+        (b) => x < b.x + b.width && x + w > b.x && y < b.y + b.height && y + h > b.y
+      );
+    let nx = 1200;
+    let ny = 100;
+    if (overlaps(nx, ny) || nx + w > WORLD_W) {
+      nx = ORIGIN;
+      ny = Math.min(WORLD_H - h, Math.max(0, ...layout.buildings.map((b) => b.y + b.height)) + 40);
+    }
     const newB: Building = {
       id,
       name,
-      x: 100,
-      y: 100,
-      width: 360,
-      height: 260,
+      x: nx,
+      y: ny,
+      width: w,
+      height: h,
       color: "border-slate-300 bg-white/70",
     };
     update((l) => ({
