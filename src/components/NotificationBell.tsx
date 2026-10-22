@@ -644,12 +644,12 @@ export default function NotificationBell({
           setIsOpen((prev) => !prev);
           setSearchKeyword("");
         }}
-        className="relative flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer"
+        className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer"
         title="Thông báo nhật ký Zalo"
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-rose-600 text-[10px] font-black text-white ring-2 ring-white animate-pulse">
+          <span className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] px-1 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white ring-2 ring-white shadow-xs pointer-events-none select-none z-10 leading-none">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}

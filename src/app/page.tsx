@@ -13,7 +13,9 @@ import {
   RotateCcw,
   Check,
   Database,
-  Bot
+  Bot,
+  ChevronDown,
+  X
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import WarehouseDetailModal from "@/components/WarehouseDetailModal";
@@ -27,6 +29,7 @@ import BottomTabBar, { type BottomTabType } from "@/components/BottomTabBar";
 import ConfirmModal, { type ConfirmVariant } from "@/components/ConfirmModal";
 import UndoToast from "@/components/UndoToast";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import BotStatusModal from "@/components/BotStatusModal";
 import { APP_VERSION } from "@/lib/version";
 import type { SessionRole } from "@/lib/auth-session";
 import { tingNewMessage, tingFound } from "@/lib/audio";
@@ -253,6 +256,10 @@ export default function Home() {
 
   // CẢNH BÁO ZALO BOT: offline hoặc heartbeat cũ hơn 60 giây (máy chạy bot tắt / mất mạng / session hết hạn)
   const [botOfflineReason, setBotOfflineReason] = useState<string | null>(null);
+  const [isBotAlertDismissed, setIsBotAlertDismissed] = useState(false);
+  const [isBotDetailsOpen, setIsBotDetailsOpen] = useState(false);
+  const [isBotModalOpen, setIsBotModalOpen] = useState(false);
+
   useEffect(() => {
     const check = () => {
       if (!botStatus) return setBotOfflineReason(null);
@@ -266,6 +273,14 @@ export default function Home() {
     const id = window.setInterval(check, 10000);
     return () => window.clearInterval(id);
   }, [botStatus]);
+
+  // Khi bot online trở lại, tự động reset trạng thái ẩn để nếu sau này offline lại thì cảnh báo tiếp
+  useEffect(() => {
+    if (!botOfflineReason) {
+      setIsBotAlertDismissed(false);
+      setIsBotDetailsOpen(false);
+    }
+  }, [botOfflineReason]);
 
   // Tự động trỏ con trỏ vào ô tra cứu khi vừa vào trang (đặt con trỏ ở cuối chuỗi, không bôi đen text)
   useEffect(() => {
@@ -745,9 +760,9 @@ export default function Home() {
             >
               <Database className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
               <span
-                className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${
+                className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white shadow-2xs ${
                   dbStatus?.connected
-                    ? "bg-emerald-500 animate-pulse"
+                    ? "bg-emerald-500"
                     : dbStatus
                     ? "bg-rose-500"
                     : "bg-slate-300"
@@ -755,15 +770,17 @@ export default function Home() {
               />
             </div>
 
-            {/* ICON TRẠNG THÁI BOT ZALO TRÊN MÁY TÍNH (TRÒN, CHỈ BIỂU TƯỢNG) */}
-            <div
+            {/* ICON TRẠNG THÁI BOT ZALO TRÊN MÁY TÍNH (TRÒN, CHỈ BIỂU TƯỢNG - NHẤN ĐỂ MỞ CHI TIẾT) */}
+            <button
+              type="button"
+              onClick={() => setIsBotModalOpen(true)}
               role="status"
               aria-label={botStatus?.online ? "Bot Zalo đang chạy" : "Bot Zalo đang tắt"}
-              className={`relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border transition shadow-2xs ${
+              className={`relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border transition shadow-2xs cursor-pointer active:scale-95 ${
                 botStatus?.online
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-600"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-600 hover:bg-emerald-100/70"
                   : botStatus
-                  ? "bg-amber-50 border-amber-200 text-amber-600"
+                  ? "bg-amber-50 border-amber-200 text-amber-600 hover:bg-amber-100/70"
                   : "bg-slate-100 border-slate-200 text-slate-400"
               }`}
               title={
@@ -775,25 +792,25 @@ export default function Home() {
                             b.lastPing ? ` (ping ${new Date(b.lastPing).toLocaleTimeString("vi-VN")})` : ""
                           }`
                       )
-                      .join("\n")
+                      .join("\n") + "\n(Nhấn để xem chi tiết & hướng dẫn)"
                   : botStatus?.online
                   ? `Bot Zalo trên máy tính: ĐANG CHẠY\n(Phát tín hiệu lúc ${
                       botStatus.lastPing ? new Date(botStatus.lastPing).toLocaleTimeString("vi-VN") : "mới đây"
-                    })`
-                  : "Bot Zalo trên máy tính: ĐANG TẮT\n(Khi bật bot lên, máy sẽ tự động đồng bộ lại các tin nhắn cũ)"
+                    })\n(Nhấn để xem chi tiết)`
+                  : "Bot Zalo trên máy tính: ĐANG TẮT\n(Nhấn để xem chi tiết & hướng dẫn khắc phục)"
               }
             >
               <Bot className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
               <span
-                className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white ${
+                className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white shadow-2xs ${
                   botStatus?.online
-                    ? "bg-emerald-500 animate-pulse"
+                    ? "bg-emerald-500"
                     : botStatus
                     ? "bg-amber-500"
                     : "bg-slate-300"
                 }`}
               />
-            </div>
+            </button>
 
             {/* CHUÔNG THÔNG BÁO NHẬT KÝ ZALO (PHÂN CHIA ĐÃ ĐỌC / CHƯA ĐỌC) */}
             <NotificationBell
@@ -809,9 +826,9 @@ export default function Home() {
             <button
               onClick={fetchData}
               title="Làm mới dữ liệu"
-              className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer"
+              className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
             </button>
 
           </div>
@@ -828,27 +845,63 @@ export default function Home() {
           </div>
         )}
 
-        {/* BANNER CẢNH BÁO ZALO BOT NGOẠI TUYẾN (offline hoặc mất heartbeat quá 60 giây) */}
-        {botStatus && botOfflineReason && (
-          <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-xs">
-            <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs">
-                <AlertCircle className="h-5 w-5" />
-              </span>
-              <div className="min-w-0 flex-1 space-y-2">
-                <div>
-                  <p className="text-sm font-black uppercase tracking-wide text-amber-900">
-                    Cảnh báo: Zalo Bot đang ngoại tuyến
-                  </p>
-                  <p className="mt-0.5 text-xs font-medium text-amber-800">
-                    {botOfflineReason}
+        {/* BANNER CẢNH BÁO ZALO BOT NGOẠI TUYẾN (GỌN GÀNG, KHÔNG CHIẾM CHỖ, CÓ THỂ THU GỌN / ĐÓNG) */}
+        {botStatus && botOfflineReason && !isBotAlertDismissed && (
+          <div 
+            role="alert" 
+            className="rounded-2xl border border-amber-300/90 bg-amber-50/95 p-3 sm:p-3.5 shadow-2xs transition-all duration-200 animate-in fade-in"
+          >
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-2xs">
+                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-xs sm:text-sm font-bold text-amber-950">
+                      Zalo Bot ngoại tuyến
+                    </p>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-900 border border-amber-300/60">
+                      {botOfflineReason}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-800/90 truncate mt-0.5">
                     {botStatus.lastPing
-                      ? ` · Lần tín hiệu gần nhất: ${new Date(botStatus.lastPing).toLocaleTimeString("vi-VN")}`
-                      : " · Chưa nhận được tín hiệu nào"}
-                    . Hệ thống không tự đọc tin nhắn nhóm Zalo cho tới khi bot hoạt động trở lại.
+                      ? `Lần tín hiệu gần nhất: ${new Date(botStatus.lastPing).toLocaleTimeString("vi-VN")}`
+                      : "Chưa nhận tín hiệu"} · Không tự động đọc tin nhóm Zalo
                   </p>
                 </div>
-                <ul className="list-disc space-y-1 pl-4 text-xs leading-relaxed text-amber-800">
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsBotDetailsOpen(!isBotDetailsOpen)}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-200/70 hover:bg-amber-200 active:scale-95 px-2.5 py-1.5 rounded-lg transition cursor-pointer"
+                  title={isBotDetailsOpen ? "Thu gọn hướng dẫn" : "Xem cách khắc phục"}
+                >
+                  <span className="hidden xs:inline">{isBotDetailsOpen ? "Thu gọn" : "Khắc phục"}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isBotDetailsOpen ? "rotate-180" : ""}`} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsBotAlertDismissed(true)}
+                  className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg text-amber-800 hover:bg-amber-200/70 hover:text-amber-950 active:scale-95 transition cursor-pointer"
+                  title="Ẩn thông báo này"
+                  aria-label="Đóng thông báo"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* PHẦN HƯỚNG DẪN CHI TIẾT (MẶC ĐỊNH THU GỌN ĐỂ KHÔNG ĐÈ NỘI DUNG) */}
+            {isBotDetailsOpen && (
+              <div className="mt-3 pt-3 border-t border-amber-200/80 text-xs text-amber-900 space-y-2 animate-in fade-in duration-200">
+                <p className="text-[11px] font-bold text-amber-950">
+                  Các bước xử lý trên máy tính đang chạy bot:
+                </p>
+                <ul className="list-disc space-y-1.5 pl-4 text-[11px] sm:text-xs leading-relaxed text-amber-850">
                   <li>
                     Mở app <strong>Zalo Bot Desktop</strong> trên máy đang chạy bot → khay (tray) góc phải màn hình phải hiện chấm <strong>xanh Online</strong>.
                   </li>
@@ -856,14 +909,14 @@ export default function Home() {
                     Nếu app báo <strong>Session hết hạn</strong> hoặc <strong>Mất kết nối</strong> → quét lại mã QR bằng Zalo (App &gt; Quét mã) trong cửa sổ app vừa tự mở.
                   </li>
                   <li>
-                    Nhấn <strong>Bật Bot</strong> trong app (hoặc bật mục <strong>Khởi động cùng Windows</strong>) và kiểm tra máy đang bật, có mạng internet.
+                    Nhấn <strong>Bật Bot</strong> trong app (hoặc bật mục <strong>Khởi động cùng Windows</strong>) và kiểm tra máy tính đang bật, có mạng internet.
                   </li>
                   <li>
                     Kiểm tra <strong>Cài đặt</strong> trong app: webhook phải trỏ đúng <span className="font-mono font-bold">/api/webhook/zalo</span> và trang web này đang chạy.
                   </li>
                 </ul>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -1410,6 +1463,16 @@ export default function Home() {
           setIsScanning(false);
           searchInputRef.current?.focus();
         }}
+      />
+
+      {/* MODAL TRẠNG THÁI VÀ KHẮC PHỤC BOT ZALO */}
+      <BotStatusModal
+        isOpen={isBotModalOpen}
+        onClose={() => setIsBotModalOpen(false)}
+        botStatus={botStatus}
+        botOfflineReason={botOfflineReason}
+        isBannerDismissed={isBotAlertDismissed}
+        onRestoreBanner={() => setIsBotAlertDismissed(false)}
       />
     </div>
   );
