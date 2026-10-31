@@ -9,16 +9,16 @@
  *    => Ví dụ hợp lệ: E90.100, K100.101, S100.02, P150.12, E60.1, S135.50
  * 
  * 2. Dạng Tiền Tố Cố Định + Số thứ tự (không có size):
- *    - Tiền tố: PT, PCT, BC
+ *    - Tiền tố: PT, PCT, BC, BONSAI
  *    - Số thứ tự: Số nguyên
- *    => Ví dụ hợp lệ: PT395, PCT124, BC12, BC05
+ *    => Ví dụ hợp lệ: PT395, PCT124, BC12, BC05, BONSAI01
  */
 
 export const ALLOWED_SIZES = ["60", "80", "90", "100", "120", "135", "150", "160"] as const;
 export type AllowedSize = typeof ALLOWED_SIZES[number];
 
 export const SIZED_PREFIXES = ["E", "K", "P", "S"] as const;
-export const FIXED_PREFIXES = ["PT", "PCT", "BC"] as const;
+export const FIXED_PREFIXES = ["PT", "PCT", "BC", "BONSAI"] as const;
 
 export interface SkuValidationResult {
   valid: boolean;
@@ -81,9 +81,9 @@ export function validateSku(rawSku: string): SkuValidationResult {
     }
   }
 
-  // 2. Kiểm tra nhóm mã cố định: (PT|PCT|BC) + (Số thứ tự)
-  // Regex: ^(PCT|PT|BC)([0-9]+)$
-  const fixedPattern = /^(PCT|PT|BC)([0-9]+)$/;
+  // 2. Kiểm tra nhóm mã cố định: (BONSAI|PCT|PT|BC) + (Số thứ tự)
+  // Regex: ^(BONSAI|PCT|PT|BC)([0-9]+)$
+  const fixedPattern = /^(BONSAI|PCT|PT|BC)([0-9]+)$/;
   const fixedMatch = clean.match(fixedPattern);
 
   if (fixedMatch) {
@@ -102,7 +102,7 @@ export function validateSku(rawSku: string): SkuValidationResult {
     valid: false,
     normalizedSku: clean,
     type: "invalid",
-    error: `Mã [${clean}] không đúng quy chuẩn (Chỉ chấp nhận: E/K/P/S + {60,80,90,100,120,135,150,160}.STT hoặc PT/PCT/BC + STT)`,
+    error: `Mã [${clean}] không đúng quy chuẩn (Chỉ chấp nhận: E/K/P/S + {60,80,90,100,120,135,150,160}.STT hoặc PT/PCT/BC/BONSAI + STT)`,
   };
 }
 
@@ -135,8 +135,8 @@ export function extractValidSkusFromText(text: string): {
     const hasDigit = /\d/.test(token);
     if (!hasAlpha && !hasDigit) continue;
 
-    // Chỉ xét các token có khả năng là mã sản phẩm (chứa chữ và số, hoặc bắt đầu bằng tiền tố E, K, P, S, PT, PCT, BC)
-    const isCandidate = (hasAlpha && hasDigit) || /^(E|K|P|S|PT|PCT|BC)/i.test(token);
+    // Chỉ xét các token có khả năng là mã sản phẩm (chứa chữ và số, hoặc bắt đầu bằng tiền tố E, K, P, S, PT, PCT, BC, BONSAI)
+    const isCandidate = (hasAlpha && hasDigit) || /^(E|K|P|S|PT|PCT|BC|BONSAI)/i.test(token);
     if (!isCandidate) continue;
 
     const res = validateSku(token);

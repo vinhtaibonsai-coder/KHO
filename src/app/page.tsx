@@ -282,6 +282,25 @@ export default function Home() {
     }
   }, [botOfflineReason]);
 
+  // Đo chiều cao thực tế của Header để cố định thanh tìm kiếm (Sticky Search Bar) chuẩn xác trên mọi thiết bị
+  const headerRef = useRef<HTMLElement | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(58);
+
+  useEffect(() => {
+    const updateHeaderHeight = () => {
+      if (headerRef.current) {
+        setHeaderHeight(headerRef.current.offsetHeight);
+      }
+    };
+    updateHeaderHeight();
+    window.addEventListener("resize", updateHeaderHeight);
+    const timer = setTimeout(updateHeaderHeight, 200);
+    return () => {
+      window.removeEventListener("resize", updateHeaderHeight);
+      clearTimeout(timer);
+    };
+  }, []);
+
   // Tự động trỏ con trỏ vào ô tra cứu khi vừa vào trang (đặt con trỏ ở cuối chuỗi, không bôi đen text)
   useEffect(() => {
     const focusTimer = setTimeout(() => {
@@ -707,7 +726,8 @@ export default function Home() {
       
       {/* TOPBAR / HEADER THEO CHUẨN DESIGN SYSTEM SÁNG & MOBILE PWA (Hỗ trợ tai thỏ / notch) */}
       <header 
-        className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-2xs"
+        ref={headerRef}
+        className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-2xs"
         style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
       >
         <div className="mx-auto flex max-w-7xl items-center justify-between px-3 py-2 sm:px-6 sm:py-3.5">
@@ -933,14 +953,20 @@ export default function Home() {
               <span className="text-xs text-slate-400 hidden xs:inline">1 Mã = Duy nhất 1 Vị trí</span>
             </div>
 
-            <SearchBar 
-              value={query} 
-              onChange={setQuery} 
-              inputRef={searchInputRef}
-              autoFocus={true}
-              availableSkus={items.map((i) => i.sku)}
-              onScan={() => setIsScanning(true)}
-            />
+            {/* THANH TÌM KIẾM CỐ ĐỊNH (STICKY SEARCH BAR) - DÍNH CHẶT DƯỚI HEADER KHI CUỘN */}
+            <div 
+              className="sticky z-30 bg-white -mx-4 sm:-mx-5 px-4 sm:px-5 py-2.5 border-b border-slate-100 shadow-2xs transition-all duration-150"
+              style={{ top: `${headerHeight}px` }}
+            >
+              <SearchBar 
+                value={query} 
+                onChange={setQuery} 
+                inputRef={searchInputRef}
+                autoFocus={true}
+                availableSkus={items.map((i) => i.sku)}
+                onScan={() => setIsScanning(true)}
+              />
+            </div>
 
             {/* MÀN HÌNH CHỜ TRA CỨU PHONG CÁCH GITHUB IOS (KHI CHƯA NHẬP MÃ) */}
             {!query.trim() && (

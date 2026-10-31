@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     if (validSkus.length === 0) {
       return NextResponse.json({
         ok: false,
-        error: "Không tìm thấy mã sản phẩm đúng quy chuẩn trong đoạn chat! (Quy chuẩn: E/K/P/S + {60,80,90,100,135,150,160}.STT hoặc PT/PCT/BC + STT)",
+        error: "Không tìm thấy mã sản phẩm đúng quy chuẩn trong đoạn chat! (Quy chuẩn: E/K/P/S + {60,80,90,100,120,135,150,160}.STT hoặc PT/PCT/BC/BONSAI + STT)",
       }, { status: 400 });
     }
 

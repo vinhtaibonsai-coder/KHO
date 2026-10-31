@@ -321,7 +321,7 @@ export default function PasteImportModal({
               rows={5}
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              placeholder="Ví dụ đoạn chat bạn copy từ Zalo:&#10;&#10;Huy: +E90.100 em nhập kho nhé&#10;Nam: có thêm K100.101, S100.02, P150.12&#10;và các mã PT395, PCT124, BC12 nữa..."
+              placeholder="Ví dụ đoạn chat bạn copy từ Zalo:&#10;&#10;Huy: +E90.100 em nhập kho nhé&#10;Nam: có thêm K100.101, S100.02, P150.12&#10;và các mã PT395, PCT124, BC12, BONSAI01 nữa..."
               className="w-full rounded-xl border border-slate-300 bg-slate-50/50 p-3.5 font-mono text-xs text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-3 focus:ring-emerald-500/10 placeholder:text-slate-400"
             />
           </div>
@@ -367,8 +367,8 @@ export default function PasteImportModal({
 
               <div className="rounded-lg bg-white border border-slate-200 p-2 space-y-1">
                 <span className="font-bold text-blue-800">2. Mã không có Size:</span>
-                <p>Tiền tố cố định: <strong className="text-slate-900 font-mono">PT, PCT, BC</strong> + Số thứ tự</p>
-                <p className="text-slate-400">VD: <span className="font-mono text-slate-700">PT395, PCT124, BC12</span></p>
+                <p>Tiền tố cố định: <strong className="text-slate-900 font-mono">PT, PCT, BC, BONSAI</strong> + Số thứ tự</p>
+                <p className="text-slate-400">VD: <span className="font-mono text-slate-700">PT395, PCT124, BC12, BONSAI01</span></p>
                 <p className="text-rose-600 font-medium">* Ngăn chặn hoàn toàn mọi mã trùng kho</p>
               </div>
             </div>

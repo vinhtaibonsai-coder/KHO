@@ -12,6 +12,7 @@ const QUICK_FILTERS = [
   { label: "PT", value: "PT" },
   { label: "PCT", value: "PCT" },
   { label: "BC", value: "BC" },
+  { label: "BONSAI", value: "BONSAI" },
 ];
 
 const SEARCH_HISTORY_KEY = "kho_search_history_v1";
@@ -68,6 +69,15 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
 
     return () => clearTimeout(timer);
   }, [value]);
+
+  // Tự động thu gọn nhật ký khi người dùng cuộn trang để giữ thanh tìm kiếm gọn gàng
+  useEffect(() => {
+    const handleScroll = () => {
+      if (showHistory) setShowHistory(false);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [showHistory]);
 
   const selectHistoryItem = (sku: string) => {
     onChange(sku);
@@ -157,6 +167,27 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
             </div>
           </button>
         )}
+      </div>
+
+      {/* Quick Filter Pills (Tất cả, E-Size, P-Size...) - Đặt ngay dưới ô tìm kiếm để thao tác nhanh */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-xs">
+        {QUICK_FILTERS.map((f) => {
+          const isSelected = f.value === "" ? value === "" : value === f.value;
+          return (
+            <button
+              key={f.label}
+              type="button"
+              onClick={() => onChange(f.value)}
+              className={`rounded-full px-3 py-1 text-xs font-mono font-bold whitespace-nowrap transition cursor-pointer shrink-0 border ${
+                isSelected
+                  ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs hover:bg-emerald-700"
+                  : "bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900 shadow-2xs"
+              }`}
+            >
+              {f.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* KHỐI NHẬT KÝ / LỊCH SỬ TRA CỨU - THU GỌN THÀNH 1 DÒNG, BẤM VÀO MỚI SỔ RA */}
@@ -259,27 +290,6 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
             )}
           </div>
         )}
-      </div>
-
-      {/* Quick Filter Pills (Tất cả, E-Size, P-Size...) - Chuẩn màu Emerald & Slate sáng */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar text-xs">
-        {QUICK_FILTERS.map((f) => {
-          const isSelected = f.value === "" ? value === "" : value === f.value;
-          return (
-            <button
-              key={f.label}
-              type="button"
-              onClick={() => onChange(f.value)}
-              className={`rounded-full px-3 py-1 text-xs font-mono font-bold whitespace-nowrap transition cursor-pointer shrink-0 border ${
-                isSelected
-                  ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs hover:bg-emerald-700"
-                  : "bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900 shadow-2xs"
-              }`}
-            >
-              {f.label}
-            </button>
-          );
-        })}
       </div>
     </div>
   );

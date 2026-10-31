@@ -155,11 +155,13 @@ export default function RightMenuDrawer({
       PT: 0,
       PCT: 0,
       BC: 0,
+      BONSAI: 0,
       Khác: 0,
     };
     for (const it of items) {
       const u = it.sku.toUpperCase();
-      if (u.startsWith("PCT")) map["PCT"]++;
+      if (u.startsWith("BONSAI")) map["BONSAI"]++;
+      else if (u.startsWith("PCT")) map["PCT"]++;
       else if (u.startsWith("PT")) map["PT"]++;
       else if (u.startsWith("BC")) map["BC"]++;
       else if (u.startsWith("E")) map["E"]++;

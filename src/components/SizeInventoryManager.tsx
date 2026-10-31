@@ -19,7 +19,7 @@ function groupKeyOf(sku: string): { key: string; sized: boolean } {
   const clean = sku.trim().toUpperCase();
   const sized = clean.match(/^([EKPS])(\d+)\./);
   if (sized) return { key: sized[2], sized: true };
-  const fixed = clean.match(/^(PT|PCT|BC)/);
+  const fixed = clean.match(/^(BONSAI|PCT|PT|BC)/);
   if (fixed) return { key: fixed[1], sized: false };
   return { key: "KHAC", sized: false };
 }
