@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { 
   Bell, 
+  Bot,
   CheckCheck, 
   Clock, 
   ChevronRight,
@@ -181,6 +182,8 @@ export default function NotificationBell({
   externalIsOpen,
   onOpenChange,
   embedded = false,
+  botOfflineReason,
+  onOpenBotModal,
 }: {
   messages: ZaloMessage[];
   onOpenWarehouse: (warehouse: number) => void;
@@ -189,6 +192,8 @@ export default function NotificationBell({
   externalIsOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   embedded?: boolean;
+  botOfflineReason?: string | null;
+  onOpenBotModal?: () => void;
 }) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const isOpen = embedded ? true : (externalIsOpen !== undefined ? externalIsOpen : internalIsOpen);
@@ -520,6 +525,38 @@ export default function NotificationBell({
         style={embedded ? undefined : { WebkitOverflowScrolling: "touch" }}
         onTouchMove={(e) => !embedded && e.stopPropagation()}
       >
+        {/* CẢNH BÁO BOT NGOẠI TUYẾN GHIM ĐẦU TRANG NHẬT KÝ */}
+        {botOfflineReason && (
+          <div 
+            onClick={() => {
+              setIsOpen(false);
+              onOpenBotModal?.();
+            }}
+            className="m-3 p-3 rounded-2xl border border-amber-300 bg-amber-50/95 text-amber-950 flex items-center justify-between gap-2.5 cursor-pointer hover:bg-amber-100/90 active:scale-[0.99] transition shadow-2xs"
+            role="alert"
+          >
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-2xs">
+                <Bot className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-xs font-bold text-amber-950">Zalo Bot ngoại tuyến</p>
+                  <span className="text-[10px] font-semibold text-amber-800 bg-amber-100 px-1.5 py-0.2 rounded border border-amber-200">
+                    {botOfflineReason}
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-850 truncate mt-0.5">
+                  Không tự động đọc tin nhóm Zalo · Bấm để xem xử lý
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex shrink-0 items-center text-[11px] font-bold text-amber-900 bg-amber-200/80 px-2.5 py-1.5 rounded-lg shadow-2xs">
+              Khắc phục
+            </span>
+          </div>
+        )}
+
         {filteredMessages.length === 0 ? (
           <div className="py-12 px-4 text-center text-xs text-slate-400">
             {searchKeyword ? (
