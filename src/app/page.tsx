@@ -256,7 +256,6 @@ export default function Home() {
 
   // CẢNH BÁO ZALO BOT: offline hoặc heartbeat cũ hơn 60 giây (máy chạy bot tắt / mất mạng / session hết hạn)
   const [botOfflineReason, setBotOfflineReason] = useState<string | null>(null);
-  const [isBotAlertDismissed, setIsBotAlertDismissed] = useState(false);
   const [isBotModalOpen, setIsBotModalOpen] = useState(false);
 
   useEffect(() => {
@@ -272,13 +271,6 @@ export default function Home() {
     const id = window.setInterval(check, 10000);
     return () => window.clearInterval(id);
   }, [botStatus]);
-
-  // Khi bot online trở lại, tự động reset trạng thái ẩn để nếu sau này offline lại thì cảnh báo tiếp
-  useEffect(() => {
-    if (!botOfflineReason) {
-      setIsBotAlertDismissed(false);
-    }
-  }, [botOfflineReason]);
 
   // Xác định trạng thái thực tế của bot: online VÀ không bị mất heartbeat
   const isBotTrulyOnline = !!botStatus?.online && !botOfflineReason;
@@ -1428,59 +1420,12 @@ export default function Home() {
         }}
       />
 
-      {/* THÔNG BÁO NỔI ZALO BOT NGOẠI TUYẾN (FLOATING OVERLAY - ZERO CLS, TUYỆT ĐỐI KHÔNG ĐẨY DOM / KHÔNG NHẢY Ô TÌM KIẾM) */}
-      {botStatus && botOfflineReason && !isBotAlertDismissed && (
-        <aside
-          role="status"
-          aria-live="polite"
-          className="fixed top-16 right-3 sm:right-6 z-40 max-w-[calc(100vw-1.5rem)] sm:max-w-md pointer-events-auto animate-in fade-in slide-in-from-top-2 duration-200"
-        >
-          <div className="flex items-center gap-2.5 rounded-2xl border border-amber-300/90 bg-amber-50/95 backdrop-blur-md px-3.5 py-2.5 shadow-lg shadow-amber-950/10 ring-1 ring-amber-900/10">
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <p className="text-xs font-bold text-amber-950">Zalo Bot ngoại tuyến</p>
-                <span className="text-[10px] font-semibold text-amber-800 bg-amber-100/90 px-1.5 py-0.2 rounded border border-amber-300/60">
-                  {botOfflineReason}
-                </span>
-              </div>
-              <p className="text-[11px] text-amber-850/90 truncate mt-0.5">
-                {botStatus.lastPing
-                  ? `Tín hiệu cuối: ${new Date(botStatus.lastPing).toLocaleTimeString("vi-VN")}`
-                  : "Chưa nhận tín hiệu"} · Bấm để xem xử lý
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsBotModalOpen(true)}
-              className="inline-flex shrink-0 items-center text-[11px] font-bold text-amber-900 bg-amber-200/80 hover:bg-amber-200 active:scale-95 px-2.5 py-1.5 rounded-lg transition cursor-pointer shadow-2xs"
-            >
-              Khắc phục
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsBotAlertDismissed(true)}
-              className="shrink-0 p-1 rounded-lg text-amber-800 hover:bg-amber-200/70 hover:text-amber-950 active:scale-95 transition cursor-pointer"
-              title="Ẩn thông báo nổi"
-              aria-label="Đóng thông báo"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </aside>
-      )}
-
       {/* MODAL TRẠNG THÁI VÀ KHẮC PHỤC BOT ZALO */}
       <BotStatusModal
         isOpen={isBotModalOpen}
         onClose={() => setIsBotModalOpen(false)}
         botStatus={botStatus}
         botOfflineReason={botOfflineReason}
-        isBannerDismissed={isBotAlertDismissed}
-        onRestoreBanner={() => setIsBotAlertDismissed(false)}
       />
     </div>
   );
