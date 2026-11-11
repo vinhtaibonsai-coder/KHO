@@ -164,6 +164,27 @@
           <label class="switch"><input type="checkbox" id="cWinBoot" /> Khởi động cùng Windows</label>
         </div>
         <div class="row"><button class="btn" id="btnSave">Lưu cấu hình</button><span class="hint" id="saveHint"></span></div>
+        <div class="row" style="margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line); display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <button class="btn ghost" id="btnBackup" title="Xuất toàn bộ cấu hình + phiên đăng nhập Zalo ra 1 file để mang sang máy khác">📥 Sao lưu (Backup)</button>
+          <button class="btn ghost" id="btnRestore" title="Nạp lại cấu hình từ file đã sao lưu trước đó">📤 Khôi phục (Restore)</button>
+          <button class="btn ghost" id="btnOpenFolder" title="Mở thư mục data cạnh file app để chép sang USB hoặc máy khác">📁 Mở thư mục dữ liệu</button>
+          <span class="hint" id="backupHint"></span>
+        </div>
+
+        <!-- GOOGLE DRIVE SYNC -->
+        <div id="gdriveBox" style="margin-top: 14px; padding: 12px 14px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 20px;">☁️</span>
+            <div>
+              <div style="font-size: 13px; font-weight: 700; color: #065f46;" id="gdriveTitle">Google Drive: Đang kiểm tra...</div>
+              <div style="font-size: 11px; color: #047857; word-break: break-all;" id="gdrivePath">—</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <label class="switch" style="font-size: 12px; color: #065f46;"><input type="checkbox" id="cGdriveSync" checked /> Tự động đồng bộ</label>
+            <button class="btn ghost" id="btnGdriveRestore" style="font-size: 11px; padding: 5px 10px; background: #fff;" title="Đọc và nạp lại cấu hình từ Google Drive">🔄 Nạp từ Drive</button>
+          </div>
+        </div>
       </div>
     </section>
 

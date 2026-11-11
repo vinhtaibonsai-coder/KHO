@@ -12,4 +12,10 @@ contextBridge.exposeInMainWorld("zaloBot", {
   stop: () => ipcRenderer.send("bot:stop"),
   botStatus: () => ipcRenderer.invoke("bot:status"),
   sessionExists: () => ipcRenderer.invoke("bot:sessionExists"),
+  backupConfig: () => ipcRenderer.invoke("config:backup"),
+  restoreConfig: () => ipcRenderer.invoke("config:restore"),
+  openDataFolder: () => ipcRenderer.invoke("config:openDataFolder"),
+  getGdriveStatus: () => ipcRenderer.invoke("gdrive:status"),
+  restoreGdrive: () => ipcRenderer.invoke("gdrive:restore"),
+  syncGdriveNow: () => ipcRenderer.invoke("gdrive:syncNow"),
 });

@@ -85,6 +85,23 @@
     $("cAutoStart").checked = !!cfg.autoStartBot;
     if ($("cStartMinimized")) $("cStartMinimized").checked = !!cfg.startMinimized;
     $("cWinBoot").checked = !!cfg.startWithWindows;
+    if ($("cGdriveSync")) $("cGdriveSync").checked = cfg.gdriveSync !== false;
+
+    // Cập nhật trạng thái Google Drive
+    try {
+      const gd = await api.getGdriveStatus();
+      if (gd && gd.available) {
+        $("gdriveTitle").textContent = "Google Drive: Đã kết nối tự động";
+        $("gdrivePath").textContent = gd.path;
+        $("gdriveBox").style.background = "#ecfdf5";
+        $("gdriveBox").style.borderColor = "#a7f3d0";
+      } else {
+        $("gdriveTitle").textContent = "Google Drive: Chưa phát hiện ổ đĩa Drive";
+        $("gdrivePath").textContent = "Cài Google Drive for Desktop để tự đồng bộ";
+        $("gdriveBox").style.background = "#f8fafc";
+        $("gdriveBox").style.borderColor = "#e2e8f0";
+      }
+    } catch {}
   }
   $("cShards").addEventListener("change", () => {
     $("customShardRow").hidden = $("cShards").value !== "custom";
@@ -99,10 +116,54 @@
       autoStartBot: $("cAutoStart").checked,
       startMinimized: $("cStartMinimized") ? $("cStartMinimized").checked : true,
       startWithWindows: $("cWinBoot").checked,
+      gdriveSync: $("cGdriveSync") ? $("cGdriveSync").checked : true,
     });
     $("mShards").textContent = cfg.warehouses;
-    $("saveHint").textContent = "Đã lưu! Bật/Tắt lại bot để áp dụng.";
+    $("saveHint").textContent = "Đã lưu và đồng bộ lên Google Drive!";
     setTimeout(() => { $("saveHint").textContent = ""; }, 3000);
   });
+
+  $("btnBackup")?.addEventListener("click", async () => {
+    $("backupHint").textContent = "Đang chuẩn bị file sao lưu...";
+    const res = await api.backupConfig();
+    if (res && res.success) {
+      $("backupHint").textContent = "Đã xuất file sao lưu thành công!";
+    } else if (res && !res.canceled) {
+      $("backupHint").textContent = "Lỗi khi sao lưu: " + (res.error || "Không rõ");
+    } else {
+      $("backupHint").textContent = "";
+    }
+    setTimeout(() => { $("backupHint").textContent = ""; }, 4000);
+  });
+
+  $("btnRestore")?.addEventListener("click", async () => {
+    const res = await api.restoreConfig();
+    if (res && res.success) {
+      await loadConfig();
+      $("backupHint").textContent = "Đã khôi phục cấu hình và phiên Zalo thành công!";
+    } else if (res && !res.canceled) {
+      $("backupHint").textContent = "Lỗi khôi phục: " + (res.error || "Không rõ");
+    } else {
+      $("backupHint").textContent = "";
+    }
+    setTimeout(() => { $("backupHint").textContent = ""; }, 4000);
+  });
+
+  $("btnOpenFolder")?.addEventListener("click", async () => {
+    await api.openDataFolder();
+  });
+
+  $("btnGdriveRestore")?.addEventListener("click", async () => {
+    $("backupHint").textContent = "Đang nạp lại từ Google Drive...";
+    const res = await api.restoreGdrive();
+    if (res && res.success) {
+      await loadConfig();
+      $("backupHint").textContent = "Đã đồng bộ lại từ Google Drive thành công!";
+    } else {
+      $("backupHint").textContent = res?.error || "Không thể đồng bộ từ Google Drive";
+    }
+    setTimeout(() => { $("backupHint").textContent = ""; }, 4000);
+  });
+
   api.onConfigUpdated && api.onConfigUpdated(() => loadConfig());
   loadConfig();
