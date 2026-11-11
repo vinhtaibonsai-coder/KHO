@@ -683,11 +683,13 @@ async function main() {
   );
 
   // 1. Tự động đồng bộ tin nhắn đã gửi trong lúc tắt máy (Catch-up)
-  console.log("[catch-up] Bắt đầu tự động quét các tin nhắn trong lúc tắt máy...");
-  try {
-    await syncRecentGroupHistory(api, 50);
-  } catch (syncErr) {
-    console.warn("[catch-up] Lỗi khi quét lịch sử:", syncErr.message);
+  if (process.env.ENABLE_CATCH_UP === "1") {
+    console.log("[catch-up] Bắt đầu tự động quét các tin nhắn trong lúc tắt máy...");
+    try {
+      await syncRecentGroupHistory(api, 50);
+    } catch (syncErr) {
+      console.warn("[catch-up] Lỗi khi quét lịch sử:", syncErr.message);
+    }
   }
 
   // 2. Bắt đầu lắng nghe tin nhắn trực tiếp

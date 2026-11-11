@@ -157,6 +157,7 @@ const DEFAULTS = {
   autoStartBot: false,
   startMinimized: true,
   gdriveSync: true,
+  enableCatchUp: false,
 };
 
 const configPath = () => path.join(app.getPath("userData"), "config.json");
@@ -355,6 +356,7 @@ function startBot() {
     SESSION_FILE: path.join(userData, ".zalo-session.json"),
     MAPPING_FILE: path.join(userData, "zalo-mapping.json"),
     QR_FILE: path.join(userData, "qr.png"),
+    ENABLE_CATCH_UP: cfg.enableCatchUp ? "1" : "0",
   };
   if (cfg.webhookSecret) env.ZALO_WEBHOOK_SECRET = cfg.webhookSecret;
 

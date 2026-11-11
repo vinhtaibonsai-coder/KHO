@@ -85,6 +85,7 @@
     $("cAutoStart").checked = !!cfg.autoStartBot;
     if ($("cStartMinimized")) $("cStartMinimized").checked = !!cfg.startMinimized;
     $("cWinBoot").checked = !!cfg.startWithWindows;
+    if ($("cCatchUp")) $("cCatchUp").checked = !!cfg.enableCatchUp;
     if ($("cGdriveSync")) $("cGdriveSync").checked = cfg.gdriveSync !== false;
 
     // Cập nhật trạng thái Google Drive
@@ -116,6 +117,7 @@
       autoStartBot: $("cAutoStart").checked,
       startMinimized: $("cStartMinimized") ? $("cStartMinimized").checked : true,
       startWithWindows: $("cWinBoot").checked,
+      enableCatchUp: $("cCatchUp") ? $("cCatchUp").checked : false,
       gdriveSync: $("cGdriveSync") ? $("cGdriveSync").checked : true,
     });
     $("mShards").textContent = cfg.warehouses;

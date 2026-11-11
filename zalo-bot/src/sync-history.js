@@ -198,6 +198,10 @@ export async function syncRecentGroupHistory(api, limit = 50) {
           }
         }
       } catch (err) {
+        if (err?.message?.includes("404")) {
+          console.warn(`[catch-up] Máy chủ Zalo đã đóng API đọc lịch sử nhóm (/api/group/history -> 404) — tự động bỏ qua để chuyển sang lắng nghe trực tiếp.`);
+          break;
+        }
         console.warn(`[catch-up] Lỗi đọc tin nhóm "${gName}": ${err.message}`);
       }
     }
