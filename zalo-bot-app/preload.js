@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("zaloBot", {
   onQr: (cb) => ipcRenderer.on("qr", (_e, dataUrl) => cb(dataUrl)),
   onShowQr: (cb) => ipcRenderer.on("showQr", () => cb()),
   onStatus: (cb) => ipcRenderer.on("status", (_e, status) => cb(status)),
+  onConfigUpdated: (cb) => ipcRenderer.on("configUpdated", (_e, cfg) => cb(cfg)),
   getConfig: () => ipcRenderer.invoke("config:get"),
   setConfig: (partial) => ipcRenderer.invoke("config:set", partial),
   start: () => ipcRenderer.send("bot:start"),

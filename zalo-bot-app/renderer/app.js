@@ -83,6 +83,7 @@
       $("customShardRow").hidden = false;
     }
     $("cAutoStart").checked = !!cfg.autoStartBot;
+    if ($("cStartMinimized")) $("cStartMinimized").checked = !!cfg.startMinimized;
     $("cWinBoot").checked = !!cfg.startWithWindows;
   }
   $("cShards").addEventListener("change", () => {
@@ -96,10 +97,12 @@
       botName: $("cName").value.trim() || "Bot",
       warehouses,
       autoStartBot: $("cAutoStart").checked,
+      startMinimized: $("cStartMinimized") ? $("cStartMinimized").checked : true,
       startWithWindows: $("cWinBoot").checked,
     });
     $("mShards").textContent = cfg.warehouses;
     $("saveHint").textContent = "Đã lưu! Bật/Tắt lại bot để áp dụng.";
     setTimeout(() => { $("saveHint").textContent = ""; }, 3000);
   });
+  api.onConfigUpdated && api.onConfigUpdated(() => loadConfig());
   loadConfig();

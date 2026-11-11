@@ -49,6 +49,7 @@ const DEFAULTS = {
   warehouses: "all",
   startWithWindows: false,
   autoStartBot: false,
+  startMinimized: true,
 };
 
 const configPath = () => path.join(app.getPath("userData"), "config.json");
@@ -125,11 +126,31 @@ function rebuildTray() {
   const menu = Menu.buildFromTemplate([
     { label: `Zalo Bot — ${cfg.botName} (${botOnline ? "Online" : "Offline"})`, enabled: false },
     { type: "separator" },
-    { label: "Mở giao diện", click: () => win?.show() },
+    {
+      label: "Mở giao diện",
+      click: () => {
+        if (!win) return;
+        if (win.isMinimized()) win.restore();
+        win.show();
+        win.focus();
+      },
+    },
+    { label: "Thu nhỏ xuống khay", click: () => win?.hide() },
     botOnline
       ? { label: "Tắt Bot", click: () => stopBot() }
       : { label: "Bật Bot", click: () => startBot() },
     { type: "separator" },
+    {
+      label: "Tự động hạ xuống khay khi mở app",
+      type: "checkbox",
+      checked: !!cfg.startMinimized,
+      click: (item) => {
+        cfg.startMinimized = item.checked;
+        saveConfig(cfg);
+        rebuildTray();
+        win?.webContents.send("configUpdated", cfg);
+      },
+    },
     {
       label: "Khởi động cùng Windows",
       type: "checkbox",
@@ -137,7 +158,9 @@ function rebuildTray() {
       click: (item) => {
         cfg.startWithWindows = item.checked;
         saveConfig(cfg);
-        app.setLoginItemSettings({ openAtLogin: item.checked, path: process.execPath });
+        app.setLoginItemSettings({ openAtLogin: item.checked, path: process.execPath, args: ["--hidden"] });
+        rebuildTray();
+        win?.webContents.send("configUpdated", cfg);
       },
     },
     { type: "separator" },
@@ -150,7 +173,6 @@ function setStatus(online) {
   botOnline = online;
   rebuildTray();
   win?.webContents.send("status", { online, botName: loadConfig().botName });
-  if (online) win?.show();
 }
 
 function startQrWatch() {
@@ -179,10 +201,21 @@ function handleBotOutput(text) {
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     pushLog(line);
-    if (/Thành công/.test(line)) {
+    if (/thành công/i.test(line)) {
       win?.webContents.send("qr", null);
       notify("Zalo Bot", `Đăng nhập thành công — Bot "${loadConfig().botName}" đang chạy`);
+      const cfg = loadConfig();
+      if (cfg.startMinimized && win?.isVisible()) {
+        setTimeout(() => {
+          if (!quitting && win?.isVisible()) win.hide();
+        }, 1200);
+      }
     } else if (/Chờ quét mã QR|Mở file .*qr\.png/.test(line)) {
+      if (win) {
+        if (win.isMinimized()) win.restore();
+        win.show();
+        win.focus();
+      }
       win?.webContents.send("showQr");
     } else if (/Session hết hạn/.test(line)) {
       alertWindow("Zalo Bot — Session hết hạn", "Phiên Zalo đã hết hạn — cần quét lại mã QR.\nCửa sổ app đã được mở, nhấn \"Bật Bot\" và quét QR để tiếp tục.");
@@ -258,6 +291,7 @@ function createWindow() {
     title: "Zalo Bot Desktop",
     backgroundColor: "#f8fafc",
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -279,7 +313,7 @@ ipcMain.handle("config:get", () => loadConfig());
 ipcMain.handle("config:set", (_e, partial) => {
   const cfg = { ...loadConfig(), ...(partial || {}) };
   saveConfig(cfg);
-  app.setLoginItemSettings({ openAtLogin: !!cfg.startWithWindows, path: process.execPath });
+  app.setLoginItemSettings({ openAtLogin: !!cfg.startWithWindows, path: process.execPath, args: ["--hidden"] });
   rebuildTray();
   return cfg;
 });
@@ -292,18 +326,39 @@ ipcMain.handle("bot:sessionExists", () =>
 
 app.whenReady().then(() => {
   const cfg = loadConfig();
-  app.setLoginItemSettings({ openAtLogin: !!cfg.startWithWindows, path: process.execPath });
+  const isStartupBoot =
+    process.argv.includes("--hidden") ||
+    process.argv.includes("--minimized") ||
+    (app.getLoginItemSettings && app.getLoginItemSettings().wasOpenedAtLogin);
+  const shouldStartHidden = !!cfg.startMinimized || isStartupBoot;
+
+  app.setLoginItemSettings({
+    openAtLogin: !!cfg.startWithWindows,
+    path: process.execPath,
+    args: ["--hidden"],
+  });
+
   createWindow();
-  win.show();
-  win.focus();
+
   tray = new Tray(trayIcon(false));
   tray.setToolTip(`Zalo Bot Desktop — ${cfg.botName}`);
   rebuildTray();
   tray.on("click", () => {
     if (!win) return;
-    if (win.isVisible()) win.hide();
-    else win.show();
+    if (win.isVisible()) {
+      win.hide();
+    } else {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
   });
+
+  if (!shouldStartHidden) {
+    win.show();
+    win.focus();
+  }
+
   if (cfg.autoStartBot) setTimeout(startBot, 1500);
 });
 
