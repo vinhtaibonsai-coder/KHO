@@ -558,6 +558,12 @@ async function handleDirectMessage(api, message) {
 }
 
 function startListener(api) {
+  const sendHeartbeat = () => {
+    if (isWsConnected) {
+      sendWebhookWithRetry(WEBHOOK_URL, { action: "heartbeat", botName: BOT_NAME }, 2, "heartbeat");
+    }
+  };
+
   api.listener.on("connected", () => {
     isWsConnected = true;
     isReconnecting = false;
@@ -566,10 +572,20 @@ function startListener(api) {
       reconnectTimer = null;
     }
     console.log("[ws] ĐÃ KẾT NỐI ZALO THÀNH CÔNG — đang tự động lắng nghe tất cả các nhóm Kho (Kho 01, Kho 31, ...) & Cloud của tôi...");
+
+    // Bắt đầu gửi heartbeat định kỳ ngay sau khi WebSocket đã kết nối thành công
+    sendHeartbeat();
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = setInterval(sendHeartbeat, 20000);
   });
 
   api.listener.on("disconnected", (code, reason) => {
-    console.error(`[ws] MẤT KẾT NỐI (${code}): ${reason}`);
+    isWsConnected = false;
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+    console.warn(`[ws] Mất kết nối WebSocket (${code}: ${reason || "Mạng gián đoạn"}). Đang tự động kết nối lại...`);
     notifyWsDisconnected(code, reason);
 
     // Tự động kết nối lại (Auto-reconnect) sau 5 giây nếu không phải cố tình tắt
@@ -579,7 +595,7 @@ function startListener(api) {
       reconnectTimer = setTimeout(async () => {
         try {
           console.log("[ws-reconnect] Đang khởi động lại WebSocket listener...");
-          api.listener.start();
+          api.listener.start({ retryOnClose: true });
         } catch (rErr) {
           console.error("[ws-reconnect] Lỗi khởi động lại:", rErr.message);
           isReconnecting = false;
@@ -613,7 +629,7 @@ function startListener(api) {
       console.error("[msg] Lỗi bóc tách tin nhắn:", err.message);
     }
   });
-  api.listener.start();
+  api.listener.start({ retryOnClose: true });
 }
 
 // ============================================================
@@ -692,21 +708,8 @@ async function main() {
     }
   }
 
-  // 2. Bắt đầu lắng nghe tin nhắn trực tiếp
+  // 2. Bắt đầu lắng nghe tin nhắn trực tiếp & kích hoạt heartbeat định kỳ
   startListener(api);
-
-  // 3. Heartbeat định kỳ 20 giây: CHỈ PING ONLINE KHI WEBSOCKET THỰC SỰ ĐANG SỐNG
-  const sendHeartbeat = () => {
-    if (isWsConnected) {
-      sendWebhookWithRetry(WEBHOOK_URL, { action: "heartbeat", botName: BOT_NAME }, 2, "heartbeat");
-    } else {
-      console.warn("[heartbeat] Tạm dừng ping vì WebSocket Zalo đang mất kết nối!");
-    }
-  };
-  // Gửi ngay 1 lần đầu
-  sendHeartbeat();
-  if (heartbeatTimer) clearInterval(heartbeatTimer);
-  heartbeatTimer = setInterval(sendHeartbeat, 20000);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
