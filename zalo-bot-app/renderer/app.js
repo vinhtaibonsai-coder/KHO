@@ -49,16 +49,23 @@
 
   // ---- Log ----
   const logView = $("logView");
-  api.onLog((entry) => {
+  function appendLog(entry) {
+    if (!entry || !entry.line) return;
     const div = document.createElement("div");
     div.className = "lv-" + (entry.level || "info");
-    const t = new Date(entry.ts).toLocaleTimeString("vi-VN");
+    const t = new Date(entry.ts || Date.now()).toLocaleTimeString("vi-VN");
     div.textContent = `[${t}] ${entry.line}`;
     logView.appendChild(div);
     while (logView.childNodes.length > 800) logView.removeChild(logView.firstChild);
     logView.scrollTop = logView.scrollHeight;
     const uid = entry.line.match(/uid\s+(\d+)/i);
     if (uid) $("mUid").textContent = uid[1];
+  }
+  api.onLog((entry) => appendLog(entry));
+  api.getRecentLogs?.().then((logs) => {
+    if (Array.isArray(logs)) {
+      logs.forEach((entry) => appendLog(entry));
+    }
   });
   $("btnClearLog").addEventListener("click", () => { logView.innerHTML = ""; });
 

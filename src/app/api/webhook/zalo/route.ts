@@ -161,6 +161,7 @@ export async function POST(req: Request) {
     }
     const warehouse = parseWarehouse(body.groupId);
     if (!warehouse) {
+      // Chỉ phản hồi lỗi về Zalo bot để hiển thị/ghi log phía bot, KHÔNG pushMessage lên web
       const msg: ZaloMessage = {
         id: msgId,
         groupId: body.groupId,
@@ -171,8 +172,7 @@ export async function POST(req: Request) {
         createdAt: new Date().toISOString(),
         botName,
       };
-      await pushMessage(msg);
-      return NextResponse.json({ ok: false, message: msg }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Không nhận diện được số kho từ tên nhóm", message: msg }, { status: 400 });
     }
 
     // Tự động tạo thêm kho trên web và database nếu nhóm Zalo này là kho mới (VD: Kho 31, Kho 32...)
@@ -251,7 +251,7 @@ export async function POST(req: Request) {
         createdAt: new Date().toISOString(),
         botName,
       };
-      await pushMessage(msg);
+      // Chỉ phản hồi lỗi về Zalo bot để xử lý phía bot, KHÔNG pushMessage vào nhật ký kho trên web
       return NextResponse.json({ 
         ok: false, 
         message: msg, 

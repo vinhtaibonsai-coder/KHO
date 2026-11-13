@@ -202,8 +202,12 @@ function trayIcon(online) {
   return nativeImage.createFromBitmap(buf, { width: size, height: size });
 }
 
+const logBuffer = [];
 function pushLog(line, level = "info") {
-  win?.webContents.send("log", { line: String(line).replace(/\r/g, ""), level, ts: Date.now() });
+  const entry = { line: String(line).replace(/\r/g, ""), level, ts: Date.now() };
+  logBuffer.push(entry);
+  if (logBuffer.length > 250) logBuffer.shift();
+  win?.webContents.send("log", entry);
 }
 
 function notify(title, body) {
@@ -310,7 +314,8 @@ function handleBotOutput(text) {
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
     pushLog(line);
-    if (/thành công/i.test(line)) {
+    if (/thành công|đã kết nối zalo thành công/i.test(line)) {
+      setStatus(true);
       win?.webContents.send("qr", null);
       notify("Zalo Bot", `Đăng nhập thành công — Bot "${loadConfig().botName}" đang chạy`);
       syncToCloudAndPortable();
@@ -328,10 +333,11 @@ function handleBotOutput(text) {
       }
       win?.webContents.send("showQr");
     } else if (/Session hết hạn/.test(line)) {
+      setStatus(false);
       alertWindow("Zalo Bot — Session hết hạn", "Phiên Zalo đã hết hạn — cần quét lại mã QR.\nCửa sổ app đã được mở, nhấn \"Bật Bot\" và quét QR để tiếp tục.");
     } else if (/Mất kết nối|\[ws\] Mất kết nối|MẤT KẾT NỐI/.test(line)) {
-        setStatus(false);
-      alertWindow("Zalo Bot — Mất kết nối", "Bot mất kết nối Zalo/webhook — đang thử lại.\nKiểm tra máy có đang bật và có mạng internet.");
+      // Khi mất kết nối mạng tạm thời: cập nhật trạng thái, không bật bung cửa sổ làm gián đoạn người dùng
+      setStatus(false);
     }
   }
 }
@@ -430,7 +436,8 @@ ipcMain.handle("config:set", (_e, partial) => {
 });
 ipcMain.on("bot:start", () => startBot());
 ipcMain.on("bot:stop", () => stopBot());
-ipcMain.handle("bot:status", () => ({ online: !!botProc, botName: loadConfig().botName }));
+ipcMain.handle("bot:status", () => ({ online: !!botProc && botOnline, botName: loadConfig().botName }));
+ipcMain.handle("log:getRecent", () => logBuffer);
 ipcMain.handle("bot:sessionExists", () =>
   fs.existsSync(path.join(app.getPath("userData"), ".zalo-session.json"))
 );

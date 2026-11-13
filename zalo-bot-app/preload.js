@@ -18,4 +18,5 @@ contextBridge.exposeInMainWorld("zaloBot", {
   getGdriveStatus: () => ipcRenderer.invoke("gdrive:status"),
   restoreGdrive: () => ipcRenderer.invoke("gdrive:restore"),
   syncGdriveNow: () => ipcRenderer.invoke("gdrive:syncNow"),
+  getRecentLogs: () => ipcRenderer.invoke("log:getRecent"),
 });

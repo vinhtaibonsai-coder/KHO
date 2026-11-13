@@ -38,8 +38,8 @@ function extractGroupId(groupName, rawGroupId) {
 function isWarehouseMessage(text) {
   if (!text || typeof text !== "string") return false;
   const clean = text.trim();
-  // Khớp: +mã, -mã, NK mã, XK mã, hoặc mã độc lập có chứa ký tự chữ/số/dấu chấm
-  return /^([+\-]|NK\s+|XK\s+)?[A-Z0-9_\.\-]+/i.test(clean);
+  // Khớp: có mã SKU thực thụ (E120.124, +E120, -E120, NK E120, XK E120, CK E120...)
+  return /(^|\s)[+\-]?[A-Za-z]{1,6}\d+(?:[.\-]\d+)*/.test(clean);
 }
 
 /**
