@@ -15,7 +15,8 @@ import {
   Database,
   Bot,
   ChevronDown,
-  X
+  X,
+  MapPin
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
 import WarehouseDetailModal from "@/components/WarehouseDetailModal";
@@ -947,12 +948,12 @@ export default function Home() {
                             >
                               <span>{it.sku}</span>
                               <span
-                                className={`text-[10px] px-1.5 py-0.2 rounded-md ${
+                                className={`text-[10px] px-2 py-0.5 rounded-md font-bold ${
                                   isCurrent
-                                    ? "bg-emerald-800 text-emerald-100"
+                                    ? "bg-blue-900 text-blue-100 ring-1 ring-white/20"
                                     : it.status === "sold"
                                     ? "bg-amber-100 text-amber-800"
-                                    : "bg-emerald-100 text-emerald-800"
+                                    : "bg-blue-50 text-blue-700 border border-blue-200/80"
                                 }`}
                               >
                                 {it.status === "sold" ? "Đã bán" : `Kho ${pad(it.warehouse)} (${bInfo.buildingName})`}
@@ -995,12 +996,13 @@ export default function Home() {
                               </span>
                             </div>
                           ) : (
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-slate-600">Đang nằm cố định tại:</span>
-                              <span className="inline-flex items-center gap-1 font-black text-emerald-800 bg-emerald-200/80 px-2.5 py-0.5 rounded-lg border border-emerald-400 text-sm">
+                            <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                              <span className="text-slate-700 font-semibold text-xs sm:text-sm">Đang nằm cố định tại:</span>
+                              <span className="inline-flex items-center gap-1.5 font-black text-white bg-blue-600 px-3 py-1 rounded-xl shadow-xs text-sm sm:text-base tracking-wide ring-2 ring-blue-500/25">
+                                <MapPin className="h-4 w-4 text-blue-200 shrink-0" />
                                 KHO {pad(activeFoundItem.warehouse)}
                               </span>
-                              <span className="inline-flex items-center gap-1 font-extrabold text-indigo-800 bg-indigo-100 px-2.5 py-0.5 rounded-lg border border-indigo-300 text-xs shadow-2xs">
+                              <span className="inline-flex items-center gap-1 font-extrabold text-indigo-900 bg-indigo-100/90 px-2.5 py-1 rounded-xl border border-indigo-300/80 text-xs shadow-2xs">
                                 🏢 {getWarehouseBuildingInfo(activeFoundItem.warehouse, totalWarehouses).buildingName}
                               </span>
                             </div>
