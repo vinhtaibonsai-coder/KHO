@@ -180,10 +180,14 @@ export async function POST(req: Request) {
 
     // 1. Kiểm tra xem tin nhắn có chứa nhiều mã không
     const extracted = extractValidSkusFromText(body.message);
+    const totalCandidates = extracted.validSkus.length + extracted.invalidSkus.length;
 
-    if (extracted.validSkus.length > 1) {
+    if (totalCandidates > 1) {
       // Tin nhắn chứa nhiều mã cùng lúc (VD: E100.484 E100.489 E100.500... hoặc PT305 PT303 PT304)
-      const isOut = body.message.trim().startsWith("-") || body.message.trim().toUpperCase().startsWith("XK");
+      const trimmed = body.message.trim();
+      const isOut = trimmed.startsWith("-") || trimmed.toUpperCase().startsWith("XK");
+      const isXk = trimmed.toUpperCase().startsWith("XK");
+      const prefix = isOut ? (isXk ? "XK " : "-") : "";
       const added: string[] = [];
       const duplicates: string[] = [];
       const uniqueSkus = Array.from(new Set(extracted.validSkus));
@@ -215,6 +219,9 @@ export async function POST(req: Request) {
       if (duplicates.length > 0) {
         detail += ` | Bỏ qua trùng: ${duplicates.join(", ")}`;
       }
+      if (extracted.invalidSkus.length > 0) {
+        detail += ` | Bỏ qua mã lỗi: ${extracted.invalidSkus.map((i) => i.raw).join(", ")}`;
+      }
 
       const msg: ZaloMessage = {
         id: msgId,
@@ -226,15 +233,20 @@ export async function POST(req: Request) {
         createdAt: new Date().toISOString(),
         botName,
       };
-      await pushMessage(msg);
+      if (added.length > 0) {
+        await pushMessage(msg);
+      }
 
       return NextResponse.json({
         ok: added.length > 0,
         message: msg,
-        total: uniqueSkus.length,
+        total: totalCandidates,
         addedCount: added.length,
+        validSkus: added,
         duplicates,
         invalidSkus: extracted.invalidSkus,
+        isOut,
+        prefix,
       });
     }
 
@@ -257,7 +269,12 @@ export async function POST(req: Request) {
         message: msg, 
         invalidSku: true, 
         sku: parsed?.sku || body.message.trim(),
-        reason: parsed?.error || "Cú pháp mã không hợp lệ" 
+        reason: parsed?.error || "Cú pháp mã không hợp lệ",
+        validSkus: [],
+        duplicates: [],
+        invalidSkus: [{ raw: parsed?.sku || body.message.trim(), error: parsed?.error || "Cú pháp mã không hợp lệ" }],
+        isOut: false,
+        prefix: "",
       }, { status: 400 });
     }
 
@@ -277,7 +294,16 @@ export async function POST(req: Request) {
             botName,
           };
           await pushMessage(msg);
-          return NextResponse.json({ ok: false, message: msg, duplicate: true }, { status: 409 });
+          return NextResponse.json({
+            ok: false,
+            message: msg,
+            duplicate: true,
+            validSkus: [],
+            duplicates: [`${parsed.sku} (ở Kho ${existing.warehouse})`],
+            invalidSkus: [],
+            isOut: false,
+            prefix: "",
+          }, { status: 409 });
         } else {
           const msg: ZaloMessage = {
             id: msgId,
@@ -290,7 +316,16 @@ export async function POST(req: Request) {
             botName,
           };
           await pushMessage(msg);
-          return NextResponse.json({ ok: false, message: msg, duplicate: true }, { status: 409 });
+          return NextResponse.json({
+            ok: false,
+            message: msg,
+            duplicate: true,
+            validSkus: [],
+            duplicates: [`${parsed.sku} (đã có ở Kho ${warehouse})`],
+            invalidSkus: [],
+            isOut: false,
+            prefix: "",
+          }, { status: 409 });
         }
       }
     }
@@ -320,9 +355,18 @@ export async function POST(req: Request) {
     };
     await pushMessage(msg);
 
+    const isSingleOut = parsed.action === "out";
+    const isSingleXk = body.message.trim().toUpperCase().startsWith("XK");
+    const singlePrefix = isSingleOut ? (isSingleXk ? "XK " : "-") : "";
+
     return NextResponse.json({
       ok: true,
       message: msg,
+      validSkus: [parsed.sku],
+      duplicates: [],
+      invalidSkus: [],
+      isOut: isSingleOut,
+      prefix: singlePrefix,
       effect: {
         action: parsed.action,
         sku: parsed.sku,

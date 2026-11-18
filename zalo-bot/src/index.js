@@ -343,6 +343,33 @@ async function groupName(api, groupId, msgData = null) {
   return "";
 }
 
+// Cache tránh vòng lặp tin nhắn do chính Bot gửi lại vào nhóm (selfListen: true)
+const recentBotReSentCache = new Map();
+
+function recordBotReSent(groupId, text) {
+  const key = `${groupId}:${text.trim()}`;
+  recentBotReSentCache.set(key, Date.now() + 60000); // 60s TTL
+  if (recentBotReSentCache.size > 200) {
+    const now = Date.now();
+    for (const [k, exp] of recentBotReSentCache.entries()) {
+      if (now > exp) recentBotReSentCache.delete(k);
+    }
+  }
+}
+
+function isBotReSent(groupId, text) {
+  const key = `${groupId}:${text.trim()}`;
+  const exp = recentBotReSentCache.get(key);
+  if (exp) {
+    if (Date.now() < exp) {
+      recentBotReSentCache.delete(key);
+      return true;
+    }
+    recentBotReSentCache.delete(key);
+  }
+  return false;
+}
+
 async function handleGroupMessage(api, message) {
   let text = "";
   if (typeof message.data?.content === "string") {
@@ -358,6 +385,13 @@ async function handleGroupMessage(api, message) {
   if (!text || !hasSku(text)) return; // bỏ qua tán gẫu / hình ảnh không có mã hàng
 
   const groupId = message.threadId;
+
+  // Bỏ qua nếu là tin nhắn do chính Bot vừa lọc và gửi lại vào nhóm
+  if (message.isSelf && isBotReSent(groupId, text)) {
+    console.log(`[bot-resend] Bỏ qua tin nhắn do chính Bot vừa lọc và gửi lại vào nhóm ${groupId}: "${text}"`);
+    return;
+  }
+
   const mapping = loadMapping();
   const name = await groupName(api, groupId, message.data);
   const warehouse = resolveWarehouse(mapping, groupId, name);
@@ -392,6 +426,7 @@ async function handleGroupMessage(api, message) {
   // CẢNH BÁO TRÙNG MÃ HOẶC MÃ SAI QUY CHUẨN -> TỰ ĐỘNG THU HỒI / XÓA TIN NHẮN TRONG NHÓM & BÁO VÀO MY DOCUMENTS
   const hasDuplicate = res.duplicate || (Array.isArray(res.duplicates) && res.duplicates.length > 0);
   const hasInvalidSku = res.invalidSku || (Array.isArray(res.invalidSkus) && res.invalidSkus.length > 0);
+  const validSkus = Array.isArray(res.validSkus) ? res.validSkus : [];
 
   if (hasDuplicate || hasInvalidSku) {
     // 1. TỰ ĐỘNG XÓA / THU HỒI TIN NHẮN KHỎI NHÓM ZALO
@@ -422,7 +457,21 @@ async function handleGroupMessage(api, message) {
       console.warn(`[bot-delete] Không xóa được tin nhắn trong nhóm (Có thể tài khoản chưa được phân quyền Trưởng/Phó nhóm): ${delErr.message}`);
     }
 
-    // 2. GỬI BÁO CÁO CHI TIẾT RIÊNG VÀO "CLOUD CỦA TÔI" (MY DOCUMENTS)
+    // 2. TỰ ĐỘNG GỬI LẠI CÁC MÃ HỢP LỆ VÀO ĐÚNG NHÓM ĐÓ (NẾU CÒN ÍT NHẤT 1 MÃ HỢP LỆ)
+    if (validSkus.length > 0) {
+      try {
+        const pfx = res.prefix || (res.isOut ? "-" : "");
+        // Mỗi mã trên một dòng riêng biệt theo quyết định đã thống nhất
+        const reSentMsg = validSkus.map((s) => `${pfx}${s}`).join("\n");
+        recordBotReSent(groupId, reSentMsg);
+        await api.sendMessage({ msg: reSentMsg }, groupId, ThreadType.Group);
+        console.log(`[bot-resend] Đã gửi lại ${validSkus.length} mã hợp lệ vào nhóm "${name || groupId}":\n${reSentMsg}`);
+      } catch (sendErr) {
+        console.error(`[bot-resend] Không gửi lại được mã hợp lệ vào nhóm "${name || groupId}":`, sendErr.message);
+      }
+    }
+
+    // 3. GỬI BÁO CÁO CHI TIẾT RIÊNG VÀO "CLOUD CỦA TÔI" (MY DOCUMENTS)
     try {
       const ctx = api.getContext ? api.getContext() : null;
       const send2meId = ctx?.loginInfo?.send2me_id || (api.getOwnId ? api.getOwnId() : null);
@@ -432,7 +481,11 @@ async function handleGroupMessage(api, message) {
         return;
       }
 
-      // Trường hợp 2.1: Báo lỗi mã sai quy chuẩn / Size không hợp lệ
+      const reSentNote = validSkus.length > 0 
+        ? `\n\n🔄 TỰ ĐỘNG GỬI LẠI: Đã lọc và gửi lại ${validSkus.length} mã hợp lệ vào nhóm:\n${validSkus.map((s) => `• ${res.prefix || (res.isOut ? "-" : "")}${s}`).join("\n")}`
+        : "";
+
+      // Trường hợp 3.1: Báo lỗi mã sai quy chuẩn / Size không hợp lệ
       if (hasInvalidSku) {
         const title = `🚨 [CẢNH BÁO] MÃ NHẬP SAI QUY CHUẨN KHO`;
         let errorDetail = "";
@@ -453,7 +506,7 @@ async function handleGroupMessage(api, message) {
           "",
           `💬 Tin nhắn gốc: "${text}"`,
           "",
-          `🛡️ TRẠNG THÁI: Tin nhắn đã được hệ thống tự động thu hồi/xóa khỏi nhóm để tránh sai sót kiểm kho.`
+          `🛡️ TRẠNG THÁI: Tin nhắn gốc đã được hệ thống tự động thu hồi/xóa khỏi nhóm để tránh sai sót kiểm kho.${reSentNote}`
         ];
         const fullMsg = msgLines.join("\n");
 
@@ -471,7 +524,7 @@ async function handleGroupMessage(api, message) {
         console.log(`[bot-reply] Đã gửi thông báo MÃ SAI QUY CHUẨN chuẩn đẹp vào "Cloud của tôi" (send2meId: ${send2meId})`);
       }
 
-      // Trường hợp 2.2: Báo lỗi trùng mã sản phẩm
+      // Trường hợp 3.2: Báo lỗi trùng mã sản phẩm
       if (hasDuplicate) {
         const title = `🚫 [CẢNH BÁO] PHÁT HIỆN TRÙNG MÃ KHO`;
         let dupDetail = "";
@@ -494,7 +547,7 @@ async function handleGroupMessage(api, message) {
           "",
           `💬 Tin nhắn gốc: "${text}"`,
           "",
-          `🛡️ TRẠNG THÁI: Đã từ chối nạp trùng và thu hồi/xóa tin nhắn khỏi nhóm để bảo vệ tính độc bản của mã hàng.`
+          `🛡️ TRẠNG THÁI: Đã từ chối nạp trùng và thu hồi/xóa tin nhắn khỏi nhóm để bảo vệ tính độc bản của mã hàng.${reSentNote}`
         ];
         const fullMsg = msgLines.join("\n");
 
@@ -655,7 +708,8 @@ function selftest() {
   assert(parseWarehouseFromName("Kho 105") === null, "kho 105 -> null");
 
   const mapping = { groups: { "gid-1": 7 } };
-  assert(resolveWarehouse(mapping, "gid-1", "Kho 9") === 7, "map theo Group ID được ưu tiên");
+  assert(resolveWarehouse(mapping, "gid-1", "Kho 9") === 9, "đổi tên nhóm được ưu tiên cập nhật");
+  assert(resolveWarehouse(mapping, "gid-1", "Nhóm chung") === 7, "map theo Group ID khi tên không có chữ Kho");
   assert(resolveWarehouse(mapping, "gid-2", "Kho 9") === 9, "suy ra từ tên nhóm");
   assert(resolveWarehouse(mapping, "gid-3", "") === null, "không có dữ liệu -> null");
 
