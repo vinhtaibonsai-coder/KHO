@@ -19,6 +19,7 @@ import {
   MapPin
 } from "lucide-react";
 import SearchBar from "@/components/SearchBar";
+import SearchResultSkeleton from "@/components/SearchResultSkeleton";
 import WarehouseDetailModal from "@/components/WarehouseDetailModal";
 import WarehouseGrid from "@/components/WarehouseGrid";
 import WarehouseMapCanvas, { getWarehouseBuildingInfo } from "@/components/WarehouseMapCanvas";
@@ -100,7 +101,8 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<BottomTabType>("search");
   const [defaultPasteWarehouse, setDefaultPasteWarehouse] = useState(1);
   const [error, setError] = useState<string | null>(null);
-  const [, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [initialLoaded, setInitialLoaded] = useState(false);
   const [isSearchTransferring, setIsSearchTransferring] = useState(false);
   const [searchTargetWarehouse, setSearchTargetWarehouse] = useState(1);
   const [warehouseView, setWarehouseView] = useState<"grid" | "map">("grid");
@@ -215,6 +217,7 @@ export default function Home() {
         saveLocalHistory(data.history || []).catch(() => undefined);
         setError(null);
         setLoading(false);
+        setInitialLoaded(true);
       })
       .catch(async (caught) => {
         if (caught instanceof DOMException && caught.name === "AbortError") return;
@@ -237,6 +240,7 @@ export default function Home() {
           setError("Không thể đồng bộ dữ liệu kho");
         }
         setLoading(false);
+        setInitialLoaded(true);
       })
       .finally(() => { fetchingRef.current = false; });
   }, []);
@@ -299,7 +303,7 @@ export default function Home() {
   useEffect(() => {
     const focusTimer = setTimeout(() => {
       const el = searchInputRef.current || (document.getElementById("main-search-input") as HTMLInputElement | null);
-      if (el) {
+      if (el && !el.disabled) {
         el.focus({ preventScroll: true });
         const len = el.value.length;
         try {
@@ -309,6 +313,11 @@ export default function Home() {
     }, 200);
     return () => clearTimeout(focusTimer);
   }, []);
+
+  // Trạng thái dữ liệu & kết nối database
+  const isDataReady = items.length > 0;
+  const isConnecting = !isDataReady && (loading || !initialLoaded);
+  const isDbDisconnected = !isDataReady && initialLoaded && !loading && (dbStatus?.connected === false || !!error);
 
   const matchingItems = useMemo(() => {
     const code = query.trim().toUpperCase();
@@ -748,9 +757,20 @@ export default function Home() {
           <div className="flex items-center gap-1.5 sm:gap-2.5">
             {/* THỐNG KÊ NHANH MÃ & SỐ KHO */}
             <div className="hidden xs:flex items-center gap-1.5 rounded-xl bg-slate-100 px-2.5 py-1.5 border border-slate-200 text-xs font-semibold text-slate-700">
-              <span><strong className="font-mono text-slate-900 font-bold">{activeItems.length}</strong> mã</span>
-              <span className="text-slate-300">|</span>
-              <span><strong className="text-emerald-700 font-bold">{occupiedWarehouses}</strong>/{totalWarehouses} kho</span>
+              {isConnecting ? (
+                <span className="inline-flex items-center gap-1.5 text-slate-400 font-medium animate-pulse">
+                  <span className="inline-block h-3.5 w-8 bg-slate-200 rounded" />
+                  <span>mã</span>
+                  <span className="text-slate-300">|</span>
+                  <span className="inline-block h-3.5 w-12 bg-slate-200 rounded" />
+                </span>
+              ) : (
+                <>
+                  <span><strong className="font-mono text-slate-900 font-bold">{activeItems.length}</strong> mã</span>
+                  <span className="text-slate-300">|</span>
+                  <span><strong className="text-emerald-700 font-bold">{occupiedWarehouses}</strong>/{totalWarehouses} kho</span>
+                </>
+              )}
             </div>
 
             {/* ICON TRẠNG THÁI SUPABASE CLOUD (TRÒN, CHỈ BIỂU TƯỢNG) */}
@@ -853,7 +873,7 @@ export default function Home() {
               title="Làm mới dữ liệu"
               className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition active:scale-95 shadow-2xs cursor-pointer"
             >
-              <RefreshCw className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+              <RefreshCw className={`h-4 w-4 sm:h-[18px] sm:w-[18px] ${loading ? "animate-spin text-emerald-600" : ""}`} />
             </button>
 
           </div>
@@ -895,27 +915,96 @@ export default function Home() {
                 autoFocus={true}
                 availableSkus={items.map((i) => i.sku)}
                 onScan={() => setIsScanning(true)}
+                disabled={isDbDisconnected}
+                loading={isConnecting}
+                placeholder={
+                  isConnecting
+                    ? "Đang kết nối database & tải danh sách kho..."
+                    : isDbDisconnected
+                    ? "Chưa kết nối cơ sở dữ liệu — Không thể tra cứu"
+                    : undefined
+                }
               />
             </div>
 
             {/* MÀN HÌNH CHỜ TRA CỨU PHONG CÁCH GITHUB IOS (KHI CHƯA NHẬP MÃ) */}
             {!query.trim() && (
-              <div className="py-12 sm:py-16 flex flex-col items-center justify-center text-center space-y-3 px-4">
-                <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-1 border border-slate-200/80 shadow-inner">
-                  <PackageSearch className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400 stroke-[1.5]" />
+              isConnecting ? (
+                <div className="py-12 sm:py-16 flex flex-col items-center justify-center text-center space-y-3 px-4 animate-pulse">
+                  <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600 mb-1 border border-emerald-200/80 shadow-xs">
+                    <RefreshCw className="h-8 w-8 sm:h-10 sm:w-10 text-emerald-600 animate-spin" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                    Đang kết nối cơ sở dữ liệu kho...
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 max-w-sm leading-relaxed">
+                    Hệ thống đang đồng bộ danh sách mã sản phẩm và vị trí các kho từ máy chủ. Vui lòng đợi trong giây lát...
+                  </p>
                 </div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                  Tìm vị trí hàng trong kho.
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-500 max-w-sm leading-relaxed">
-                  Nhập mã SKU trên tem sản phẩm (ví dụ: <span className="font-mono font-bold text-slate-700">E120.124</span>, <span className="font-mono font-bold text-slate-700">K100</span>, <span className="font-mono font-bold text-slate-700">PT395</span>...) để định vị chính xác ô kho đang chứa hàng.
-                </p>
-              </div>
+              ) : isDbDisconnected ? (
+                <div className="rounded-2xl border-2 border-rose-300 bg-rose-50/90 p-5 sm:p-6 text-center space-y-3 my-4 animate-in fade-in duration-200">
+                  <div className="mx-auto h-12 w-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center border border-rose-200">
+                    <Database className="h-6 w-6 text-rose-600" />
+                  </div>
+                  <h3 className="text-base font-bold text-rose-900">
+                    Chưa kết nối được cơ sở dữ liệu
+                  </h3>
+                  <p className="text-xs sm:text-sm text-rose-700 max-w-md mx-auto">
+                    Không thể tải danh sách sản phẩm từ máy chủ hoặc Supabase Cloud. Vui lòng kiểm tra đường truyền mạng hoặc bấm nút thử lại bên dưới để tiếp tục tra cứu.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={fetchData}
+                      className="inline-flex items-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 text-xs sm:text-sm shadow-xs transition active:scale-95 cursor-pointer"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      <span>Thử kết nối lại</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-12 sm:py-16 flex flex-col items-center justify-center text-center space-y-3 px-4">
+                  <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-1 border border-slate-200/80 shadow-inner">
+                    <PackageSearch className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400 stroke-[1.5]" />
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                    Tìm vị trí hàng trong kho.
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-500 max-w-sm leading-relaxed">
+                    Nhập mã SKU trên tem sản phẩm (ví dụ: <span className="font-mono font-bold text-slate-700">E120.124</span>, <span className="font-mono font-bold text-slate-700">K100</span>, <span className="font-mono font-bold text-slate-700">PT395</span>...) để định vị chính xác ô kho đang chứa hàng.
+                  </p>
+                </div>
+              )
             )}
 
             {/* BANNER THÔNG BÁO KẾT QUẢ TÌM KIẾM */}
             {query.trim() && (
-              matchingItems.length > 0 && activeFoundItem ? (
+              isConnecting ? (
+                <SearchResultSkeleton query={query} />
+              ) : isDbDisconnected ? (
+                <div className="rounded-2xl border-2 border-rose-300 bg-rose-50/90 p-5 sm:p-6 text-center space-y-3 my-2 animate-in fade-in duration-200">
+                  <div className="mx-auto h-12 w-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center border border-rose-200">
+                    <Database className="h-6 w-6 text-rose-600" />
+                  </div>
+                  <h3 className="text-base font-bold text-rose-900">
+                    Chưa kết nối được cơ sở dữ liệu để tra cứu
+                  </h3>
+                  <p className="text-xs sm:text-sm text-rose-700 max-w-md mx-auto">
+                    Hệ thống chưa kết nối được máy chủ hoặc Supabase nên chưa thể tìm kiếm mã &quot;<span className="font-mono font-bold">{query.trim().toUpperCase()}</span>&quot;. Vui lòng thử kết nối lại.
+                  </p>
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={fetchData}
+                      className="inline-flex items-center gap-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 text-xs sm:text-sm shadow-xs transition active:scale-95 cursor-pointer"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      <span>Thử kết nối lại</span>
+                    </button>
+                  </div>
+                </div>
+              ) : matchingItems.length > 0 && activeFoundItem ? (
                 <div className="space-y-3">
                   {/* THANH DANH SÁCH TẤT CẢ CÁC MÃ TÌM THẤY (KHI TÌM ĐƯỢC NHIỀU MÃ) */}
                   {matchingItems.length > 1 && (
@@ -1238,6 +1327,7 @@ export default function Home() {
                 query={query}
                 totalWarehouses={totalWarehouses}
                 onSelect={setOpenWarehouse}
+                loading={isConnecting}
               />
             ) : (
               <WarehouseMapCanvas

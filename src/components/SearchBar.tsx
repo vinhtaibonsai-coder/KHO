@@ -1,7 +1,7 @@
 "use client";
 
 import React, { forwardRef, useState, useEffect } from "react";
-import { Search, X, Camera, History, Trash2, ArrowUpRight, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, X, Camera, History, Trash2, ArrowUpRight, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 
 const QUICK_FILTERS = [
   { label: "Tất cả", value: "" },
@@ -25,10 +25,22 @@ export interface SearchBarProps {
   autoFocus?: boolean;
   availableSkus?: string[];
   onScan?: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+  placeholder?: string;
 }
 
 const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBar(
-  { value, onChange, inputRef, autoFocus = false, onScan },
+  {
+    value,
+    onChange,
+    inputRef,
+    autoFocus = false,
+    onScan,
+    disabled = false,
+    loading = false,
+    placeholder,
+  },
   ref
 ) {
   const [history, setHistory] = useState<string[]>([]);
@@ -113,18 +125,31 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
     else if (inputRef) (inputRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
   };
 
+  const resolvedPlaceholder = placeholder
+    ? placeholder
+    : loading
+    ? "Đang kết nối database & tải dữ liệu kho..."
+    : disabled
+    ? "Chưa kết nối database..."
+    : "Tìm mã sản phẩm (E120.124, K100, PT395...)";
+
   return (
     <div className="relative w-full space-y-2.5">
       {/* Khung ô tìm kiếm */}
       <div className="relative w-full flex items-center">
         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 z-10">
-          <Search className="h-4 w-4 text-slate-400" />
+          {loading ? (
+            <Loader2 className="h-4 w-4 text-emerald-600 animate-spin" />
+          ) : (
+            <Search className={`h-4 w-4 ${disabled ? "text-slate-300" : "text-slate-400"}`} />
+          )}
         </div>
 
         <input
           id="main-search-input"
           ref={combinedRef}
-          autoFocus={autoFocus}
+          autoFocus={autoFocus && !disabled}
+          disabled={disabled}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value.toUpperCase())}
@@ -133,16 +158,22 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
               saveToHistory(value.trim());
             }
           }}
-          placeholder="Tìm mã sản phẩm (E120.124, K100, PT395...)"
+          placeholder={resolvedPlaceholder}
           aria-label="Tìm mã sản phẩm"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="characters"
-          className="w-full rounded-full border border-slate-200/90 bg-slate-100/80 hover:bg-slate-100 py-3 pr-10 pl-9 font-mono text-sm sm:text-base font-bold tracking-wide text-slate-900 uppercase transition placeholder:font-sans placeholder:text-xs sm:placeholder:text-sm placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/15 shadow-inner"
+          className={`w-full rounded-full border py-3 pr-10 pl-9 font-mono text-sm sm:text-base font-bold tracking-wide uppercase transition shadow-inner placeholder:font-sans placeholder:text-xs sm:placeholder:text-sm placeholder:font-normal ${
+            disabled
+              ? "border-slate-200 bg-slate-100/70 text-slate-400 cursor-not-allowed placeholder:text-slate-400"
+              : loading
+              ? "border-emerald-300 bg-emerald-50/40 text-slate-900 placeholder:text-emerald-700/70 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/15"
+              : "border-slate-200/90 bg-slate-100/80 hover:bg-slate-100 text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/15"
+          }`}
         />
 
-        {/* NÚT CAMERA QUÉT MÃ VẠCH (CHỈ MOBILE + KHI Ô TÌM KIẾM TRỐNG) */}
-        {onScan && !value && (
+        {/* NÚT CAMERA QUÉT MÃ VẠCH (CHỈ MOBILE + KHI Ô TÌM KIẾM TRỐNG VÀ KHÔNG BỊ KHÓA) */}
+        {onScan && !value && !disabled && (
           <button
             type="button"
             onClick={onScan}
@@ -155,7 +186,7 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
           </button>
         )}
 
-        {value && (
+        {value && !disabled && (
           <button
             type="button"
             onClick={() => onChange("")}
@@ -177,11 +208,14 @@ const SearchBar = forwardRef<HTMLInputElement, SearchBarProps>(function SearchBa
             <button
               key={f.label}
               type="button"
+              disabled={disabled || loading}
               onClick={() => onChange(f.value)}
-              className={`rounded-full px-3 py-1 text-xs font-mono font-bold whitespace-nowrap transition cursor-pointer shrink-0 border ${
-                isSelected
-                  ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs hover:bg-emerald-700"
-                  : "bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900 shadow-2xs"
+              className={`rounded-full px-3 py-1 text-xs font-mono font-bold whitespace-nowrap transition shrink-0 border ${
+                disabled || loading
+                  ? "opacity-50 cursor-not-allowed bg-white text-slate-400 border-slate-200"
+                  : isSelected
+                  ? "bg-emerald-600 text-white border-emerald-600 shadow-2xs hover:bg-emerald-700 cursor-pointer"
+                  : "bg-white text-slate-600 border-slate-200/90 hover:bg-slate-50 hover:text-slate-900 shadow-2xs cursor-pointer"
               }`}
             >
               {f.label}

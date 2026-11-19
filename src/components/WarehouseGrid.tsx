@@ -12,6 +12,7 @@ export default function WarehouseGrid({
   query = "",
   totalWarehouses = 30,
   onSelect,
+  loading = false,
 }: {
   items: Item[];
   highlight: number | null;
@@ -19,8 +20,37 @@ export default function WarehouseGrid({
   query?: string;
   totalWarehouses?: number;
   onSelect: (warehouse: number) => void;
+  loading?: boolean;
 }) {
   const cleanQuery = query.trim().toUpperCase();
+
+  if (loading && items.length === 0) {
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 animate-pulse">
+        {Array.from({ length: totalWarehouses }, (_, i) => i + 1).map((w) => (
+          <div
+            key={w}
+            className="flex flex-col justify-between rounded-xl border border-slate-200/90 bg-slate-50/80 p-3.5 min-h-[110px]"
+          >
+            <div className="flex items-center justify-between w-full">
+              <span className="font-mono text-sm font-extrabold text-slate-300">
+                Kho {pad(w)}
+              </span>
+              <span className="h-4 w-9 bg-slate-200 rounded" />
+            </div>
+            <div className="my-2 space-y-1.5">
+              <div className="h-3 w-16 bg-slate-200 rounded" />
+              <div className="h-3 w-12 bg-slate-200/70 rounded" />
+            </div>
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+              <span className="h-2.5 w-12 bg-slate-200 rounded" />
+              <span className="h-3 w-3 bg-slate-200 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6">
